@@ -218,7 +218,7 @@ def volume_analysis(df: pd.DataFrame) -> dict:
         "latest_volume": int(latest_vol) if pd.notna(latest_vol) else 0,
         "avg_volume_20d": int(avg_vol)   if pd.notna(avg_vol)    else 0,
         "ratio":  ratio,
-        "alert":  ratio >= 1.5,
+        "alert":  bool(ratio >= 1.5),
     }
 
 # ── 新聞 RSS ──────────────────────────────────────────────────────────────────
