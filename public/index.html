@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>台股監測儀表板 V3</title>
+<title>台股監測儀表板 V4</title>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -276,9 +276,9 @@ input[type=number]:focus{border-color:var(--accent)}
 
 <!-- ─── Header ─────────────────────────────────────────────────────────────── -->
 <header>
-  <div class="logo">台股<span>MONITOR</span><small>V3</small></div>
+  <div class="logo">台股<span>MONITOR</span><small>V4 即時版</small></div>
   <div class="hdr-right">
-    <span class="auto-badge" id="auto-badge">⟳ 自動刷新 30s</span>
+    <span class="auto-badge" id="auto-badge">⟳ 即時價自動刷新 30s</span>
     <span class="clock" id="clock"></span>
   </div>
 </header>
@@ -328,6 +328,7 @@ input[type=number]:focus{border-color:var(--accent)}
           <div class="price-big" id="d-close"></div>
           <div class="price-chg" id="d-chg"></div>
         </div>
+        <div id="rt-info" style="margin:4px 0 10px;font-family:var(--mono);font-size:11px;color:var(--muted)"></div>
         <div class="pmeta">
           <div><label>開盤</label><span id="d-open"></span></div>
           <div><label>最高</label><span id="d-high" class="up"></span></div>
@@ -529,7 +530,7 @@ input[type=number]:focus{border-color:var(--accent)}
     ⚠️ 本工具僅供技術分析參考，不構成任何投資建議。<br>
     股市有風險，投資人應自行判斷，買賣股票盈虧自負。<br>
     資料來源：FinMind API・TWSE Open API・Google News RSS（均為免費公開資料）<br>
-    台股監測儀表板 V3 | Firebase Hosting + Render
+    台股監測儀表板 V4 | Firebase Hosting + Render
   </div>
 
 </div><!-- /wrap -->
@@ -706,10 +707,11 @@ async function fetchWithTimeout(url, options={}, timeoutMs=25000){
 // ─── Render ───────────────────────────────────────────────────────────────
 function render(d){
   const p=d.price, ind=d.indicators, bt=d.backtest, sc=d.score, vol=d.volume;
+  const rt=d.realtime_quote || null;
 
   setTxt('d-id',   d.stock_id);
   setTxt('d-name', d.stock_name);
-  setTxt('d-date', '最新資料：'+d.last_date);
+  setTxt('d-date', '日線技術分析基準日：'+d.last_date);
 
   const ce = document.getElementById('d-conc');
   ce.textContent = d.conclusion;
@@ -719,7 +721,14 @@ function render(d){
   setTxt('d-chg', `${sign(p.change)}${f(p.change)} (${sign(p.change_pct)}${f(p.change_pct)}%)`);
   addCls('d-chg',cc(p.change));
   setTxt('d-open',f(p.open)); setTxt('d-high',f(p.high)); setTxt('d-low',f(p.low));
-  setTxt('d-vol', fvol(vol.latest_volume));
+  setTxt('d-vol', fvol((rt && rt.volume) ? rt.volume : vol.latest_volume));
+
+  const rtInfo = document.getElementById('rt-info');
+  if(rt && rt.price!=null){
+    rtInfo.innerHTML = `<span class="pill pill-ok">盤中/延遲報價：${rt.source || 'TWSE MIS'}｜${rt.market?.toUpperCase() || ''}｜更新：${rt.quote_time || 'N/A'}</span> <span style="margin-left:6px">日線收盤：${f(p.daily_close || p.close)}</span>`;
+  }else{
+    rtInfo.innerHTML = `<span class="pill pill-warn">休市或無即時成交，顯示日線收盤價</span> <span style="margin-left:6px">日線收盤：${f(p.daily_close || p.close)}</span>`;
+  }
 
   document.getElementById('vol-alert').innerHTML = vol.alert
     ? `<span class="pill pill-warn">⚠️ 成交量異常放大（${vol.ratio}x 均量）</span>`

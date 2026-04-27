@@ -1,6 +1,6 @@
 """
-台股監測後端 V3 - FastAPI
-新增：AI-like 策略評分引擎、LINE Messaging API 通知、進階回測
+台股監測後端 V4 - FastAPI
+新增：即時股價、AI-like 策略評分引擎、LINE Messaging API 通知、進階回測
 資料來源：FinMind API（免費）、TWSE Open API（免費）、Google News RSS
 """
 
@@ -16,7 +16,7 @@ import xml.etree.ElementTree as ET
 import re
 import asyncio
 
-app = FastAPI(title="台股監測 API", version="3.0.0")
+app = FastAPI(title="台股監測 API", version="4.0.0")
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
 _raw_origins = os.getenv(
@@ -54,6 +54,7 @@ FINMIND_BASE  = "https://api.finmindtrade.com/api/v4/data"
 TWSE_NAME_URL = "https://www.twse.com.tw/rwd/zh/api/basic"
 LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push"
 TIMEOUT = 25
+TWSE_MIS_URL = "https://mis.twse.com.tw/stock/api/getStockInfo.jsp"
 
 BULLISH_KEYWORDS = [
     "獲利", "營收成長", "突破", "漲停", "利多", "買超", "法人買", "創新高",
@@ -188,6 +189,95 @@ async def fetch_news(stock_id: str, stock_name: str = "") -> list:
         if n["title"] not in seen:
             seen.add(n["title"]); unique.append(n)
     return unique[:10]
+
+# ══════════════════════════════════════════════════════════════════════════════
+# V4 即時/盤中報價（TWSE MIS；上市 tse、上櫃 otc 依序嘗試）
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _num(v):
+    """把 TWSE MIS 的字串價格安全轉成 float。"""
+    if v is None:
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    s = str(v).strip().replace(',', '')
+    if not s or s in {'-', '--', '－', 'null', 'None'}:
+        return None
+    if '_' in s:
+        for part in s.split('_'):
+            n = _num(part)
+            if n is not None:
+                return n
+        return None
+    try:
+        return float(s)
+    except Exception:
+        return None
+
+def _int_num(v):
+    n = _num(v)
+    return int(n) if n is not None else 0
+
+def _quote_time(d, t):
+    d = (d or '').strip()
+    t = (t or '').strip()
+    if len(d) == 8 and d.isdigit():
+        return f"{d[:4]}-{d[4:6]}-{d[6:8]} {t}".strip()
+    return f"{d} {t}".strip() or None
+
+async def fetch_realtime_quote(stock_id: str) -> dict | None:
+    """
+    使用 TWSE MIS 抓盤中/延遲報價。
+    上市：tse_2330.tw；上櫃：otc_XXXX.tw。
+    若休市或無成交，可能回傳最後可用值或 price=None。
+    """
+    ts = int(datetime.now().timestamp() * 1000)
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://mis.twse.com.tw/stock/index.jsp",
+    }
+    async with httpx.AsyncClient(timeout=10, headers=headers, follow_redirects=True) as client:
+        for market in ("tse", "otc"):
+            params = {
+                "ex_ch": f"{market}_{stock_id}.tw",
+                "json": "1",
+                "delay": "0",
+                "_": str(ts),
+            }
+            try:
+                r = await client.get(TWSE_MIS_URL, params=params)
+                data = r.json()
+                arr = data.get("msgArray") or []
+                if not arr:
+                    continue
+                q = arr[0]
+                price = _num(q.get("z")) or _num(q.get("a")) or _num(q.get("b"))
+                prev = _num(q.get("y"))
+                open_ = _num(q.get("o"))
+                high = _num(q.get("h"))
+                low = _num(q.get("l"))
+                change = round(price - prev, 2) if price is not None and prev else None
+                change_pct = round(change / prev * 100, 2) if change is not None and prev else None
+                return {
+                    "stock_id": str(q.get("c") or stock_id),
+                    "stock_name": q.get("n") or stock_id,
+                    "market": market,
+                    "realtime": price is not None,
+                    "price": price,
+                    "open": open_,
+                    "high": high,
+                    "low": low,
+                    "previous_close": prev,
+                    "change": change,
+                    "change_pct": change_pct,
+                    "volume": _int_num(q.get("v")),
+                    "quote_time": _quote_time(q.get("d"), q.get("t")),
+                    "source": "TWSE MIS",
+                    "note": "盤中即時或延遲報價；若休市則可能顯示最後可用資料。",
+                }
+            except Exception:
+                continue
+    return None
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 技術指標
@@ -614,9 +704,14 @@ async def get_stock(stock_id: str):
         elif rsi_val < 30: rsi_alert = "⚠️ RSI 過冷（<30），可能出現反彈"
 
     news = await fetch_news(stock_id, stock_name)
+    realtime_quote = await fetch_realtime_quote(stock_id)
 
-    # AI 評分
-    current_price = float(latest["收盤價"])
+    # AI 評分：優先用即時價，若沒有即時價才用日線收盤價
+    current_price = (
+        float(realtime_quote["price"])
+        if realtime_quote and realtime_quote.get("price") is not None
+        else float(latest["收盤價"])
+    )
     ai_signal = compute_ai_signal(score_info, latest, vol_info, winrate, news, current_price)
 
     def f(v, d=2):
@@ -646,12 +741,15 @@ async def get_stock(stock_id: str):
         "stock_name":  stock_name,
         "last_date":   latest["日期"].strftime("%Y-%m-%d"),
         "price": {
-            "close":      f(latest["收盤價"]),
-            "open":       f(latest["開盤價"]),
-            "high":       f(latest["最高價"]),
-            "low":        f(latest["最低價"]),
-            "change":     round(change, 2),
-            "change_pct": change_pct,
+            # V4：畫面主價格優先顯示即時價；日線收盤保留在 daily_close
+            "close":       f(current_price),
+            "daily_close": f(latest["收盤價"]),
+            "open":        f(realtime_quote.get("open") if realtime_quote else latest["開盤價"]),
+            "high":        f(realtime_quote.get("high") if realtime_quote else latest["最高價"]),
+            "low":         f(realtime_quote.get("low")  if realtime_quote else latest["最低價"]),
+            "change":      f(realtime_quote.get("change"), 2) if realtime_quote and realtime_quote.get("change") is not None else round(change, 2),
+            "change_pct":  f(realtime_quote.get("change_pct"), 2) if realtime_quote and realtime_quote.get("change_pct") is not None else change_pct,
+            "mode":        "realtime" if realtime_quote and realtime_quote.get("price") is not None else "daily",
         },
         "indicators": {
             "ma5":    f(latest["MA5"]),
@@ -668,9 +766,20 @@ async def get_stock(stock_id: str):
         "conclusion": conclusion,
         "rsi_alert":  rsi_alert,
         "ai_signal":  ai_signal,
+        "realtime_quote": realtime_quote,
         "news":       news,
         "chart_data": chart_data,
     }
+
+
+@app.get("/api/realtime/{stock_id}")
+async def get_realtime(stock_id: str):
+    if not re.match(r"^\d{4,6}$", stock_id):
+        raise HTTPException(status_code=400, detail="股票代號格式錯誤，請輸入 4~6 位數字")
+    quote = await fetch_realtime_quote(stock_id)
+    if not quote:
+        raise HTTPException(status_code=404, detail="找不到即時報價；可能為休市、資料源暫時不可用或股票代號錯誤")
+    return quote
 
 # ══════════════════════════════════════════════════════════════════════════════
 # LINE 通知端點
@@ -715,7 +824,8 @@ async def check_alerts(body: WatchlistBody):
             winrate    = backtest_winrate(price_df)
             vol_info   = volume_analysis(price_df)
             news       = await fetch_news(stock_id, stock_name)
-            cur_price  = float(latest["收盤價"])
+            realtime   = await fetch_realtime_quote(stock_id)
+            cur_price  = float(realtime["price"]) if realtime and realtime.get("price") is not None else float(latest["收盤價"])
             ai         = compute_ai_signal(score_info, latest, vol_info, winrate, news, cur_price)
 
             results.append({
@@ -796,9 +906,10 @@ async def run_backtest(
 def health():
     return {
         "status":          "ok",
-        "version":         "3.0.0",
+        "version":         "4.0.0",
         "time":            datetime.now().isoformat(),
         "dev_mode":        DEV_MODE,
         "line_configured": bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
         "line_enabled":    ENABLE_LINE_ALERTS,
+        "realtime_source": "TWSE MIS",
     }
