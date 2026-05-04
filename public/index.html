@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>台股監測 V8.1 · 穩定版</title>
+<title>台股監測 V9 · AI 學習版</title>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -346,11 +346,25 @@ input[type=number]:focus{border-color:var(--accent)}
 .top-news-item:last-child{border-bottom:none}
 .tn-bull{color:var(--up)}.tn-bear{color:var(--down)}.tn-neu{color:var(--muted)}
 
+/* V9 AI 學習中心 */
+.learning-card{background:var(--panel2);border:1px solid rgba(167,139,250,.28);border-radius:var(--r);padding:16px;margin-bottom:18px;position:relative;overflow:hidden}
+.learning-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(167,139,250,.75),transparent)}
+.learning-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.learning-title{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--purple);letter-spacing:.1em;text-transform:uppercase}
+.weight-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}
+.weight-item{background:rgba(26,40,64,.45);border:1px solid var(--border);border-radius:9px;padding:10px}
+.weight-label{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:5px}
+.weight-value{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--text)}
+.weight-bar{height:4px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:7px}.weight-fill{height:100%;background:linear-gradient(90deg,var(--purple),var(--accent));border-radius:3px}
+.learning-stats{display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;color:var(--muted);margin:10px 0}.learning-stats b{color:var(--text)}
+.learning-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.learning-log{display:none;margin-top:10px;background:rgba(26,40,64,.45);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:var(--mono);font-size:12px;color:var(--muted);max-height:220px;overflow:auto;white-space:pre-wrap}
+@media(max-width:768px){.weight-grid{grid-template-columns:repeat(2,1fr)}.learning-actions .btn{width:100%;justify-content:center}}
+
 </style>
 </head>
 <body>
 <header>
-  <div class="logo"><div class="logo-dot"></div>台股<span>MONITOR</span><small>V8.1</small></div>
+  <div class="logo"><div class="logo-dot"></div>台股<span>MONITOR</span><small>V9</small></div>
   <div class="hdr-right"><span class="clock" id="clock"></span></div>
 </header>
 <div class="wrap">
@@ -404,6 +418,20 @@ input[type=number]:focus{border-color:var(--accent)}
 .top-news-item:last-child{border-bottom:none}
 .tn-bull{color:var(--up)}.tn-bear{color:var(--down)}.tn-neu{color:var(--muted)}
 
+/* V9 AI 學習中心 */
+.learning-card{background:var(--panel2);border:1px solid rgba(167,139,250,.28);border-radius:var(--r);padding:16px;margin-bottom:18px;position:relative;overflow:hidden}
+.learning-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(167,139,250,.75),transparent)}
+.learning-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.learning-title{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--purple);letter-spacing:.1em;text-transform:uppercase}
+.weight-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}
+.weight-item{background:rgba(26,40,64,.45);border:1px solid var(--border);border-radius:9px;padding:10px}
+.weight-label{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:5px}
+.weight-value{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--text)}
+.weight-bar{height:4px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:7px}.weight-fill{height:100%;background:linear-gradient(90deg,var(--purple),var(--accent));border-radius:3px}
+.learning-stats{display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;color:var(--muted);margin:10px 0}.learning-stats b{color:var(--text)}
+.learning-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.learning-log{display:none;margin-top:10px;background:rgba(26,40,64,.45);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:var(--mono);font-size:12px;color:var(--muted);max-height:220px;overflow:auto;white-space:pre-wrap}
+@media(max-width:768px){.weight-grid{grid-template-columns:repeat(2,1fr)}.learning-actions .btn{width:100%;justify-content:center}}
+
 </style>
 <div class="search-section">
     <div class="search-wrapper"><input type="text" id="inp" placeholder="輸入股票代號或名稱，例如 2330" maxlength="10"><div class="suggest-box" id="search-suggest" style="display:none"></div></div>
@@ -448,6 +476,36 @@ input[type=number]:focus{border-color:var(--accent)}
     </div>
     <div class="auto-last" id="auto-last-r"></div>
     <div class="auto-note">⚠️ 需保持網頁開啟。24 小時監控建議改用 GitHub Actions / Cloud Scheduler。<br>每 5 分鐘自動掃描，條件達成發 LINE 推播（同股 30 分鐘冷卻）。</div>
+  </div>
+
+
+
+  <!-- V9 AI 學習中心 -->
+  <div class="learning-card">
+    <div class="learning-head">
+      <div class="learning-title">🧠 AI 學習中心</div>
+      <span style="font-family:var(--mono);font-size:11px;color:var(--muted)" id="learn-updated">權重載入中…</span>
+    </div>
+    <div class="weight-grid">
+      <div class="weight-item"><div class="weight-label">技術面</div><div class="weight-value" id="w-technical">—</div><div class="weight-bar"><div class="weight-fill" id="wb-technical" style="width:0%"></div></div></div>
+      <div class="weight-item"><div class="weight-label">基本面</div><div class="weight-value" id="w-fundamental">—</div><div class="weight-bar"><div class="weight-fill" id="wb-fundamental" style="width:0%"></div></div></div>
+      <div class="weight-item"><div class="weight-label">籌碼面</div><div class="weight-value" id="w-chip">—</div><div class="weight-bar"><div class="weight-fill" id="wb-chip" style="width:0%"></div></div></div>
+      <div class="weight-item"><div class="weight-label">消息面</div><div class="weight-value" id="w-news">—</div><div class="weight-bar"><div class="weight-fill" id="wb-news" style="width:0%"></div></div></div>
+    </div>
+    <div class="learning-stats">
+      <span>📚 樣本：<b id="learn-total">—</b></span>
+      <span>✅ 已評估：<b id="learn-evaluated">—</b></span>
+      <span>⏳ 待評估：<b id="learn-pending">—</b></span>
+      <span>🏆 近30勝率：<b id="learn-winrate">—</b></span>
+    </div>
+    <div class="learning-actions">
+      <button class="btn sm ghost" onclick="loadLearningCenter()">↻ 更新權重</button>
+      <button class="btn sm ghost" id="learn-eval-btn" onclick="evaluateSignals()">📊 評估歷史訊號</button>
+      <button class="btn sm green" id="learn-train-btn" onclick="retrainWeights()">🧠 重新訓練權重</button>
+      <button class="btn sm ghost" onclick="showLearningHistory()">🧾 查看最近訊號</button>
+    </div>
+    <div class="auto-note">AI 會記錄 BUY / WATCH 訊號，5 天後檢查實際表現；樣本達 30 筆後，才會小幅調整四面向權重，避免亂學。</div>
+    <div class="learning-log" id="learning-log"></div>
   </div>
 
   <!-- Error / Loading -->
@@ -1306,11 +1364,64 @@ function showErr(m){const el=document.getElementById('err');el.textContent='❌ 
 function hideErr(){document.getElementById('err').style.display='none'}
 inp?.addEventListener('keydown',e=>{if(e.key==='Enter')doSearch()});
 
+
+/* V9 AI Learning Center */
+function pctWeight(v){return Math.round((Number(v)||0)*100)+'%'}
+function setWeightUI(key,val){
+  const pct=Math.round((Number(val)||0)*100);
+  setTxt('w-'+key,pct+'%');
+  const bar=document.getElementById('wb-'+key); if(bar)bar.style.width=pct+'%';
+}
+function showLearningLog(text){
+  const el=document.getElementById('learning-log'); if(!el)return;
+  el.style.display='block'; el.textContent=text;
+}
+async function loadLearningCenter(){
+  try{
+    const res=await apiFetch(`${API_BASE_URL}/api/learning/weights`,{},30000);
+    const d=await res.json(); if(!res.ok)throw new Error(d.detail||'讀取學習資料失敗');
+    const w=d.weights||{}, st=d.stats||{};
+    setWeightUI('technical',w.technical); setWeightUI('fundamental',w.fundamental); setWeightUI('chip',w.chip); setWeightUI('news',w.news);
+    setTxt('learn-total',st.total??0); setTxt('learn-evaluated',st.evaluated??0); setTxt('learn-pending',st.pending??0); setTxt('learn-winrate',(st.winrate_30??0)+'%');
+    setTxt('learn-updated',w.updated_at?('最後更新：'+new Date(w.updated_at).toLocaleString()):'使用預設權重');
+  }catch(e){setTxt('learn-updated','學習資料讀取失敗')}
+}
+async function evaluateSignals(){
+  const btn=document.getElementById('learn-eval-btn'); if(btn)btn.disabled=true;
+  showLearningLog('評估中，請稍候…');
+  try{
+    const res=await apiFetch(`${API_BASE_URL}/api/learning/evaluate`,{},120000);
+    const d=await res.json(); if(!res.ok)throw new Error(d.detail||'評估失敗');
+    showLearningLog(`評估完成：新增評估 ${d.updated||0} 筆\n樣本：${d.stats?.total||0}｜已評估：${d.stats?.evaluated||0}｜近30勝率：${d.stats?.winrate_30||0}%`);
+    await loadLearningCenter();
+  }catch(e){showLearningLog('評估失敗：'+e.message)}finally{if(btn)btn.disabled=false;}
+}
+async function retrainWeights(){
+  const btn=document.getElementById('learn-train-btn'); if(btn)btn.disabled=true;
+  showLearningLog('訓練中，請稍候…');
+  try{
+    const res=await apiFetch(`${API_BASE_URL}/api/learning/retrain`,{method:'POST'},60000);
+    const d=await res.json(); if(!res.ok)throw new Error(d.detail||'訓練失敗');
+    if(!d.updated){showLearningLog(`暫不調整：${d.message||'樣本不足'}\n目前樣本：${d.sample_count||0}`)}
+    else{showLearningLog(`權重已更新\n原因：${(d.reasons||[]).join('\n')||'—'}\n新權重：${JSON.stringify(d.new_weights,null,2)}`)}
+    await loadLearningCenter();
+  }catch(e){showLearningLog('訓練失敗：'+e.message)}finally{if(btn)btn.disabled=false;}
+}
+async function showLearningHistory(){
+  showLearningLog('讀取最近訊號中…');
+  try{
+    const res=await apiFetch(`${API_BASE_URL}/api/learning/history?limit=30`,{},30000);
+    const d=await res.json(); if(!res.ok)throw new Error(d.detail||'讀取失敗');
+    const lines=(d.signals||[]).map(x=>`${(x.created_at||'').slice(0,16)}  ${x.stock_name||x.stock_id}(${x.stock_id})  ${x.signal} ${x.confidence}/100  ${x.evaluated?'已評估 '+(x.result?.success?'✅':'❌'):'待評估'}`);
+    showLearningLog(lines.join('\n')||'尚無訊號紀錄');
+  }catch(e){showLearningLog('讀取失敗：'+e.message)}
+}
+
 /* Init */
 (async function init(){
   await loadStockMaster();
   await loadWatchlistFromServer();
-  renderWLGrid();refreshAllWL();startWLTimer();checkLineStatus();
+  renderWLGrid();refreshAllWL();startWLTimer();checkLineStatus();loadLearningCenter();
   loadAutoState();updateAutoUI();if(autoEnabled)startAutoTimer();
 })();
 

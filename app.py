@@ -47,6 +47,8 @@ ALERT_COOLDOWN_MINUTES = 30
 BASE_DIR          = Path(__file__).parent
 WATCHLIST_FILE    = BASE_DIR/"watchlist.json"
 STOCK_MASTER_FILE = BASE_DIR/"stock_master.json"
+WEIGHTS_FILE      = BASE_DIR/"weights.json"
+SIGNAL_HISTORY_FILE = BASE_DIR/"signal_history.json"
 
 FINMIND_BASE  = "https://api.finmindtrade.com/api/v4/data"
 TWSE_NAME_URL = "https://www.twse.com.tw/rwd/zh/api/basic"
@@ -92,6 +94,232 @@ STOCK_NAME_MAP: dict[str,str] = {
     "2301":"光寶科","2323":"中環","2345":"智邦","2353":"宏碁","3005":"神基",
     "4904":"遠傳","5841":"合作金庫",
 }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# V9 AI 權重自我學習系統
+# ══════════════════════════════════════════════════════════════════════════════
+DEFAULT_WEIGHTS = {
+    "technical": 0.35,
+    "fundamental": 0.25,
+    "chip": 0.25,
+    "news": 0.15,
+    "risk": 0.10,
+    "macro": 0.05,
+    "updated_at": "",
+    "version": "9.0.0",
+    "last_reason": "預設權重",
+}
+
+WEIGHT_LIMITS = {
+    "technical": (0.20, 0.45),
+    "fundamental": (0.10, 0.35),
+    "chip": (0.10, 0.40),
+    "news": (0.05, 0.25),
+}
+
+
+def _read_json_file(path: Path, default):
+    try:
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return default
+
+
+def _write_json_file(path: Path, data):
+    try:
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _normalize_weights(w: dict) -> dict:
+    base = DEFAULT_WEIGHTS.copy()
+    base.update({k: float(v) for k, v in (w or {}).items() if k in DEFAULT_WEIGHTS and isinstance(v, (int, float))})
+    for k, (lo, hi) in WEIGHT_LIMITS.items():
+        base[k] = max(lo, min(hi, float(base.get(k, DEFAULT_WEIGHTS[k]))))
+    total = sum(base[k] for k in ["technical", "fundamental", "chip", "news"])
+    if total <= 0:
+        for k in ["technical", "fundamental", "chip", "news"]:
+            base[k] = DEFAULT_WEIGHTS[k]
+        total = 1.0
+    for k in ["technical", "fundamental", "chip", "news"]:
+        base[k] = round(base[k] / total, 4)
+    base["risk"] = float(base.get("risk", DEFAULT_WEIGHTS["risk"]))
+    base["macro"] = float(base.get("macro", DEFAULT_WEIGHTS["macro"]))
+    base["updated_at"] = base.get("updated_at") or ""
+    return base
+
+
+def load_ai_weights() -> dict:
+    return _normalize_weights(_read_json_file(WEIGHTS_FILE, DEFAULT_WEIGHTS.copy()))
+
+
+def save_ai_weights(weights: dict):
+    weights = _normalize_weights(weights)
+    weights["updated_at"] = datetime.now().isoformat()
+    _write_json_file(WEIGHTS_FILE, weights)
+    return weights
+
+
+def load_signal_history() -> list:
+    data = _read_json_file(SIGNAL_HISTORY_FILE, {"signals": []})
+    if isinstance(data, list):
+        return data
+    return data.get("signals", []) if isinstance(data, dict) else []
+
+
+def save_signal_history(history: list):
+    _write_json_file(SIGNAL_HISTORY_FILE, {"updated_at": datetime.now().isoformat(), "signals": history[-2000:]})
+
+
+def _a4_scores_for_learning(analysis_4d: dict | None) -> dict:
+    analysis_4d = analysis_4d or {}
+    return {
+        "technical": analysis_4d.get("technical", {}).get("score"),
+        "fundamental": analysis_4d.get("fundamental", {}).get("score"),
+        "chip": analysis_4d.get("chip", {}).get("score"),
+        "news": analysis_4d.get("news", {}).get("score"),
+    }
+
+
+def record_ai_signal(stock_id: str, stock_name: str, ai: dict, analysis_4d: dict | None = None, source: str = "stock"):
+    """記錄 BUY / WATCH 訊號供日後學習；同股同日同訊號只記一次。"""
+    try:
+        signal = ai.get("signal")
+        confidence = ai.get("confidence", 0) or 0
+        if signal not in {"BUY", "WATCH"} or confidence < 55:
+            return
+        today = datetime.now().strftime("%Y-%m-%d")
+        history = load_signal_history()
+        if any(x.get("stock_id") == stock_id and str(x.get("created_at", "")).startswith(today) and x.get("signal") == signal for x in history):
+            return
+        item = {
+            "id": f"{stock_id}_{datetime.now().isoformat(timespec='seconds')}",
+            "stock_id": stock_id,
+            "stock_name": stock_name,
+            "created_at": datetime.now().isoformat(),
+            "source": source,
+            "signal": signal,
+            "confidence": confidence,
+            "entry_price": ai.get("entry_price"),
+            "target_price": ai.get("target_price"),
+            "stop_loss": ai.get("stop_loss"),
+            "holding_days": ai.get("holding_days"),
+            "scores": _a4_scores_for_learning(analysis_4d),
+            "weights_at_time": {k: load_ai_weights()[k] for k in ["technical", "fundamental", "chip", "news"]},
+            "evaluated": False,
+            "result": None,
+        }
+        history.append(item)
+        save_signal_history(history)
+    except Exception:
+        pass
+
+
+def _learning_stats(history: list) -> dict:
+    evaluated = [x for x in history if x.get("evaluated") and x.get("result")]
+    last30 = evaluated[-30:]
+    winrate30 = round(sum(1 for x in last30 if x.get("result", {}).get("success")) / len(last30) * 100, 1) if last30 else 0
+    return {"total": len(history), "evaluated": len(evaluated), "pending": len(history) - len(evaluated), "winrate_30": winrate30}
+
+
+async def evaluate_signal_history() -> dict:
+    history = load_signal_history()
+    updated = 0
+    errors = []
+    now = datetime.now()
+    for item in history:
+        if item.get("evaluated"):
+            continue
+        try:
+            created = datetime.fromisoformat(str(item.get("created_at")).replace("Z", ""))
+        except Exception:
+            continue
+        if (now - created).days < 5:
+            continue
+        stock_id = item.get("stock_id")
+        entry = item.get("entry_price") or 0
+        if not stock_id or not entry:
+            continue
+        try:
+            df, _ = await fetch_price_with_fallback(stock_id, lookback_days=40)
+            if df.empty:
+                continue
+            df = df[df["日期"] >= pd.to_datetime(created.date())].head(10)
+            if df.empty:
+                continue
+            closes = pd.to_numeric(df["收盤價"], errors="coerce").dropna()
+            highs = pd.to_numeric(df.get("最高價", df["收盤價"]), errors="coerce").dropna()
+            lows = pd.to_numeric(df.get("最低價", df["收盤價"]), errors="coerce").dropna()
+            if closes.empty:
+                continue
+            max_return = round((highs.max() - entry) / entry * 100, 2) if not highs.empty else 0
+            min_return = round((lows.min() - entry) / entry * 100, 2) if not lows.empty else 0
+            final_return = round((closes.iloc[-1] - entry) / entry * 100, 2)
+            target = item.get("target_price")
+            stop = item.get("stop_loss")
+            hit_target = bool(target and not highs.empty and highs.max() >= target)
+            hit_stop = bool(stop and not lows.empty and lows.min() <= stop)
+            if item.get("signal") == "BUY":
+                success = (hit_target or final_return > 2) and not hit_stop
+            else:
+                success = final_return > 0
+            item["evaluated"] = True
+            item["evaluated_at"] = now.isoformat()
+            item["result"] = {
+                "max_return_pct": max_return,
+                "min_return_pct": min_return,
+                "final_return_pct": final_return,
+                "hit_target": hit_target,
+                "hit_stop": hit_stop,
+                "success": success,
+            }
+            updated += 1
+        except Exception as e:
+            errors.append({"stock_id": stock_id, "error": str(e)})
+    save_signal_history(history)
+    return {"updated": updated, "errors": errors[:20], "stats": _learning_stats(history)}
+
+
+def retrain_ai_weights() -> dict:
+    history = load_signal_history()
+    evaluated = [x for x in history if x.get("evaluated") and x.get("result")]
+    if len(evaluated) < 30:
+        return {"updated": False, "message": "樣本不足，至少需要 30 筆已評估訊號", "sample_count": len(evaluated), "weights": load_ai_weights()}
+    success = [x for x in evaluated if x.get("result", {}).get("success")]
+    fail = [x for x in evaluated if not x.get("result", {}).get("success")]
+    if not success or not fail:
+        return {"updated": False, "message": "成功或失敗樣本不足，暫不調整", "sample_count": len(evaluated), "weights": load_ai_weights()}
+    weights = load_ai_weights()
+    old = {k: weights[k] for k in ["technical", "fundamental", "chip", "news"]}
+    deltas = {k: 0.0 for k in old}
+    reasons = []
+    for k in old:
+        sv = [x.get("scores", {}).get(k) for x in success if x.get("scores", {}).get(k) is not None]
+        fv = [x.get("scores", {}).get(k) for x in fail if x.get("scores", {}).get(k) is not None]
+        if len(sv) < 5 or len(fv) < 5:
+            continue
+        s_avg = sum(sv) / len(sv)
+        f_avg = sum(fv) / len(fv)
+        diff = s_avg - f_avg
+        if diff >= 5:
+            deltas[k] = 0.02
+            reasons.append(f"{k} 成功樣本平均高出 {diff:.1f}，權重 +2%")
+        elif diff <= -5:
+            deltas[k] = -0.02
+            reasons.append(f"{k} 失敗樣本平均較高 {abs(diff):.1f}，權重 -2%")
+    if not any(deltas.values()):
+        return {"updated": False, "message": "本次樣本沒有明顯權重調整訊號", "sample_count": len(evaluated), "weights": weights}
+    for k, d in deltas.items():
+        lo, hi = WEIGHT_LIMITS[k]
+        weights[k] = max(lo, min(hi, weights[k] + d))
+    weights["last_reason"] = "；".join(reasons)
+    weights = save_ai_weights(weights)
+    return {"updated": True, "sample_count": len(evaluated), "old_weights": old, "new_weights": {k: weights[k] for k in old}, "deltas": deltas, "reasons": reasons, "weights": weights}
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 全市場股票主檔
@@ -849,24 +1077,22 @@ def analyze_news_4d(news:list)->dict:
 
 # ── 總分 overall ──────────────────────────────────────────────────────────────
 def compute_overall_4d(fundamental:dict,technical:dict,chip:dict,news:dict)->dict:
-    # 加權：基本面25%、技術面35%、籌碼面25%、消息面15%
-    weights={"fundamental":0.25,"technical":0.35,"chip":0.25,"news":0.15}
+    # V9：權重改由 weights.json 控制，若某面向資料不足則自動重新分配權重
+    weights = load_ai_weights()
     scores={"fundamental":fundamental.get("score"),
             "technical":technical.get("score"),
             "chip":chip.get("score"),
             "news":news.get("score")}
 
-    # 有效分項加權
     valid=[(k,v,weights[k]) for k,v in scores.items() if v is not None]
     if not valid:
         return {"overall_score":None,"rating":"資料不足","summary":"各面向資料均不足，無法評估。",
-                "weights":weights,"scores":scores}
+                "weights":{k:weights[k] for k in ["fundamental","technical","chip","news"]},"scores":scores}
 
     total_w=sum(w for _,_,w in valid)
     weighted=sum(v*w for _,v,w in valid)
     overall_score=round(weighted/total_w,1)
 
-    # 摘要
     parts=[]
     for k,v,_ in [("fundamental",fundamental,None),("technical",technical,None),
                    ("chip",chip,None),("news",news,None)]:
@@ -883,7 +1109,8 @@ def compute_overall_4d(fundamental:dict,technical:dict,chip:dict,news:dict)->dic
     summary="，".join(parts)+"。"+action_map.get(rating,"")
 
     return {"overall_score":overall_score,"rating":rating,"summary":summary,
-            "weights":weights,"scores":scores}
+            "weights":{k:weights[k] for k in ["fundamental","technical","chip","news"]},"scores":scores,
+            "learning_enabled": True}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 建議入場價
@@ -1172,6 +1399,7 @@ async def _analyze_stock(stock_id:str,macro:dict,lookback_days:int=400,with_4d:b
     analysis_4d={"fundamental":fund_4d,"technical":tech_4d,"chip":chip_4d,"news":news_4d,"overall":overall_4d}
 
     ai=compute_ai_signal(score_info,latest,vol_info,winrate,news,cur_price,macro,analysis_4d)
+    record_ai_signal(stock_id, stock_name, ai, analysis_4d, source="stock")
 
     chart_data=[]
     for _,row in price_df.tail(60).iterrows():
@@ -1368,6 +1596,7 @@ async def _analyze_stock_lite(stock_id: str, macro: dict | None = None) -> dict:
             wr_info  = backtest_winrate(price_df)
             ai       = compute_ai_signal_lite(latest, wr_info, cur_price, macro)
 
+        record_ai_signal(stock_id, stock_name, ai, None, source="stock-lite")
         return {
             "stock_id":       stock_id,
             "stock_name":     stock_name,
@@ -1380,6 +1609,7 @@ async def _analyze_stock_lite(stock_id: str, macro: dict | None = None) -> dict:
             "lite":           True,
         }
     except Exception as e:
+        record_ai_signal(stock_id, stock_name, ai, None, source="stock-lite")
         return {
             "stock_id":       stock_id,
             "stock_name":     stock_name,
@@ -1560,11 +1790,30 @@ async def run_backtest(stock_id:str,lookback_days:int=400,holding_days:int=5,min
             "params":{"lookback_days":lookback_days,"holding_days":holding_days,"min_score":min_score},
             "result":{k:v for k,v in result.items() if k!="trades"},"trades":result["trades"]}
 
+
+@app.get("/api/learning/weights")
+def api_learning_weights():
+    history = load_signal_history()
+    return {"weights": load_ai_weights(), "stats": _learning_stats(history), "recent": history[-10:]}
+
+@app.get("/api/learning/history")
+def api_learning_history(limit:int=Query(100,ge=1,le=500)):
+    history = load_signal_history()
+    return {"count": len(history), "signals": list(reversed(history))[:limit]}
+
+@app.get("/api/learning/evaluate")
+async def api_learning_evaluate():
+    return await evaluate_signal_history()
+
+@app.post("/api/learning/retrain")
+def api_learning_retrain():
+    return retrain_ai_weights()
+
 @app.get("/health")
 def health():
-    return {"status":"ok","version":"8.1.0","time":datetime.now().isoformat(),
+    return {"status":"ok","version":"9.0.0","time":datetime.now().isoformat(),
             "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
             "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
             "price_sources":"FinMind → Yahoo Finance → TWSE Official",
             "stock_master_count":len(STOCK_MASTER),"stock_master_updated":_master_updated_at,
-            "features":["4D analysis","chip data","fundamental data","bollinger bands","ATR","stock-lite API"]}
+            "features":["4D analysis","chip data","fundamental data","bollinger bands","ATR","stock-lite API","AI learning weights","signal history"]}
