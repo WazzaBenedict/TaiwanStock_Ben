@@ -1196,7 +1196,99 @@ function startMainRefresh(){
   const fill=document.getElementById('refresh-fill');fill.style.width='100%';
   mainTimer=setInterval(()=>{mainElapsed++;fill.style.width=Math.max(0,100-(mainElapsed/30*100))+'%';if(mainElapsed>=30){mainElapsed=0;fill.style.width='100%';if(currentStockId)silentRefresh()}},1000);
 }
-async function silentRefresh(){if(!currentStockId)return;try{const res=await apiFetch(`${API_BASE_URL}/api/stock/${currentStockId}`);if(res.ok)render(await res.json())}catch(e){}}
+async function silentRefresh(){
+  if(!currentStockId)return;
+  try{
+    const res=await apiFetch(`${API_BASE_URL}/api/stock-lite/${currentStockId}`,{},15000);
+    if(res.ok){
+      const lite=await res.json();
+      render(normalizeLiteData(lite));
+    }
+  }catch(e){}
+}
+
+function normalizeLiteData(lite){
+  const rt=lite.realtime_quote||{};
+  const ai=lite.ai_signal||{};
+  const price=lite.price??rt.price??null;
+  const change=lite.change??rt.change??0;
+  const changePct=lite.change_pct??rt.change_pct??0;
+  const stockId=lite.stock_id||currentStockId||'';
+  const stockName=lite.stock_name||stockId;
+  return {
+    stock_id: stockId,
+    stock_name: stockName,
+    last_date: rt.quote_time || new Date().toLocaleString('zh-TW'),
+    data_source: lite.data_source || rt.source || 'stock-lite',
+    data_warning: '已先顯示即時報價，完整四面向分析背景載入中…',
+    price: {
+      close: price,
+      daily_close: price,
+      open: rt.open ?? price,
+      high: rt.high ?? price,
+      low: rt.low ?? price,
+      change: change,
+      change_pct: changePct,
+      mode: rt.realtime ? 'realtime' : 'lite'
+    },
+    realtime_quote: rt.price!=null ? rt : {
+      stock_id: stockId,
+      stock_name: stockName,
+      price: price,
+      change: change,
+      change_pct: changePct,
+      source: lite.data_source || 'stock-lite'
+    },
+    indicators: {},
+    backtest: {},
+    score: {score: 0, max: 5, reasons: ['完整技術分析背景載入中']},
+    volume: {latest_volume: rt.volume || 0, avg_volume_20d: 0, ratio: 1, alert: false},
+    conclusion: ai.signal === 'BUY' ? '短線偏多' : ai.signal === 'AVOID' ? '條件不足' : '觀望',
+    rsi_alert: null,
+    ai_signal: ai,
+    news: [],
+    chart_data: [],
+    analysis_4d: makePending4D('完整分析載入中…'),
+    lite: true
+  };
+}
+
+function makePending4D(msg){
+  const block={score:null,rating:'資料不足',reasons:[msg],risks:[]};
+  return {
+    fundamental:{...block},
+    technical:{...block},
+    chip:{...block},
+    news:{...block},
+    overall:{overall_score:null,rating:'載入中',summary:msg}
+  };
+}
+
+function showFullAnalysisSlow(msg='完整分析載入較慢，請稍後重試'){
+  try{
+    render4D(makePending4D(msg));
+    const dw=document.getElementById('data-warning'),dwt=document.getElementById('data-warning-txt');
+    if(dw&&dwt){dwt.textContent='完整分析載入較慢，但即時報價已顯示。';dw.style.display='block'}
+  }catch(e){}
+}
+
+async function loadFullAnalysisInBackground(id){
+  try{
+    const res=await apiFetch(`${API_BASE_URL}/api/stock/${id}`,{},90000);
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const full=await res.json();
+    if(currentStockId===id){
+      render(full);
+      const rt=full.realtime_quote||{},dp=full.price||{},ai=full.ai_signal||{};
+      WL_CACHE[id]={name:full.stock_name||id,price:rt.price??dp.close??null,changePct:rt.change_pct??dp.change_pct??null,signal:ai.signal||null,confidence:ai.confidence??null,riskLevel:ai.risk_model?.risk_level||null,entryPrice:ai.entry_price??null,error:false};
+      const item=WL_LIST.find(x=>x.stock_id===id);
+      if(item&&full.stock_name&&full.stock_name!==id)item.stock_name=full.stock_name;
+      renderWLGrid();
+    }
+  }catch(e){
+    if(currentStockId===id) showFullAnalysisSlow('完整分析載入較慢，請稍後重試');
+  }
+}
 
 async function doSearch(){
   const id=inp?.value?.trim()||'';
@@ -1206,19 +1298,39 @@ async function doSearch(){
   currentStockId=id;document.getElementById('bt-id').value=id;
   setLoad(true);hideErr();document.getElementById('dash').style.display='none';
   document.getElementById('data-warning').style.display='none';
-  clearTimeout(loadTid);loadTid=setTimeout(()=>{document.getElementById('loading-msg').textContent='⏳ Render 免費方案可能正在喚醒（約 30 秒）…'},10000);
+  clearTimeout(loadTid);loadTid=setTimeout(()=>{document.getElementById('loading-msg').textContent='⏳ 後端喚醒中，先載入即時報價…'},8000);
   try{
-    const res=await apiFetch(`${API_BASE_URL}/api/stock/${id}`,{},36000);
+    const res=await apiFetch(`${API_BASE_URL}/api/stock-lite/${id}`,{},15000);
     clearTimeout(loadTid);
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.detail||`HTTP ${res.status}`)}
-    const data=await res.json();render(data);checkLineStatus();startMainRefresh();
-    const rt=data.realtime_quote||{},dp=data.price||{},ai=data.ai_signal||{};
-    WL_CACHE[id]={name:data.stock_name||id,price:rt.price??dp.close??null,changePct:rt.change_pct??dp.change_pct??null,signal:ai.signal||null,confidence:ai.confidence??null,riskLevel:ai.risk_model?.risk_level||null,entryPrice:ai.entry_price??null,error:false};
+    const lite=await res.json();
+    const data=normalizeLiteData(lite);
+    render(data);
+    checkLineStatus();
+    startMainRefresh();
+    const rt=lite.realtime_quote||{},ai=lite.ai_signal||{};
+    WL_CACHE[id]={
+      name:lite.stock_name||id,
+      price:lite.price??rt.price??null,
+      changePct:lite.change_pct??rt.change_pct??null,
+      signal:ai.signal||null,
+      confidence:ai.confidence??null,
+      riskLevel:ai.risk_model?.risk_level||null,
+      entryPrice:ai.entry_price??null,
+      error:false
+    };
     const item=WL_LIST.find(x=>x.stock_id===id);
-    if(item&&data.stock_name&&data.stock_name!==id)item.stock_name=data.stock_name;
+    if(item&&lite.stock_name&&lite.stock_name!==id)item.stock_name=lite.stock_name;
     renderWLGrid();
-  }catch(e){clearTimeout(loadTid);let msg=e.message||'網路錯誤';if(e.name==='TimeoutError')msg=e.message;showErr('查詢失敗：'+msg)}
-  finally{setLoad(false)}
+    setLoad(false);
+    loadFullAnalysisInBackground(id);
+  }catch(e){
+    clearTimeout(loadTid);
+    let msg=e.message||'網路錯誤';
+    if(e.name==='TimeoutError')msg='即時報價載入逾時，可能是 Render 免費服務喚醒中，請稍後再試。';
+    showErr('查詢失敗：'+msg);
+    setLoad(false);
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════
