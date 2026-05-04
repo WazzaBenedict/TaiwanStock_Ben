@@ -1,5 +1,5 @@
 """
-台股監測後端 V8 - 四面向分析版
+台股監測後端 V8.1 - 穩定版（輕量自選股 API）
 新增：四面向分析 analysis_4d（基本面/技術面/籌碼面/消息面/總分）
      布林通道、ATR、支撐壓力、籌碼面資料（TWSE 三大法人、融資融券）
      AI 訊號整合 analysis_4d 加減分
@@ -18,7 +18,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="台股監測 API V8", version="8.0.0")
+app = FastAPI(title="台股監測 API V8.1", version="8.1.0")
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
 _raw_origins = os.getenv(
@@ -1208,6 +1208,192 @@ async def _analyze_stock(stock_id:str,macro:dict,lookback_days:int=400,with_4d:b
 # ══════════════════════════════════════════════════════════════════════════════
 # 啟動事件
 # ══════════════════════════════════════════════════════════════════════════════
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ★ 輕量 AI 訊號（僅用技術指標，不跑 4D 分析）供 stock-lite 使用
+# ══════════════════════════════════════════════════════════════════════════════
+
+def compute_ai_signal_lite(
+    row: pd.Series,
+    winrate_info: dict,
+    current_price: float,
+    macro: dict | None = None,
+) -> dict:
+    """
+    輕量版 AI 訊號：只用 MA/RSI/MACD + 簡易 winrate，不跑四面向、不跑新聞。
+    永遠不拋例外，一定回傳完整 dict。
+    """
+    try:
+        def _g(col): return float(row[col]) if col in row.index and pd.notna(row.get(col)) else None
+        rsi_val  = _g("RSI");  ma5_val  = _g("MA5");  ma20_val = _g("MA20")
+        ma60_val = _g("MA60"); macd_val = _g("MACD"); sig_val  = _g("Signal"); hist_val = _g("Hist")
+        wr       = winrate_info.get("winrate", 0)
+        trials   = winrate_info.get("trials", 0)
+
+        score = 0
+        # 趨勢
+        if ma20_val and current_price > ma20_val: score += 10
+        if ma5_val and ma20_val and ma5_val > ma20_val: score += 10
+        if ma20_val and ma60_val and ma20_val > ma60_val: score += 10
+        # 動能
+        if macd_val and sig_val and macd_val > sig_val: score += 10
+        if hist_val and hist_val > 0: score += 5
+        if rsi_val:
+            if 45 <= rsi_val <= 68: score += 10
+            elif rsi_val > 75: score -= 10
+            elif rsi_val < 35: score -= 5
+        # 回測
+        if trials >= 5:
+            if wr >= 65: score += 20
+            elif wr >= 55: score += 12
+            elif wr >= 45: score += 6
+        # 風險扣分
+        risk_penalty = 0
+        if rsi_val and rsi_val > 75: risk_penalty -= 8
+        if rsi_val and rsi_val < 35: risk_penalty -= 4
+        if ma20_val and ma20_val > 0:
+            pct = (current_price - ma20_val) / ma20_val * 100
+            if pct > 12: risk_penalty -= 8
+        if trials < 5: risk_penalty -= 5
+        # 宏觀
+        macro_penalty = 0
+        macro = macro or {}
+        if macro.get("usd_twd") and macro["usd_twd"] > 32.0: macro_penalty -= 3
+        if macro.get("dxy") and macro["dxy"] > 104: macro_penalty -= 3
+
+        final_score = max(0, min(100, score + risk_penalty + macro_penalty))
+        risk_level = "HIGH" if (risk_penalty + macro_penalty) <= -15 else "MEDIUM" if (risk_penalty + macro_penalty) <= -8 else "LOW"
+
+        if final_score >= 75:   signal = "BUY"
+        elif final_score >= 55: signal = "WATCH"
+        else:                   signal = "AVOID"
+
+        if signal == "BUY":   target_price = round(current_price * 1.06, 2)
+        elif signal == "WATCH": target_price = round(current_price * 1.03, 2)
+        else:                 target_price = None
+
+        stop_loss = round(ma20_val * 0.98, 2) if ma20_val else round(current_price * 0.95, 2)
+
+        if target_price and stop_loss and current_price > stop_loss:
+            rr = round((target_price - current_price) / (current_price - stop_loss), 2)
+            risk_reward_ratio = rr if rr > 0 else None
+        else:
+            risk_reward_ratio = None
+
+        # BUY 降級
+        if signal == "BUY" and (risk_reward_ratio is None or risk_reward_ratio < 1.5):
+            signal = "WATCH"
+        if signal == "BUY" and wr < 50 and trials >= 5:
+            signal = "WATCH"
+
+        entry_price = None
+        if signal != "AVOID":
+            if ma5_val and current_price > ma5_val: entry_price = round(ma5_val, 2)
+            elif ma20_val and current_price > ma20_val: entry_price = round(ma20_val, 2)
+            else: entry_price = round(current_price, 2) if signal == "WATCH" else round(current_price * 1.01, 2)
+
+        if wr >= 65: holding_days = "5-10 天"
+        elif wr >= 50: holding_days = "3-5 天"
+        else: holding_days = "不建議持有"
+
+        return {
+            "signal":            signal,
+            "confidence":        final_score,
+            "entry_price":       entry_price,
+            "target_price":      target_price,
+            "stop_loss":         stop_loss,
+            "holding_days":      holding_days,
+            "risk_reward_ratio": risk_reward_ratio,
+            "risk_model":        {"risk_level": risk_level, "final_score": final_score,
+                                  "base_score": score, "risk_penalty": risk_penalty,
+                                  "macro_penalty": macro_penalty, "a4_bonus": 0, "risk_factors": []},
+            "disclaimer":        "⚠️ 本工具僅供參考，非投資建議",
+        }
+    except Exception:
+        return {"signal": "WATCH", "confidence": 0, "entry_price": None,
+                "target_price": None, "stop_loss": None, "holding_days": "不建議持有",
+                "risk_reward_ratio": None,
+                "risk_model": {"risk_level": "HIGH", "final_score": 0},
+                "disclaimer": "⚠️ 本工具僅供參考，非投資建議"}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ★ 輕量股票分析（供 /api/stock-lite 和 /api/scan/ai 使用）
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def _analyze_stock_lite(stock_id: str, macro: dict | None = None) -> dict:
+    """
+    輕量版分析：優先用 TWSE MIS 即時報價，
+    若無即時報價則抓最近 90 天歷史，只計算 MA/RSI/MACD。
+    不跑 4D、不跑新聞、不跑基本面、不跑籌碼。
+    永遠不拋 HTTP 500，失敗時回傳降級資料。
+    """
+    stock_name = get_stock_name(stock_id)
+    macro = macro or {}
+    fallback_ai = {"signal": "WATCH", "confidence": 0, "entry_price": None,
+                   "target_price": None, "stop_loss": None, "holding_days": "不建議持有",
+                   "risk_reward_ratio": None,
+                   "risk_model": {"risk_level": "HIGH", "final_score": 0, "base_score": 0,
+                                  "risk_penalty": 0, "macro_penalty": 0, "a4_bonus": 0, "risk_factors": []},
+                   "disclaimer": "⚠️ 本工具僅供參考，非投資建議"}
+    try:
+        # Step 1: 即時報價
+        rt = await fetch_realtime_quote(stock_id)
+        if rt and rt.get("stock_name"): stock_name = rt["stock_name"]
+
+        price     = rt["price"]     if rt and rt.get("price")     is not None else None
+        change    = rt["change"]    if rt and rt.get("change")    is not None else None
+        chg_pct   = rt["change_pct"] if rt and rt.get("change_pct") is not None else None
+        data_src  = "TWSE MIS"
+
+        # Step 2: 若即時報價有價格，仍抓短期歷史算指標（90天夠 MA60）
+        price_df, hist_src = await fetch_price_with_fallback(stock_id, lookback_days=100)
+
+        if price is None and not price_df.empty:
+            # 即時報價沒有，用歷史最後一筆
+            price   = float(price_df.iloc[-1]["收盤價"])
+            data_src = hist_src
+            if len(price_df) >= 2:
+                prev_c  = float(price_df.iloc[-2]["收盤價"])
+                change  = round(price - prev_c, 2)
+                chg_pct = round(change / prev_c * 100, 2) if prev_c else None
+
+        cur_price = price or 0.0
+
+        # Step 3: 計算輕量技術指標
+        ai = fallback_ai.copy()
+        if not price_df.empty and cur_price > 0:
+            price_df = compute_indicators(price_df)
+            latest   = price_df.iloc[-1]
+            wr_info  = backtest_winrate(price_df)
+            ai       = compute_ai_signal_lite(latest, wr_info, cur_price, macro)
+
+        return {
+            "stock_id":       stock_id,
+            "stock_name":     stock_name,
+            "price":          price,
+            "change":         change,
+            "change_pct":     chg_pct,
+            "realtime_quote": rt,
+            "ai_signal":      ai,
+            "data_source":    data_src,
+            "lite":           True,
+        }
+    except Exception as e:
+        return {
+            "stock_id":       stock_id,
+            "stock_name":     stock_name,
+            "price":          None,
+            "change":         None,
+            "change_pct":     None,
+            "realtime_quote": None,
+            "ai_signal":      fallback_ai,
+            "data_source":    "error",
+            "lite":           True,
+            "error":          str(e),
+        }
+
+
 @app.on_event("startup")
 async def startup_event():
     loaded=_load_master_from_file()
@@ -1275,6 +1461,22 @@ async def get_stock(stock_id:str):
             "backtest":{"trials":0,"wins":0,"winrate":0},"conclusion":"資料不足 ⚠️","rsi_alert":None,
             "ai_signal":degraded_ai,"realtime_quote":rt,"news":[],"chart_data":[],"analysis_4d":degraded_4d}
     return result
+
+
+@app.get("/api/stock-lite/{stock_id}")
+async def get_stock_lite(stock_id: str):
+    """
+    輕量版股票資料 API，供自選股卡片刷新使用。
+    不跑 4D 分析，不跑新聞，速度快。
+    """
+    if not re.match(r"^\d{4,6}$", stock_id):
+        raise HTTPException(400, detail="股票代號格式錯誤，請輸入 4~6 位數字")
+    # 宏觀資料快取（允許 None，不會拋錯）
+    try:
+        macro = await asyncio.wait_for(fetch_macro_context(), timeout=8)
+    except Exception:
+        macro = {"usd_twd": None, "dxy": None, "risk_note": ""}
+    return await _analyze_stock_lite(stock_id, macro)
 
 @app.get("/api/realtime/{stock_id}")
 async def get_realtime(stock_id:str):
@@ -1360,9 +1562,9 @@ async def run_backtest(stock_id:str,lookback_days:int=400,holding_days:int=5,min
 
 @app.get("/health")
 def health():
-    return {"status":"ok","version":"8.0.0","time":datetime.now().isoformat(),
+    return {"status":"ok","version":"8.1.0","time":datetime.now().isoformat(),
             "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
             "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
             "price_sources":"FinMind → Yahoo Finance → TWSE Official",
             "stock_master_count":len(STOCK_MASTER),"stock_master_updated":_master_updated_at,
-            "features":["4D analysis","chip data","fundamental data","bollinger bands","ATR"]}
+            "features":["4D analysis","chip data","fundamental data","bollinger bands","ATR","stock-lite API"]}

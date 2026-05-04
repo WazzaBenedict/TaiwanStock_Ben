@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>台股監測 V8 · 四面向分析</title>
+<title>台股監測 V8.1 · 穩定版</title>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -350,7 +350,7 @@ input[type=number]:focus{border-color:var(--accent)}
 </head>
 <body>
 <header>
-  <div class="logo"><div class="logo-dot"></div>台股<span>MONITOR</span><small>V8</small></div>
+  <div class="logo"><div class="logo-dot"></div>台股<span>MONITOR</span><small>V8.1</small></div>
   <div class="hdr-right"><span class="clock" id="clock"></span></div>
 </header>
 <div class="wrap">
@@ -888,9 +888,16 @@ function cardHTML(id){
   const c=WL_CACHE[id],wlItem=WL_LIST.find(x=>x.stock_id===id)||{};
   const nameFallback=wlItem.stock_name||getLocalName(id)||id;
   if(!c)return `<div class="wl-card" id="wc-${id}" onclick="loadStock('${id}')">
-    <div class="wc-top"><div class="wc-ids"><div class="wc-name">讀取中…</div><div class="wc-id">${id}</div></div><button class="wc-del" onclick="delFromWL('${id}',event)">×</button></div>
-    <div class="wc-price-row"><span class="wc-price tw-flat">—</span></div>
-    <div class="wc-ai"><span class="wc-conf">—</span></div>
+    <div class="wc-top"><div class="wc-ids"><div class="wc-name">${getLocalName(id)||id}</div><div class="wc-id">${id}</div></div><button class="wc-del" onclick="delFromWL('${id}',event)">×</button></div>
+    <div class="wc-price-row"><span class="wc-price tw-flat" style="font-size:14px;color:var(--muted)">讀取中…</span></div>
+    <div class="wc-ai"><span class="wc-conf" style="color:var(--muted);font-size:11px">—</span></div>
+    <div class="wc-bar-bg"><div class="wc-bar-fill" style="width:0%"></div></div>
+  </div>`;
+  // noData 狀態：有快取但暫無資料（不顯示 "資料載入失敗"）
+  if(c.noData)return `<div class="wl-card" id="wc-${id}" onclick="loadStock('${id}')">
+    <div class="wc-top"><div class="wc-ids"><div class="wc-name">${dsn(id,c.name)}</div><div class="wc-id">${id}</div></div><button class="wc-del" onclick="delFromWL('${id}',event)">×</button></div>
+    <div class="wc-price-row"><span class="wc-price tw-flat" style="font-size:13px;color:var(--muted)">暫時無資料</span></div>
+    <div class="wc-ai"><span class="wc-conf" style="color:var(--muted);font-size:11px">點擊查詢</span></div>
     <div class="wc-bar-bg"><div class="wc-bar-fill" style="width:0%"></div></div>
   </div>`;
   const clr=twCC(c.changePct),pT=c.price!=null?Number(c.price).toFixed(2):'—';
@@ -929,34 +936,60 @@ function renderWLGrid(){
   if(currentStockId){const s=document.getElementById(`wc-${currentStockId}`);if(s)s.classList.add('wl-selected')}
 }
 
+/* ── fetchOneWL V8.1：呼叫輕量 /api/stock-lite，不跑完整四面向分析 ── */
 async function fetchOneWL(id){
   try{
-    const res=await apiFetch(`${API_BASE_URL}/api/stock/${id}`,{},45000);
-    if(!res.ok){WL_CACHE[id]={name:'資料載入失敗',price:null,changePct:null,signal:null,confidence:null,riskLevel:null,entryPrice:null,error:true};return}
-    const d=await res.json();console.log('watchlist data',id,d);
-    const rt=d.realtime_quote||{},dp=d.price||{},ai=d.ai_signal||{};
+    const res=await apiFetch(`${API_BASE_URL}/api/stock-lite/${id}`,{},25000);
+    if(!res.ok){
+      if(!WL_CACHE[id]) WL_CACHE[id]={name:getLocalName(id)||id,price:null,changePct:null,signal:null,confidence:null,riskLevel:null,entryPrice:null,error:false,noData:true};
+      console.warn('wl-lite fail',id,res.status);return;
+    }
+    const d=await res.json();
+    console.log('watchlist data',id,d);
+    const ai=d.ai_signal||{};
     WL_CACHE[id]={
-      name:       d.stock_name||id,
-      price:      rt.price??dp.close??null,
-      changePct:  rt.change_pct??dp.change_pct??null,
+      name:       d.stock_name||getLocalName(id)||id,
+      price:      d.price??null,
+      changePct:  d.change_pct??null,
       signal:     ai.signal||null,
       confidence: ai.confidence??null,
       riskLevel:  ai.risk_model?.risk_level||null,
       entryPrice: ai.entry_price??null,
-      error:false,
+      error:      false,
+      noData:     false,
     };
-    // 同步名稱到 WL_LIST
     const item=WL_LIST.find(x=>x.stock_id===id);
     if(item&&d.stock_name&&d.stock_name!==id)item.stock_name=d.stock_name;
-  }catch(e){console.error('wl err',id,e.message);WL_CACHE[id]={name:'資料載入失敗',price:null,changePct:null,signal:null,confidence:null,riskLevel:null,entryPrice:null,error:true}}
+  }catch(e){
+    console.error('wl-lite err',id,e.message);
+    if(!WL_CACHE[id]) WL_CACHE[id]={name:getLocalName(id)||id,price:null,changePct:null,signal:null,confidence:null,riskLevel:null,entryPrice:null,error:false,noData:true};
+  }
 }
+
+let isRefreshingWL=false;
+
+let isRefreshingWL=false;
 
 async function refreshAllWL(){
+  if(isRefreshingWL){console.log('wl refresh running, skip');return}
   const ids=WL_LIST.map(x=>x.stock_id);if(!ids.length)return;
-  for(let i=0;i<ids.length;i+=4){await Promise.allSettled(ids.slice(i,i+4).map(id=>fetchOneWL(id)));renderWLGrid()}
+  isRefreshingWL=true;
+  try{
+    const batchSize=2;
+    for(let i=0;i<ids.length;i+=batchSize){
+      const batch=ids.slice(i,i+batchSize);
+      await Promise.allSettled(batch.map(id=>fetchOneWL(id).catch(e=>console.warn('wl batch err',id,e.message))));
+      renderWLGrid();
+      if(i+batchSize<ids.length) await new Promise(r=>setTimeout(r,400));
+    }
+  }finally{isRefreshingWL=false}
 }
 
-async function wlForceRefresh(){wlCountdown=30;document.getElementById('wl-fill').style.width='100%';await refreshAllWL()}
+async function wlForceRefresh(){
+  isRefreshingWL=false;  // reset in case stuck
+  wlCountdown=30;document.getElementById('wl-fill').style.width='100%';
+  await refreshAllWL();
+}
 
 function startWLTimer(){
   clearInterval(wlTimer);wlCountdown=30;
