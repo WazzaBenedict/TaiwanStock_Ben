@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>台股監測 V7</title>
+<title>台股監測 V8 · 四面向分析</title>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -298,17 +298,113 @@ input[type=number]:focus{border-color:var(--accent)}
   header .clock{display:none}
   .price-big{font-size:28px}
 }
+
+/* ══ 四面向分析 ══════════════════════════════════════════════════ */
+.d4-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px}
+@media(max-width:768px){.d4-grid{grid-template-columns:1fr}}
+.d4-card{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--r);padding:16px;position:relative;overflow:hidden}
+.d4-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.d4-card.fund::before{background:linear-gradient(90deg,#3b82f6,#60a5fa)}
+.d4-card.tech::before{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.d4-card.chip::before{background:linear-gradient(90deg,var(--purple),#c084fc)}
+.d4-card.news-d::before{background:linear-gradient(90deg,var(--yellow),#fb923c)}
+.d4-overall{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:14px;position:relative;overflow:hidden}
+.d4-overall::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--purple),var(--accent2))}
+.d4-title{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.d4-score-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.d4-num{font-family:var(--mono);font-size:36px;font-weight:600;line-height:1}
+.d4-rating{font-family:var(--mono);font-size:13px;font-weight:600;padding:3px 10px;border-radius:8px;margin-left:6px}
+.d4-rating.強{background:rgba(232,56,79,.15);color:var(--up);border:1px solid rgba(232,56,79,.3)}
+.d4-rating.中{background:rgba(251,191,36,.12);color:var(--yellow);border:1px solid rgba(251,191,36,.3)}
+.d4-rating.弱{background:rgba(0,184,107,.12);color:var(--down);border:1px solid rgba(0,184,107,.25)}
+.d4-rating.資料不足{background:rgba(90,112,144,.15);color:var(--muted);border:1px solid var(--border)}
+.d4-bar-wrap{margin:6px 0 10px}
+.d4-bar-bg{height:6px;background:var(--border);border-radius:4px;overflow:hidden}
+.d4-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.d4-reasons{font-size:12px;color:var(--muted);line-height:1.8}
+.d4-reasons li{list-style:none;padding:2px 0}
+.d4-reasons li::before{content:'✅ ';color:var(--up)}
+.d4-risks li::before{content:'⚠️ '}
+.d4-risks{color:var(--down)}
+.d4-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.d4-tag{font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:6px;background:rgba(26,40,64,.6);border:1px solid var(--border);color:var(--muted)}
+/* 雷達 / 橫條圖 */
+.d4-bars{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.d4-bar-item{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:12px}
+.d4-bar-label{width:60px;color:var(--muted);flex-shrink:0}
+.d4-bar-track{flex:1;height:10px;background:var(--border);border-radius:5px;overflow:hidden}
+.d4-bar-seg{height:100%;border-radius:5px;transition:width .6s ease}
+.d4-bar-val{width:40px;text-align:right;color:var(--text);flex-shrink:0}
+.d4-overall-summary{font-size:13px;color:var(--text);line-height:1.7;background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.12);border-radius:8px;padding:10px 13px;margin-top:10px}
+.d4-overall-score-big{font-family:var(--mono);font-size:52px;font-weight:600;line-height:1;text-align:center}
+.d4-overall-rating{font-family:var(--mono);font-size:16px;font-weight:600;text-align:center;margin-top:4px}
+.d4-chip-table{font-family:var(--mono);font-size:12px;width:100%;border-collapse:collapse;margin-top:8px}
+.d4-chip-table td{padding:4px 8px;border-bottom:1px solid rgba(26,40,64,.4)}
+.d4-chip-table tr:last-child td{border-bottom:none}
+.d4-chip-table .lbl{color:var(--muted)}
+.top-news-item{padding:5px 0;border-bottom:1px solid rgba(26,40,64,.4);font-size:12px;color:var(--text);line-height:1.5}
+.top-news-item:last-child{border-bottom:none}
+.tn-bull{color:var(--up)}.tn-bear{color:var(--down)}.tn-neu{color:var(--muted)}
+
 </style>
 </head>
 <body>
 <header>
-  <div class="logo"><div class="logo-dot"></div>台股<span>MONITOR</span><small>V7</small></div>
+  <div class="logo"><div class="logo-dot"></div>台股<span>MONITOR</span><small>V8</small></div>
   <div class="hdr-right"><span class="clock" id="clock"></span></div>
 </header>
 <div class="wrap">
 
   <!-- 搜尋 -->
-  <style>.search-wrapper{position:relative;flex:1;min-width:160px;max-width:280px}.suggest-box{position:absolute;top:100%;left:0;right:0;background:var(--panel);border:1px solid var(--border);border-radius:8px;z-index:500;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4);margin-top:3px}.suggest-item{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;cursor:pointer;font-size:13px;transition:background .15s}.suggest-item:hover{background:rgba(0,212,255,.08)}.si-name{color:var(--text)}.si-id{font-family:var(--mono);font-size:11px;color:var(--muted)}</style>
+  <style>.search-wrapper{position:relative;flex:1;min-width:160px;max-width:280px}.suggest-box{position:absolute;top:100%;left:0;right:0;background:var(--panel);border:1px solid var(--border);border-radius:8px;z-index:500;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4);margin-top:3px}.suggest-item{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;cursor:pointer;font-size:13px;transition:background .15s}.suggest-item:hover{background:rgba(0,212,255,.08)}.si-name{color:var(--text)}.si-id{font-family:var(--mono);font-size:11px;color:var(--muted)}
+/* ══ 四面向分析 ══════════════════════════════════════════════════ */
+.d4-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px}
+@media(max-width:768px){.d4-grid{grid-template-columns:1fr}}
+.d4-card{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--r);padding:16px;position:relative;overflow:hidden}
+.d4-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.d4-card.fund::before{background:linear-gradient(90deg,#3b82f6,#60a5fa)}
+.d4-card.tech::before{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.d4-card.chip::before{background:linear-gradient(90deg,var(--purple),#c084fc)}
+.d4-card.news-d::before{background:linear-gradient(90deg,var(--yellow),#fb923c)}
+.d4-overall{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:14px;position:relative;overflow:hidden}
+.d4-overall::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--purple),var(--accent2))}
+.d4-title{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.d4-score-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.d4-num{font-family:var(--mono);font-size:36px;font-weight:600;line-height:1}
+.d4-rating{font-family:var(--mono);font-size:13px;font-weight:600;padding:3px 10px;border-radius:8px;margin-left:6px}
+.d4-rating.強{background:rgba(232,56,79,.15);color:var(--up);border:1px solid rgba(232,56,79,.3)}
+.d4-rating.中{background:rgba(251,191,36,.12);color:var(--yellow);border:1px solid rgba(251,191,36,.3)}
+.d4-rating.弱{background:rgba(0,184,107,.12);color:var(--down);border:1px solid rgba(0,184,107,.25)}
+.d4-rating.資料不足{background:rgba(90,112,144,.15);color:var(--muted);border:1px solid var(--border)}
+.d4-bar-wrap{margin:6px 0 10px}
+.d4-bar-bg{height:6px;background:var(--border);border-radius:4px;overflow:hidden}
+.d4-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.d4-reasons{font-size:12px;color:var(--muted);line-height:1.8}
+.d4-reasons li{list-style:none;padding:2px 0}
+.d4-reasons li::before{content:'✅ ';color:var(--up)}
+.d4-risks li::before{content:'⚠️ '}
+.d4-risks{color:var(--down)}
+.d4-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.d4-tag{font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:6px;background:rgba(26,40,64,.6);border:1px solid var(--border);color:var(--muted)}
+/* 雷達 / 橫條圖 */
+.d4-bars{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.d4-bar-item{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:12px}
+.d4-bar-label{width:60px;color:var(--muted);flex-shrink:0}
+.d4-bar-track{flex:1;height:10px;background:var(--border);border-radius:5px;overflow:hidden}
+.d4-bar-seg{height:100%;border-radius:5px;transition:width .6s ease}
+.d4-bar-val{width:40px;text-align:right;color:var(--text);flex-shrink:0}
+.d4-overall-summary{font-size:13px;color:var(--text);line-height:1.7;background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.12);border-radius:8px;padding:10px 13px;margin-top:10px}
+.d4-overall-score-big{font-family:var(--mono);font-size:52px;font-weight:600;line-height:1;text-align:center}
+.d4-overall-rating{font-family:var(--mono);font-size:16px;font-weight:600;text-align:center;margin-top:4px}
+.d4-chip-table{font-family:var(--mono);font-size:12px;width:100%;border-collapse:collapse;margin-top:8px}
+.d4-chip-table td{padding:4px 8px;border-bottom:1px solid rgba(26,40,64,.4)}
+.d4-chip-table tr:last-child td{border-bottom:none}
+.d4-chip-table .lbl{color:var(--muted)}
+.top-news-item{padding:5px 0;border-bottom:1px solid rgba(26,40,64,.4);font-size:12px;color:var(--text);line-height:1.5}
+.top-news-item:last-child{border-bottom:none}
+.tn-bull{color:var(--up)}.tn-bear{color:var(--down)}.tn-neu{color:var(--muted)}
+
+</style>
 <div class="search-section">
     <div class="search-wrapper"><input type="text" id="inp" placeholder="輸入股票代號或名稱，例如 2330" maxlength="10"><div class="suggest-box" id="search-suggest" style="display:none"></div></div>
     <button class="btn" onclick="doSearch()">🔍 查詢</button>
@@ -497,6 +593,86 @@ input[type=number]:focus{border-color:var(--accent)}
       <div id="notify-result"></div>
     </div>
 
+    
+    <!-- ══ 四面向分析 ══════════════════════════════════════════════ -->
+    <div class="full">
+      <div class="card" style="padding:18px">
+        <div class="card-title">🔍 四面向分析</div>
+
+        <!-- 總分 -->
+        <div class="d4-overall">
+          <div class="d4-title">📊 總體評分</div>
+          <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+            <div>
+              <div class="d4-overall-score-big" id="d4-ov-score">—</div>
+              <div class="d4-overall-rating" id="d4-ov-rating">—</div>
+            </div>
+            <div style="flex:1;min-width:200px">
+              <div class="d4-bars" id="d4-bars">
+                <!-- filled by JS -->
+              </div>
+            </div>
+          </div>
+          <div class="d4-overall-summary" id="d4-ov-summary">—</div>
+        </div>
+
+        <!-- 四張卡片 -->
+        <div class="d4-grid">
+          <!-- 基本面 -->
+          <div class="d4-card fund">
+            <div class="d4-title">💰 基本面</div>
+            <div class="d4-score-row">
+              <span class="d4-num" id="d4-f-score">—</span>
+              <span class="d4-rating" id="d4-f-rating">—</span>
+            </div>
+            <div class="d4-bar-wrap"><div class="d4-bar-bg"><div class="d4-bar-fill" id="d4-f-bar" style="width:0%;background:#3b82f6"></div></div></div>
+            <div class="d4-meta" id="d4-f-meta"></div>
+            <ul class="d4-reasons" id="d4-f-reasons" style="margin-top:8px"></ul>
+            <ul class="d4-reasons d4-risks" id="d4-f-risks"></ul>
+          </div>
+
+          <!-- 技術面 -->
+          <div class="d4-card tech">
+            <div class="d4-title">📈 技術面</div>
+            <div class="d4-score-row">
+              <span class="d4-num" id="d4-t-score">—</span>
+              <span class="d4-rating" id="d4-t-rating">—</span>
+            </div>
+            <div class="d4-bar-wrap"><div class="d4-bar-bg"><div class="d4-bar-fill" id="d4-t-bar" style="width:0%;background:var(--accent)"></div></div></div>
+            <div class="d4-meta" id="d4-t-meta"></div>
+            <ul class="d4-reasons" id="d4-t-reasons" style="margin-top:8px"></ul>
+            <ul class="d4-reasons d4-risks" id="d4-t-risks"></ul>
+          </div>
+
+          <!-- 籌碼面 -->
+          <div class="d4-card chip">
+            <div class="d4-title">🏦 籌碼面</div>
+            <div class="d4-score-row">
+              <span class="d4-num" id="d4-c-score">—</span>
+              <span class="d4-rating" id="d4-c-rating">—</span>
+            </div>
+            <div class="d4-bar-wrap"><div class="d4-bar-bg"><div class="d4-bar-fill" id="d4-c-bar" style="width:0%;background:var(--purple)"></div></div></div>
+            <table class="d4-chip-table" id="d4-c-table"></table>
+            <ul class="d4-reasons" id="d4-c-reasons" style="margin-top:8px"></ul>
+            <ul class="d4-reasons d4-risks" id="d4-c-risks"></ul>
+          </div>
+
+          <!-- 消息面 -->
+          <div class="d4-card news-d">
+            <div class="d4-title">📰 消息面</div>
+            <div class="d4-score-row">
+              <span class="d4-num" id="d4-n-score">—</span>
+              <span class="d4-rating" id="d4-n-rating">—</span>
+            </div>
+            <div class="d4-bar-wrap"><div class="d4-bar-bg"><div class="d4-bar-fill" id="d4-n-bar" style="width:0%;background:var(--yellow)"></div></div></div>
+            <div class="d4-meta" id="d4-n-meta"></div>
+            <div id="d4-n-news" style="margin-top:8px"></div>
+            <ul class="d4-reasons" id="d4-n-reasons" style="margin-top:4px"></ul>
+            <ul class="d4-reasons d4-risks" id="d4-n-risks"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
     <!-- Backtest -->
     <div class="card bt-card full">
       <div class="card-title">📊 進階策略回測</div>
@@ -985,6 +1161,7 @@ function render(d){
   setTxt('d-wr',(bt.winrate||0)+'%');addCls('d-wr',bt.winrate>=60?'up':bt.winrate<45?'down':'flat');
   setTxt('d-wr-sub',bt.trials?'近一年回測結果':'樣本不足');setTxt('d-trials',bt.trials||0);setTxt('d-wins',bt.wins||0);
   if(d.ai_signal)renderAI(d.ai_signal,p.close);
+  if(d.analysis_4d)render4D(d.analysis_4d);
   const nl=document.getElementById('d-news');
   if(!d.news||!d.news.length){nl.innerHTML='<div style="color:var(--muted);font-family:var(--mono);font-size:12px">暫無相關新聞</div>'}
   else{nl.innerHTML=d.news.map(n=>{const sc=n.sentiment==='利多'?'s-bull':n.sentiment==='利空'?'s-bear':'s-neu';return `<div class="ni"><a href="${n.link}" target="_blank" rel="noopener">${n.title}</a><div class="nmeta"><span class="stag ${sc}">${n.sentiment}</span><span>${fmtD(n.pub_date)}</span></div></div>`}).join('')}
@@ -1105,6 +1282,108 @@ inp?.addEventListener('keydown',e=>{if(e.key==='Enter')doSearch()});
   renderWLGrid();refreshAllWL();startWLTimer();checkLineStatus();
   loadAutoState();updateAutoUI();if(autoEnabled)startAutoTimer();
 })();
+
+
+/* ══════════════════════════════════════════════════════════════════
+   四面向分析渲染
+   ══════════════════════════════════════════════════════════════════ */
+function render4D(a4){
+  if(!a4) return;
+  const {fundamental:f,technical:t,chip:c,news:n,overall:ov}=a4;
+
+  // 總分
+  const ovS=ov?.overall_score;
+  setTxt('d4-ov-score',ovS!=null?Math.round(ovS):'—');
+  setTxt('d4-ov-rating',ov?.rating||'—');
+  setTxt('d4-ov-summary',ov?.summary||'—');
+  addCls('d4-ov-score',ovS>=65?'up':ovS>=50?'flat':'down');
+
+  // 橫條圖
+  const bars=document.getElementById('d4-bars');
+  if(bars){
+    const items=[
+      {label:'基本面',score:f?.score,color:'#3b82f6',max:100},
+      {label:'技術面',score:t?.score,color:'var(--accent)',max:100},
+      {label:'籌碼面',score:c?.score,color:'var(--purple)',max:100},
+      {label:'消息面',score:n?.score,color:'var(--yellow)',max:100},
+    ];
+    bars.innerHTML=items.map(x=>{
+      const pct=x.score!=null?Math.round(x.score):0;
+      const label=x.score!=null?pct+'分':'—';
+      return `<div class="d4-bar-item">
+        <span class="d4-bar-label">${x.label}</span>
+        <div class="d4-bar-track"><div class="d4-bar-seg" style="width:${pct}%;background:${x.color}"></div></div>
+        <span class="d4-bar-val">${label}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // 工具：渲染單張卡片
+  function renderCard(prefix,data,metaFn,tableFn){
+    const s=data?.score;
+    setTxt(`d4-${prefix}-score`,s!=null?Math.round(s):'—');
+    const rating=data?.rating||'—';
+    setTxt(`d4-${prefix}-rating`,rating);
+    const rEl=document.getElementById(`d4-${prefix}-rating`);
+    if(rEl){rEl.className='d4-rating '+(rating==='強'?'強':rating==='中'?'中':rating==='弱'?'弱':'資料不足')}
+    const bEl=document.getElementById(`d4-${prefix}-bar`);
+    if(bEl) bEl.style.width=(s!=null?Math.min(100,s):0)+'%';
+    const mEl=document.getElementById(`d4-${prefix}-meta`);
+    if(mEl&&metaFn) mEl.innerHTML=metaFn(data);
+    if(tableFn){const tEl=document.getElementById(`d4-${prefix}-table`);if(tEl)tEl.innerHTML=tableFn(data)}
+    const rEl2=document.getElementById(`d4-${prefix}-reasons`);
+    if(rEl2) rEl2.innerHTML=(data?.reasons||[]).slice(0,3).map(r=>`<li>${r}</li>`).join('');
+    const rkEl=document.getElementById(`d4-${prefix}-risks`);
+    if(rkEl) rkEl.innerHTML=(data?.risks||[]).slice(0,2).map(r=>`<li>${r}</li>`).join('');
+  }
+
+  // 基本面
+  renderCard('f',f,d=>{
+    const tags=[];
+    if(d?.per!=null) tags.push(`PE:${d.per}`);
+    if(d?.roe!=null) tags.push(`ROE:${d.roe}%`);
+    if(d?.eps!=null) tags.push(`EPS:${d.eps}`);
+    if(d?.revenue_yoy!=null) tags.push(`營收YoY:${d.revenue_yoy>0?'+':''}${d.revenue_yoy}%`);
+    return tags.map(t=>`<span class="d4-tag">${t}</span>`).join('');
+  });
+
+  // 技術面
+  renderCard('t',t,d=>{
+    const tags=[];
+    if(d?.trend) tags.push(`趨勢:${d.trend}`);
+    if(d?.support) tags.push(`支撐:${d.support}`);
+    if(d?.resistance) tags.push(`壓力:${d.resistance}`);
+    if(d?.atr) tags.push(`ATR:${d.atr}`);
+    return tags.map(t=>`<span class="d4-tag">${t}</span>`).join('');
+  });
+
+  // 籌碼面
+  renderCard('c',c,null,d=>{
+    if(!d?.foreign_net_buy&&!d?.margin_change) return '<tr><td class="lbl" colspan="2">籌碼資料暫時無法取得</td></tr>';
+    const fmt=v=>v!=null?(v>0?`<span class="up">+${v.toLocaleString()}</span>`:`<span class="down">${v.toLocaleString()}</span>`):'—';
+    return [
+      ['外資','foreign_net_buy'],['投信','investment_trust_net_buy'],['自營商','dealer_net_buy'],
+      ['三大法人合計','three_major_total'],['融資變化','margin_change'],['融券變化','short_change'],
+    ].map(([label,key])=>`<tr><td class="lbl">${label}</td><td>${fmt(d?.[key])}</td></tr>`).join('');
+  });
+
+  // 消息面
+  renderCard('n',n,d=>{
+    if(!d) return '';
+    return `<span class="d4-tag tn-bull">利多 ${d.bullish_count}</span><span class="d4-tag tn-bear">利空 ${d.bearish_count}</span><span class="d4-tag">中性 ${d.neutral_count}</span>`;
+  });
+  // 消息面頭條新聞
+  const nNewsEl=document.getElementById('d4-n-news');
+  if(nNewsEl&&n?.top_news){
+    const rkWrap=n.risk_keywords?.length?`<div style="font-family:var(--mono);font-size:11px;color:var(--down);margin-bottom:6px">⚠️ 風險字詞：${n.risk_keywords.join('、')}</div>`:'';
+    nNewsEl.innerHTML=rkWrap+(n.top_news||[]).slice(0,3).map(x=>{
+      const cls=x.sentiment==='利多'?'tn-bull':x.sentiment==='利空'?'tn-bear':'tn-neu';
+      return `<div class="top-news-item"><span class="${cls}">[${x.sentiment}]</span> <a href="${x.link}" target="_blank" style="color:var(--text);text-decoration:none;font-size:11px">${x.title}</a></div>`;
+    }).join('');
+  }
+}
+
+
 </script>
 </body>
 </html>
