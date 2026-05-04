@@ -968,8 +968,6 @@ async function fetchOneWL(id){
 
 let isRefreshingWL=false;
 
-let isRefreshingWL=false;
-
 async function refreshAllWL(){
   if(isRefreshingWL){console.log('wl refresh running, skip');return}
   const ids=WL_LIST.map(x=>x.stock_id);if(!ids.length)return;
