@@ -1,5 +1,5 @@
 """
-台股監測後端 V8.1 - 穩定版（輕量自選股 API）
+台股監測後端 V9.1 Stable - V7穩定核心 + AI學習中心
 新增：四面向分析 analysis_4d（基本面/技術面/籌碼面/消息面/總分）
      布林通道、ATR、支撐壓力、籌碼面資料（TWSE 三大法人、融資融券）
      AI 訊號整合 analysis_4d 加減分
@@ -18,7 +18,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="台股監測 API V8.1", version="8.1.0")
+app = FastAPI(title="台股監測 API V9.1 Stable", version="9.1.0")
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
 _raw_origins = os.getenv(
@@ -1372,7 +1372,8 @@ async def _analyze_stock(stock_id:str,macro:dict,lookback_days:int=400,with_4d:b
         if rsi_val>70: rsi_alert="⚠️ RSI 過熱（>70）"
         elif rsi_val<30: rsi_alert="⚠️ RSI 過冷（<30）"
 
-    # 並行抓新聞+即時報價+四面向資料
+    # V9.1：預設查詢走穩定核心，不自動抓新聞/基本面/籌碼/四面向。
+    # with_4d=True 僅供 /api/analysis-4d/{stock_id} 按鈕觸發。
     if with_4d:
         news,rt,fund_raw,chip_raw,margin_raw = await asyncio.gather(
             fetch_news(stock_id,stock_name),
@@ -1380,23 +1381,26 @@ async def _analyze_stock(stock_id:str,macro:dict,lookback_days:int=400,with_4d:b
             fetch_fundamental_data(stock_id),
             fetch_chip_data(stock_id),
             fetch_margin_data(stock_id),
+            return_exceptions=False,
         )
     else:
-        news,rt = await asyncio.gather(fetch_news(stock_id,stock_name),fetch_realtime_quote(stock_id))
+        news=[]
+        rt=await fetch_realtime_quote(stock_id)
         fund_raw={"data_available":False}
         chip_raw={"data_available":False}
         margin_raw={"data_available":False}
 
     cur_price=float(rt["price"]) if rt and rt.get("price") is not None else float(latest["收盤價"])
 
-    # 四面向分析
-    tech_4d   = analyze_technical_4d(price_df,latest,cur_price)
-    fund_4d   = analyze_fundamental_4d(fund_raw)
-    chip_4d   = analyze_chip_4d(chip_raw,margin_raw)
-    news_4d   = analyze_news_4d(news)
-    overall_4d= compute_overall_4d(fund_4d,tech_4d,chip_4d,news_4d)
-
-    analysis_4d={"fundamental":fund_4d,"technical":tech_4d,"chip":chip_4d,"news":news_4d,"overall":overall_4d}
+    if with_4d:
+        tech_4d   = analyze_technical_4d(price_df,latest,cur_price)
+        fund_4d   = analyze_fundamental_4d(fund_raw)
+        chip_4d   = analyze_chip_4d(chip_raw,margin_raw)
+        news_4d   = analyze_news_4d(news)
+        overall_4d= compute_overall_4d(fund_4d,tech_4d,chip_4d,news_4d)
+        analysis_4d={"fundamental":fund_4d,"technical":tech_4d,"chip":chip_4d,"news":news_4d,"overall":overall_4d}
+    else:
+        analysis_4d=None
 
     ai=compute_ai_signal(score_info,latest,vol_info,winrate,news,cur_price,macro,analysis_4d)
     record_ai_signal(stock_id, stock_name, ai, analysis_4d, source="stock")
@@ -1668,7 +1672,7 @@ async def api_stocks_search(q:str=Query("",min_length=1)):
 async def get_stock(stock_id:str):
     if not re.match(r"^\d{4,6}$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤，請輸入 4~6 位數字")
     macro=await fetch_macro_context()
-    result=await _analyze_stock(stock_id,macro,with_4d=True)
+    result=await _analyze_stock(stock_id,macro,with_4d=False)
     if "error" in result and "price" not in result:
         rt=result.get("realtime_quote"); rt_price=rt.get("price") if rt else None
         degraded_ai={"signal":"WATCH","confidence":0,
@@ -1811,9 +1815,9 @@ def api_learning_retrain():
 
 @app.get("/health")
 def health():
-    return {"status":"ok","version":"9.0.0","time":datetime.now().isoformat(),
+    return {"status":"ok","version":"9.1.0","time":datetime.now().isoformat(),
             "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
             "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
             "price_sources":"FinMind → Yahoo Finance → TWSE Official",
             "stock_master_count":len(STOCK_MASTER),"stock_master_updated":_master_updated_at,
-            "features":["4D analysis","chip data","fundamental data","bollinger bands","ATR","stock-lite API","AI learning weights","signal history"]}
+            "features":["V7 stable core","stock-lite API","AI learning weights","signal history","4D analysis on demand"]}
