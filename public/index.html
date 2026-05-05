@@ -5,6 +5,46 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>台股監測 V7</title>
 <script src="config.js"></script>
+<script>
+/* Firebase Firestore 自選股同步（跨裝置、保留版本更新後自選股） */
+window.__firebaseWatchlistReady = (async function(){
+  try{
+    if(!window.FIREBASE_CONFIG){
+      console.warn('FIREBASE_CONFIG 未設定，將使用本機自選股備份');
+      return null;
+    }
+    const appMod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+    const fsMod  = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+    const app = appMod.initializeApp(window.FIREBASE_CONFIG);
+    const db = fsMod.getFirestore(app);
+    return { db, doc: fsMod.doc, getDoc: fsMod.getDoc, setDoc: fsMod.setDoc };
+  }catch(e){
+    console.warn('Firebase 初始化失敗，將使用本機自選股備份', e);
+    return null;
+  }
+})();
+
+window.loadWatchlistFromCloud = async function(){
+  const fb = await window.__firebaseWatchlistReady;
+  if(!fb) throw new Error('Firebase 尚未啟用');
+  const ref = fb.doc(fb.db, 'watchlists', 'default');
+  const snap = await fb.getDoc(ref);
+  if(!snap.exists()) return [];
+  const data = snap.data() || {};
+  return Array.isArray(data.watchlist) ? data.watchlist : [];
+};
+
+window.saveWatchlistToCloud = async function(list){
+  const fb = await window.__firebaseWatchlistReady;
+  if(!fb) throw new Error('Firebase 尚未啟用');
+  const ref = fb.doc(fb.db, 'watchlists', 'default');
+  await fb.setDoc(ref, {
+    watchlist: list,
+    updated_at: new Date().toISOString()
+  }, { merge: true });
+};
+</script>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Noto+Sans+TC:wght@300;400;700&display=swap" rel="stylesheet">
@@ -322,7 +362,7 @@ input[type=number]:focus{border-color:var(--accent)}
   <!-- 自選股 -->
   <div class="wl-section">
     <div class="wl-header">
-      <div class="wl-title">⭐ 自選股監控 <span class="wl-badge" id="wl-count">0 檔</span></div>
+      <div class="wl-title">⭐ 自選股監控 <span class="wl-badge" id="wl-count">0 檔</span> <span class="wl-badge" id="sync-status">☁️ 同步中</span></div>
       <div class="wl-toolbar">
         <span style="font-family:var(--mono);font-size:11px;color:var(--muted)" id="wl-timer-txt">30s 後刷新</span>
         <button class="btn sm ghost" onclick="wlForceRefresh()">↻ 刷新</button>
@@ -650,28 +690,53 @@ function selectSuggest(id,name){
 /* ══════════════════════════════════════════════════════════════════
    跨裝置自選股（從後端讀寫）
    ══════════════════════════════════════════════════════════════════ */
+function normalizeWatchlist(raw){
+  const arr = Array.isArray(raw) ? raw : [];
+  const out = [], seen = new Set();
+  for(const item of arr){
+    const id = (typeof item === 'string' ? item : item?.stock_id || '').toString().trim();
+    if(!id || seen.has(id)) continue;
+    seen.add(id);
+    const nm = (typeof item === 'object' && item?.stock_name) ? item.stock_name : (getLocalName(id) || id);
+    out.push({stock_id:id, stock_name:nm});
+  }
+  return out;
+}
+
+function setSyncStatus(type,msg){
+  const el=document.getElementById('sync-status');
+  if(!el)return;
+  el.textContent=msg;
+  el.style.color = type==='ok'?'var(--up)':type==='fail'?'var(--down)':'var(--yellow)';
+}
+
 async function loadWatchlistFromServer(){
+  setSyncStatus('loading','⏳ 同步中');
   try{
-    const res=await apiFetch(`${API_BASE_URL}/api/watchlist`,{},10000);
-    if(res.ok){
-      const d=await res.json();
-      WL_LIST=d.watchlist||[];
-      return;
-    }
-  }catch(e){console.warn('watchlist server load failed',e.message)}
-  // fallback: localStorage
+    const cloudList = await window.loadWatchlistFromCloud();
+    WL_LIST = normalizeWatchlist(cloudList);
+    localStorage.setItem(WL_KEY,JSON.stringify(WL_LIST));
+    setSyncStatus('ok','☁️ 已同步');
+    return;
+  }catch(e){
+    console.warn('Firestore watchlist load failed',e.message);
+    setSyncStatus('fail','⚠️ 使用本機備份');
+  }
   const raw=JSON.parse(localStorage.getItem(WL_KEY)||'[]');
-  WL_LIST=raw.map(x=>typeof x==='string'?{stock_id:x,stock_name:getLocalName(x)||x}:x);
+  WL_LIST=normalizeWatchlist(raw);
 }
 
 async function saveWatchlistToServer(){
-  // 同時存 localStorage 備援
+  WL_LIST = normalizeWatchlist(WL_LIST);
   localStorage.setItem(WL_KEY,JSON.stringify(WL_LIST));
+  setSyncStatus('loading','⏳ 同步中');
   try{
-    await apiFetch(`${API_BASE_URL}/api/watchlist`,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({watchlist:WL_LIST})},10000);
-  }catch(e){console.warn('watchlist server save failed',e.message)}
+    await window.saveWatchlistToCloud(WL_LIST);
+    setSyncStatus('ok','☁️ 已同步');
+  }catch(e){
+    console.warn('Firestore watchlist save failed',e.message);
+    setSyncStatus('fail','⚠️ 同步失敗，本機備份');
+  }
 }
 
 /* ── 自選股排序 ─────────────────────────────────────────────────── */
