@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>台股 MONITOR V9 Stable</title>
+<title>台股 MONITOR V9.2 Stable</title>
 <script src="config.js"></script>
 <style>
 :root{
@@ -80,6 +80,12 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .avoid.sig-badge,.card.avoid .sig-badge{background:rgba(0,184,107,.1);color:var(--down);border:1px solid rgba(0,184,107,.25)}
 .card-conf{font-family:var(--mono);font-size:11px;color:var(--muted)}
 .conf-bar{height:3px;background:#172946;border-radius:2px;overflow:hidden;margin-top:4px}
+.card-quality-row{display:flex;gap:4px;flex-wrap:wrap;margin:3px 0 2px}
+.sq-tag{font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:5px;font-weight:600}
+.sq-full{background:rgba(0,184,107,.12);color:var(--down);border:1px solid rgba(0,184,107,.25)}
+.sq-partial{background:rgba(251,191,36,.12);color:var(--yellow);border:1px solid rgba(251,191,36,.3)}
+.sq-nd{background:rgba(100,116,139,.15);color:var(--muted);border:1px solid var(--line)}
+.sq-none{background:rgba(100,116,139,.15);color:var(--muted);border:1px solid var(--line)}
 .conf-bar-fill{height:100%;border-radius:2px;transition:width .5s}
 /* Colors */
 .up{color:var(--up)!important}.down{color:var(--down)!important}.flat{color:var(--flat)!important}
@@ -261,7 +267,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="logo">
     <span class="live-dot"></span>
     台股<span style="color:var(--down)">MONITOR</span>
-    <span class="ver">V9 Stable</span>
+    <span class="ver">V9.2 Stable</span>
   </div>
   <span class="clock" id="clock"></span>
 </header>
@@ -698,12 +704,26 @@ async function saveWatchlist() {
 
 /* ── 排序 ────────────────────────────────────────────────────────── */
 function sortWL(ids) {
-  const rank={BUY:3,WATCH:2,AVOID:1};
+  // ★ V9.2: 五層排序
+  // 1. BUY   full       2. WATCH full       3. WATCH partial
+  // 4. AVOID full/part  5. 無資料
+  function sortKey(c) {
+    if(!c||c.noData) return 60;
+    const sig=c.signal||"WATCH", q=c.scoreQuality||"none";
+    if(sig==="BUY"   && q==="full")    return 10;
+    if(sig==="WATCH" && q==="full")    return 20;
+    if(sig==="WATCH" && q==="partial") return 30;
+    if(sig==="AVOID" && q==="full")    return 40;
+    if(sig==="AVOID" && q==="partial") return 45;
+    if(q==="none")                     return 50;
+    return 55;
+  }
   return [...ids].sort((a,b)=>{
     const A=WL_CACHE[a]||{},B=WL_CACHE[b]||{};
     if(A.error&&!B.error)return 1;if(!A.error&&B.error)return -1;
-    const rA=rank[A.signal]||0,rB=rank[B.signal]||0;
-    if(rB!==rA)return rB-rA;
+    const kA=sortKey(A),kB=sortKey(B);
+    if(kA!==kB)return kA-kB;
+    // 同層級：confidence 高的排前面（null 排後）
     const cA=A.confidence??-1,cB=B.confidence??-1;
     if(cB!==cA)return cB-cA;
     return (B.changePct??-999)-(A.changePct??-999);
@@ -728,8 +748,22 @@ function cardHTML(id) {
     <div class="conf-bar"><div class="conf-bar-fill" style="width:0%"></div></div>
   </div>`;
   const clr=twcc(c.changePct),pT=c.price!=null?f(c.price):"—",cT=pct(c.changePct);
-  const sig=c.signal||"WATCH",cls=sigCls(sig),conf=c.confidence??0;
-  const barC=conf>=75?"var(--up)":conf>=55?"var(--yellow)":"var(--down)";
+  const sig=c.signal||"WATCH",cls=sigCls(sig);
+  // ★ V9.2: 三層顯示邏輯
+  const conf   = c.confidence??null;   // null = 無資料 or 估算中
+  const quality= c.scoreQuality||"none";
+  const status = c.scoreStatus||"";
+  const confTxt= conf!=null ? conf+"/100" : "—";
+  const confW  = conf!=null ? conf : 0;
+  // 進度條顏色：全資料=正常色，估算=黃色，無資料=灰
+  const barC = quality==="full"
+    ? (conf>=75?"var(--up)":conf>=55?"var(--yellow)":"var(--down)")
+    : quality==="partial" ? "var(--yellow)"
+    : "var(--flat)";
+  // 狀態標籤
+  const qualityTag = quality==="full"  ? `<span class="sq-tag sq-full">正式分數</span>`
+                   : quality==="partial" ? `<span class="sq-tag sq-partial">估算分</span><span class="sq-tag sq-nd">資料不足</span>`
+                   : `<span class="sq-tag sq-none">無資料</span>`;
   const nm=dsn(id,c.name||nameFallback);
   const ep=c.entryPrice!=null?`<div class="card-ep">入場 ${f(c.entryPrice)} 目標 ${c.targetPrice?f(c.targetPrice):"—"} 止蝕 ${c.stopLoss?f(c.stopLoss):"—"}</div>`:"";
   return `<div class="card ${cls}${id===CURRENT_ID?" selected":""}" id="wc-${id}" onclick="loadStock('${id}')">
@@ -739,8 +773,9 @@ function cardHTML(id) {
     </div>
     <div class="card-price-row"><span class="card-price ${clr}">${pT}</span><span class="card-chg ${clr}">${cT}</span></div>
     ${ep}
-    <div class="card-sig-row"><span class="sig-badge">${sigIcon(sig)}</span><span class="card-conf">${conf>0?conf+"/100":"—"}</span></div>
-    <div class="conf-bar"><div class="conf-bar-fill" style="width:${conf}%;background:${barC}"></div></div>
+    <div class="card-sig-row"><span class="sig-badge">${sigIcon(sig)}</span><span class="card-conf">${confTxt}</span></div>
+    <div class="card-quality-row">${qualityTag}</div>
+    <div class="conf-bar"><div class="conf-bar-fill" style="width:${confW}%;background:${barC}"></div></div>
   </div>`;
 }
 
@@ -757,12 +792,15 @@ async function fetchOneWL(id) {
     if(!r.ok) throw new Error("stock-lite " + r.status);
     const d = await r.json(); const ai = d.ai_signal||{};
     WL_CACHE[id] = {
-      name:        d.stock_name || getLocalName(id) || id,
-      price:       d.price??null, changePct: d.change_pct??null,
-      signal:      ai.signal||null, confidence: ai.confidence??null,
-      entryPrice:  ai.entry_price??null, targetPrice: ai.target_price??null,
-      stopLoss:    ai.stop_loss??null,
-      riskLevel:   ai.risk_model?.risk_level||null, error:false, noData:false,
+      name:         d.stock_name || getLocalName(id) || id,
+      price:        d.price??null, changePct: d.change_pct??null,
+      signal:       ai.signal||null,
+      confidence:   ai.confidence??null,       // null = 無資料
+      scoreStatus:  ai.score_status||null,
+      scoreQuality: ai.score_quality||"none",  // "full"|"partial"|"none"
+      entryPrice:   ai.entry_price??null, targetPrice: ai.target_price??null,
+      stopLoss:     ai.stop_loss??null,
+      riskLevel:    ai.risk_model?.risk_level||null, error:false, noData:false,
     };
     const item=WL.find(x=>x.stock_id===id);
     if(item&&d.stock_name&&d.stock_name!==id)item.stock_name=d.stock_name;
@@ -930,7 +968,10 @@ async function doSearch(forceId) {
       const d1=await r1.json();
       renderStockLite(d1);
       WL_CACHE[id]={name:d1.stock_name||id,price:d1.price??null,changePct:d1.change_pct??null,
-        signal:d1.ai_signal?.signal||null,confidence:d1.ai_signal?.confidence??null,
+        signal:d1.ai_signal?.signal||null,
+        confidence:d1.ai_signal?.confidence??null,
+        scoreStatus:d1.ai_signal?.score_status||null,
+        scoreQuality:d1.ai_signal?.score_quality||"none",
         entryPrice:d1.ai_signal?.entry_price??null,targetPrice:d1.ai_signal?.target_price??null,
         stopLoss:d1.ai_signal?.stop_loss??null,riskLevel:d1.ai_signal?.risk_model?.risk_level||null,error:false,noData:false};
       renderWL();
@@ -947,7 +988,10 @@ async function doSearch(forceId) {
     const d2=await r2.json();
     renderStock(d2);
     WL_CACHE[id]={name:d2.stock_name||id,price:d2.price?.close??null,changePct:d2.price?.change_pct??null,
-      signal:d2.ai_signal?.signal||null,confidence:d2.ai_signal?.confidence??null,
+      signal:d2.ai_signal?.signal||null,
+      confidence:d2.ai_signal?.confidence??null,
+      scoreStatus:d2.ai_signal?.score_status||null,
+      scoreQuality:d2.ai_signal?.score_quality||"none",
       entryPrice:d2.ai_signal?.entry_price??null,targetPrice:d2.ai_signal?.target_price??null,
       stopLoss:d2.ai_signal?.stop_loss??null,riskLevel:d2.ai_signal?.risk_model?.risk_level||null,error:false,noData:false};
     renderWL(); checkLineStatus();
@@ -1119,7 +1163,7 @@ function render4D(a4, news, container){
 }
 
 function renderNews(news){
-  if(!news||!news.length)return'<div style="color:var(--muted);font-family:var(--mono);font-size:12px">暫無相關新聞</div>';
+  if(!news||!news.length)return'<div style="color:var(--muted);font-family:var(--mono);font-size:12px;padding:8px;background:#0d1728;border-radius:7px">暫無即時新聞資料，消息面暫以中性處理</div>';
   return news.map(n=>{const cls=n.sentiment==="利多"?"s-bull":n.sentiment==="利空"?"s-bear":"s-neu";
     return `<div class="news-item"><a href="${n.link}" target="_blank" rel="noopener">${n.title}</a><div class="news-meta"><span class="stag ${cls}">${n.sentiment}</span><span>${fmtD(n.pub_date)}</span></div></div>`;
   }).join("");

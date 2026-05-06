@@ -20,7 +20,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="台股監測 API V9", version="9.0-stable-firestore")
+app = FastAPI(title="台股監測 API V9.1", version="9.1-stable-firestore")
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
 _raw_origins = os.getenv(
@@ -532,27 +532,61 @@ async def _fetch_stock_name_from_api(stock_id: str) -> str:
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 新聞（僅供四面向分析使用）
+# 多關鍵字 fallback + 5s timeout + 永不失敗，失敗回傳中性預設值
 # ══════════════════════════════════════════════════════════════════════════════
+NEWS_TIMEOUT = 5   # 新聞專用 timeout，降低等待時間
+
+_NEWS_FALLBACK_4D = {
+    "score": 50, "rating": "中", "sentiment": "中性",
+    "bullish_count": 0, "bearish_count": 0, "neutral_count": 0,
+    "top_news": [], "risk_keywords": [],
+    "reasons": ["暫時無法取得即時新聞，先以中性處理"],
+    "risks": [],
+}
+
 async def fetch_news(stock_id: str, stock_name: str = "") -> list:
-    query = stock_name if stock_name and stock_name != stock_id else stock_id
+    """
+    依序嘗試多關鍵字，任何失敗都 continue，不 raise。
+    最終回傳去重後最多 10 筆，或空 list（由 analyze_news_4d 處理為中性）。
+    """
+    name = stock_name if stock_name and stock_name != stock_id else ""
+    # 搜尋優先順序：名稱+代號 → 名稱+台股 → 代號+台股 → 純名稱
+    queries = []
+    if name:
+        queries.append(f"{name} {stock_id}")
+        queries.append(f"{name} 台股")
+    queries.append(f"{stock_id} 台股")
+    if name:
+        queries.append(name)
+
     items = []
     try:
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-            for url in [f"https://news.google.com/rss/search?q={query}+台股&hl=zh-TW&gl=TW&ceid=TW:zh-TW",
-                        f"https://news.google.com/rss/search?q={stock_id}&hl=zh-TW&gl=TW&ceid=TW:zh-TW"]:
+        async with httpx.AsyncClient(timeout=NEWS_TIMEOUT, follow_redirects=True) as client:
+            for q in queries:
+                if items: break  # 已有新聞，停止嘗試
+                url = f"https://news.google.com/rss/search?q={q}&hl=zh-TW&gl=TW&ceid=TW:zh-TW"
                 try:
-                    r = await client.get(url, follow_redirects=True)
+                    r = await client.get(url)
+                    if r.status_code != 200: continue
                     root = ET.fromstring(r.content)
                     for el in root.findall(".//item")[:10]:
-                        title = el.findtext("title","")
-                        items.append({"title":title,"link":el.findtext("link",""),
-                                      "pub_date":el.findtext("pubDate",""),"sentiment":score_sentiment(title)})
-                    if items: break
-                except: continue
-    except: pass
+                        title = el.findtext("title", "").strip()
+                        if not title: continue
+                        items.append({
+                            "title":     title,
+                            "link":      el.findtext("link", ""),
+                            "pub_date":  el.findtext("pubDate", ""),
+                            "sentiment": score_sentiment(title),
+                        })
+                except Exception:
+                    continue
+    except Exception:
+        pass   # 網路整體失敗，回傳空 list
+
     seen, unique = set(), []
     for n in items:
-        if n["title"] not in seen: seen.add(n["title"]); unique.append(n)
+        if n["title"] not in seen:
+            seen.add(n["title"]); unique.append(n)
     return unique[:10]
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -852,8 +886,13 @@ def analyze_fundamental_4d(fund: dict) -> dict:
 
 def analyze_news_4d(news: list) -> dict:
     if not news:
-        return {"score":50,"rating":"中性","sentiment":"中性","bullish_count":0,"bearish_count":0,"neutral_count":0,
-                "top_news":[],"risk_keywords":[],"reasons":["暫無相關新聞"],"risks":[]}
+        return {
+            "score": 50, "rating": "中", "sentiment": "中性",
+            "bullish_count": 0, "bearish_count": 0, "neutral_count": 0,
+            "top_news": [], "risk_keywords": [],
+            "reasons": ["暫時無法取得即時新聞，先以中性處理"],
+            "risks": [],
+        }
     bull = sum(1 for n in news if n.get("sentiment")=="利多"); bear = sum(1 for n in news if n.get("sentiment")=="利空")
     neu  = sum(1 for n in news if n.get("sentiment")=="中性")
     risk_kws = list(dict.fromkeys([kw for kw in RISK_KEYWORDS for n in news if kw in n.get("title","")]))[:5]
@@ -905,73 +944,162 @@ def compute_entry_price(row: pd.Series, current_price: float, signal: str) -> fl
     return round(current_price, 2)
 
 # ══════════════════════════════════════════════════════════════════════════════
-# AI 訊號（輕量版，供 stock / stock-lite / scan / alerts 使用）
+# AI 訊號輕量版 V9.2 三層評分：正式分數 / 估算分 / 無資料
 # ══════════════════════════════════════════════════════════════════════════════
-def compute_ai_signal_lite(row: pd.Series, winrate_info: dict, current_price: float, macro: dict | None = None) -> dict:
-    try:
-        def _g(col): return float(row[col]) if col in row.index and pd.notna(row.get(col)) else None
-        rsi_val  = _g("RSI"); ma5_val  = _g("MA5"); ma20_val = _g("MA20"); ma60_val = _g("MA60")
-        macd_val = _g("MACD"); sig_val = _g("Signal"); hist_val = _g("Hist")
-        wr = winrate_info.get("winrate",0); trials = winrate_info.get("trials",0)
-        score = 0
-        if ma20_val and current_price > ma20_val: score += 10
-        if ma5_val and ma20_val and ma5_val > ma20_val: score += 10
-        if ma20_val and ma60_val and ma20_val > ma60_val: score += 10
-        if macd_val and sig_val and macd_val > sig_val: score += 10
-        if hist_val and hist_val > 0: score += 5
-        if rsi_val:
-            if 45 <= rsi_val <= 68: score += 10
-            elif rsi_val > 75: score -= 10
-            elif rsi_val < 35: score -= 5
-        if trials >= 5:
-            if wr >= 65: score += 20
-            elif wr >= 55: score += 12
-            elif wr >= 45: score += 6
-        risk_penalty = 0
-        if rsi_val and rsi_val > 75: risk_penalty -= 8
-        if rsi_val and rsi_val < 35: risk_penalty -= 4
-        if ma20_val and ma20_val > 0:
-            pct = (current_price - ma20_val) / ma20_val * 100
-            if pct > 12: risk_penalty -= 8
-        if trials < 5: risk_penalty -= 5
-        macro_penalty = 0; macro = macro or {}
-        if macro.get("usd_twd") and macro["usd_twd"] > 32.0: macro_penalty -= 3
-        if macro.get("dxy") and macro["dxy"] > 104: macro_penalty -= 3
-        final_score = max(0, min(100, score + risk_penalty + macro_penalty))
-        risk_level  = "HIGH" if (risk_penalty+macro_penalty)<=-15 else "MEDIUM" if (risk_penalty+macro_penalty)<=-8 else "LOW"
-        if final_score >= 75:   signal = "BUY"
-        elif final_score >= 55: signal = "WATCH"
-        else:                   signal = "AVOID"
-        if signal == "BUY":     target_price = round(current_price * 1.06, 2)
-        elif signal == "WATCH": target_price = round(current_price * 1.03, 2)
-        else:                   target_price = None
-        stop_loss = round(ma20_val * 0.98, 2) if ma20_val else round(current_price * 0.95, 2)
-        if target_price and stop_loss and current_price > stop_loss:
-            rr = round((target_price - current_price) / (current_price - stop_loss), 2)
-            risk_reward_ratio = rr if rr > 0 else None
-        else: risk_reward_ratio = None
-        if signal == "BUY" and (risk_reward_ratio is None or risk_reward_ratio < 1.5): signal = "WATCH"
-        if signal == "BUY" and wr < 50 and trials >= 5: signal = "WATCH"
-        entry_price = None
+def compute_ai_signal_lite(
+    row: pd.Series,
+    winrate_info: dict,
+    current_price: float,
+    macro: dict | None = None,
+    price_df_len: int = 0,
+    realtime_quote: dict | None = None,
+) -> dict:
+    """
+    三層評分（V9.2）：
+    ─────────────────────────────────────────────────
+    Layer 1「正式分數」score_quality="full"：
+        ≥60 筆歷史 + MA20/MA60/RSI/MACD/Signal 完整
+        V7 六條件評分 0~100，可給 BUY/WATCH/AVOID
+
+    Layer 2「估算分」score_quality="partial"：
+        有即時價，資料不足
+        base_score=50，依可用資料加減分 max(20,min(80,score))
+        最高只給 WATCH，不給 BUY
+
+    Layer 3「無資料」score_quality="none"：
+        連即時價都沒有 → confidence=null
+    ─────────────────────────────────────────────────
+    """
+    macro = macro or {}
+    rt    = realtime_quote or {}
+
+    def _g(col):
+        return float(row[col]) if col in row.index and pd.notna(row.get(col)) else None
+
+    def _make_result(signal, confidence, quality, status, note, entry_p, target_p, stop_l, rr):
+        return {
+            "signal":            signal,
+            "confidence":        confidence,
+            "score_status":      status,
+            "score_quality":     quality,
+            "score_note":        note,
+            "entry_price":       entry_p,
+            "target_price":      target_p,
+            "stop_loss":         stop_l,
+            "holding_days":      "不建議持有" if signal == "AVOID" else (
+                                 "5-10 天" if (confidence or 0) >= 75 else "3-5 天"),
+            "risk_reward_ratio": rr,
+            "risk_model":        {
+                "risk_level":  "LOW" if (confidence or 0) >= 75 else
+                               "MEDIUM" if (confidence or 0) >= 55 else "HIGH",
+                "final_score": confidence,
+            },
+            "entry_reason":   [], "risk_reason": [],
+            "score_breakdown": {"trend": 0, "momentum": 0, "volume": 0, "backtest": 0, "news": 0},
+            "macro_context":  {
+                "usd_twd": macro.get("usd_twd"),
+                "dxy":     macro.get("dxy"),
+                "note":    macro.get("risk_note", ""),
+            },
+            "summary":    "技術面分析完成，四面向分析請按需載入。",
+            "disclaimer": "⚠️ 本工具僅供參考，非投資建議",
+        }
+
+    # ── Layer 3: 無價格 ─────────────────────────────────────────────────────
+    if current_price <= 0:
+        return _make_result("WATCH", None, "none", "無資料",
+                            "目前無法取得即時報價", None, None, None, None)
+
+    ma5_val  = _g("MA5");  ma20_val = _g("MA20"); ma60_val = _g("MA60")
+    rsi_val  = _g("RSI");  macd_val = _g("MACD"); sig_val  = _g("Signal"); hist_val = _g("Hist")
+
+    # 共用：入場/目標/止蝕計算
+    def _calc_prices(signal):
+        if signal == "BUY":     tp = round(current_price * 1.06, 2)
+        elif signal == "WATCH": tp = round(current_price * 1.03, 2)
+        else:                   tp = None
+        sl = round(ma20_val * 0.98, 2) if ma20_val else round(current_price * 0.95, 2)
+        ep = None
         if signal != "AVOID":
-            if ma5_val and current_price > ma5_val: entry_price = round(ma5_val, 2)
-            elif ma20_val and current_price > ma20_val: entry_price = round(ma20_val, 2)
-            else: entry_price = round(current_price, 2) if signal == "WATCH" else round(current_price * 1.01, 2)
-        holding_days = "5-10 天" if wr >= 65 else ("3-5 天" if wr >= 50 else "不建議持有")
-        return {"signal":signal,"confidence":final_score,"entry_price":entry_price,"target_price":target_price,
-                "stop_loss":stop_loss,"holding_days":holding_days,"risk_reward_ratio":risk_reward_ratio,
-                "risk_model":{"risk_level":risk_level,"final_score":final_score,"base_score":score,
-                              "risk_penalty":risk_penalty,"macro_penalty":macro_penalty,"a4_bonus":0,"risk_factors":[]},
-                "entry_reason":[],"risk_reason":[],"score_breakdown":{"trend":min(30,max(0,score//3)),"momentum":0,"volume":0,"backtest":0,"news":0},
-                "macro_context":{"usd_twd":macro.get("usd_twd"),"dxy":macro.get("dxy"),"note":macro.get("risk_note","")},
-                "summary":"技術面分析完成，四面向分析請按需載入。",
-                "disclaimer":"⚠️ 本工具僅供參考，非投資建議"}
-    except Exception:
-        return {"signal":"WATCH","confidence":0,"entry_price":None,"target_price":None,"stop_loss":None,
-                "holding_days":"不建議持有","risk_reward_ratio":None,
-                "risk_model":{"risk_level":"HIGH","final_score":0},"entry_reason":[],"risk_reason":[],
-                "score_breakdown":{"trend":0,"momentum":0,"volume":0,"backtest":0,"news":0},
-                "macro_context":{},"summary":"資料不足","disclaimer":"⚠️ 本工具僅供參考，非投資建議"}
+            if ma5_val  and current_price > ma5_val:  ep = round(ma5_val,  2)
+            elif ma20_val and current_price > ma20_val: ep = round(ma20_val, 2)
+            else: ep = round(current_price, 2)
+        if tp and sl and current_price > sl:
+            rr = round((tp - current_price) / (current_price - sl), 2)
+            rr = rr if rr > 0 else None
+        else:
+            rr = None
+        # BUY 降級：RR 不足
+        if signal == "BUY" and (rr is None or rr < 1.5):
+            signal = "WATCH"
+            tp = round(current_price * 1.03, 2)
+            if sl and current_price > sl:
+                rr2 = round((tp - current_price) / (current_price - sl), 2)
+                rr = rr2 if rr2 > 0 else None
+        return signal, ep, tp, sl, rr
+
+    # ── Layer 1: 正式分數（≥60 筆歷史 + 指標齊全）────────────────────────────
+    full_indicators = all(v is not None for v in [ma20_val, ma60_val, rsi_val, macd_val, sig_val])
+    if price_df_len >= 60 and full_indicators:
+        score = 0
+        if ma5_val  and ma20_val and ma5_val  > ma20_val: score += 20   # MA5 > MA20
+        if ma20_val and current_price         > ma20_val: score += 20   # close > MA20
+        if ma20_val and ma60_val  and ma20_val > ma60_val: score += 20  # MA20 > MA60
+        if rsi_val  and 45 <= rsi_val <= 70:               score += 15  # RSI 健康
+        if macd_val and sig_val   and macd_val > sig_val:  score += 15  # MACD 金叉
+        if hist_val and hist_val  > 0:                     score += 10  # Histogram 正
+
+        penalty = 0
+        if rsi_val and rsi_val > 78: penalty -= 10
+        if rsi_val and rsi_val < 30: penalty -= 5
+        if ma20_val and ma20_val > 0:
+            if (current_price - ma20_val) / ma20_val * 100 > 15: penalty -= 8
+        if macro.get("usd_twd") and macro["usd_twd"] > 32.0: penalty -= 3
+        if macro.get("dxy")     and macro["dxy"]     > 104:   penalty -= 3
+
+        final = max(0, min(100, score + penalty))
+        if final >= 75:   sig = "BUY"
+        elif final >= 55: sig = "WATCH"
+        else:             sig = "AVOID"
+        sig, ep, tp, sl, rr = _calc_prices(sig)
+        return _make_result(sig, final, "full", "正式分數", "", ep, tp, sl, rr)
+
+    # ── Layer 2: 估算分（有即時價，但資料不足）───────────────────────────────
+    adj = 0
+    chg_p = rt.get("change_pct")
+    prev  = rt.get("previous_close")
+
+    if chg_p is not None:
+        cp = float(chg_p)
+        if   cp >  3: adj += 8
+        elif cp >  1: adj += 5
+        elif cp < -3: adj -= 8
+        elif cp < -1: adj -= 5
+
+    if prev and current_price:
+        if   current_price > float(prev): adj += 5
+        elif current_price < float(prev): adj -= 5
+
+    if ma20_val:
+        if   current_price > ma20_val: adj += 10
+        elif current_price < ma20_val: adj -= 10
+
+    if rsi_val:
+        if   45 <= rsi_val <= 70: adj += 10
+        elif rsi_val > 75:        adj -= 10
+        elif rsi_val < 35:        adj -= 8
+
+    if macd_val is not None and sig_val is not None:
+        if   macd_val > sig_val: adj += 8
+        elif macd_val < sig_val: adj -= 8
+
+    est = max(20, min(80, 50 + adj))
+    # 估算分：最高只給 WATCH
+    sig = "WATCH" if est >= 55 else "AVOID"
+    sig, ep, tp, sl, rr = _calc_prices(sig)
+    return _make_result(sig, est, "partial", "估算分",
+                        "資料不足，先以即時價與可用技術資料估算",
+                        ep, tp, sl, rr)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # LINE
@@ -1016,7 +1144,7 @@ def advanced_backtest(df, holding_days=5, min_score=75):
         wi  = {"winrate":0,"trials":0,"wins":0}
         cur = float(row["收盤價"])
         ai  = compute_ai_signal_lite(row, wi, cur)
-        if ai["confidence"] < min_score: continue
+        if (ai.get("confidence") or 0) < min_score: continue
         ep  = float(df.iloc[i+holding_days]["收盤價"]); rp = round((ep-cur)/cur*100,2)
         trades.append({"date":row["日期"].strftime("%Y-%m-%d"),"entry_price":cur,"exit_price":ep,
                        "return_pct":rp,"win":ep>cur,"confidence":ai["confidence"],"signal":ai["signal"]})
@@ -1118,11 +1246,16 @@ async def _analyze_stock_core(stock_id: str) -> dict:
 async def _analyze_stock_lite(stock_id: str) -> dict:
     """超輕量：TWSE MIS 即時 → 90天歷史 → AI signal，不抓四面向/新聞"""
     stock_name = get_stock_name(stock_id)
-    fallback_ai = {"signal":"WATCH","confidence":0,"entry_price":None,"target_price":None,"stop_loss":None,
-                   "holding_days":"不建議持有","risk_reward_ratio":None,
-                   "risk_model":{"risk_level":"HIGH","final_score":0},"entry_reason":[],"risk_reason":[],
-                   "score_breakdown":{"trend":0,"momentum":0,"volume":0,"backtest":0,"news":0},
-                   "macro_context":{},"summary":"資料不足","disclaimer":"⚠️ 本工具僅供參考，非投資建議"}
+    fallback_ai = {
+        "signal": "WATCH", "confidence": None, "score_status": "無資料", "score_quality": "none",
+        "score_note": "目前無法取得即時報價",
+        "entry_price": None, "target_price": None, "stop_loss": None,
+        "holding_days": "不建議持有", "risk_reward_ratio": None,
+        "risk_model": {"risk_level": "MEDIUM", "final_score": None},
+        "entry_reason": [], "risk_reason": [],
+        "score_breakdown": {"trend": 0, "momentum": 0, "volume": 0, "backtest": 0, "news": 0},
+        "macro_context": {}, "summary": "資料不足", "disclaimer": "⚠️ 本工具僅供參考，非投資建議",
+    }
     try:
         rt = await fetch_realtime_quote(stock_id)
         if rt and rt.get("stock_name"): stock_name = rt["stock_name"]
@@ -1137,15 +1270,44 @@ async def _analyze_stock_lite(stock_id: str) -> dict:
                 change  = round(price - prev_c, 2)
                 chg_pct = round(change / prev_c * 100, 2) if prev_c else None
         cur_price = price or 0.0
-        ai = fallback_ai.copy()
+
+        # ★ V9.2: 傳入 price_df_len + realtime_quote，供三層評分使用
         if not price_df.empty and cur_price > 0:
             price_df = compute_indicators(price_df)
             latest   = price_df.iloc[-1]
             wr_info  = backtest_winrate(price_df)
-            ai       = compute_ai_signal_lite(latest, wr_info, cur_price)
+            ai = compute_ai_signal_lite(
+                latest, wr_info, cur_price,
+                price_df_len=len(price_df),
+                realtime_quote=rt,
+            )
+        elif cur_price > 0:
+            # 有即時價但無歷史資料 → 估算分
+            ai = compute_ai_signal_lite(
+                pd.Series(), {"winrate":0,"trials":0,"wins":0}, cur_price,
+                price_df_len=0,
+                realtime_quote=rt,
+            )
+        else:
+            # 完全無資料 → 無資料層
+            ai = compute_ai_signal_lite(
+                pd.Series(), {"winrate":0,"trials":0,"wins":0}, 0,
+                price_df_len=0,
+                realtime_quote=rt,
+            )
+
         record_ai_signal(stock_id, stock_name, ai, None, source="stock-lite")
-        return {"stock_id":stock_id,"stock_name":stock_name,"price":price,"change":change,"change_pct":chg_pct,
-                "realtime_quote":rt,"ai_signal":ai,"data_source":hist_src if not price_df.empty else "TWSE MIS","lite":True}
+        return {
+            "stock_id":       stock_id,
+            "stock_name":     stock_name,
+            "price":          price,
+            "change":         change,
+            "change_pct":     chg_pct,
+            "realtime_quote": rt,
+            "ai_signal":      ai,
+            "data_source":    hist_src if not price_df.empty else "TWSE MIS",
+            "lite":           True,
+        }
     except Exception as e:
         return {"stock_id":stock_id,"stock_name":stock_name,"price":None,"change":None,"change_pct":None,
                 "realtime_quote":None,"ai_signal":fallback_ai,"data_source":"error","lite":True,"error":str(e)}
@@ -1349,7 +1511,7 @@ def api_learning_retrain():
 # ── Health ───────────────────────────────────────────────────────────────────
 @app.get("/health")
 def health():
-    return {"status":"ok","version":"9.0-stable-firestore","time":datetime.now().isoformat(),
+    return {"status":"ok","version":"9.2-stable","time":datetime.now().isoformat(),
             "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
             "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
             "price_sources":"Yahoo Finance → TWSE Official → FinMind",
