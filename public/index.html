@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>台股 MONITOR V9.2 Stable</title>
+<title>台股 MONITOR V9.2 Enhanced Stable</title>
 <script src="config.js"></script>
 <style>
 :root{
@@ -267,7 +267,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="logo">
     <span class="live-dot"></span>
     台股<span style="color:var(--down)">MONITOR</span>
-    <span class="ver">V9.2 Stable</span>
+    <span class="ver">V9.2 Enhanced</span>
   </div>
   <span class="clock" id="clock"></span>
 </header>
@@ -1089,7 +1089,7 @@ async function load4d(){
     const r=await apiFetch(`${API}/api/analysis-4d/${CURRENT_ID}`,{},90000);
     if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.detail||"四面向分析失敗");}
     const d=await r.json();
-    render4D(d.analysis_4d, d.news||[], container);
+    render4D(d.analysis_4d, d.news||[], container, d.ai_signal||{});
     $("newsSection").style.display="block";
     $("dNews").innerHTML=renderNews(d.news||[]);
   }catch(e){
@@ -1097,22 +1097,65 @@ async function load4d(){
   }
 }
 
-function render4D(a4, news, container){
+function render4D(a4, news, container, aiSig){
   if(!a4){container.innerHTML='<div class="d4-status info warn">四面向資料不可用</div>';return;}
   const {fundamental:fu,technical:te,chip:ch,news:nw,overall:ov}=a4;
+  const ai = aiSig || {};
+  let html = '';
 
-  // Overall
+  // ══ ★ V9.2E 交易建議卡（置頂）══════════════════════════════════════════
+  const sigLabel = ai.signal==="BUY"?"📈 BUY":ai.signal==="AVOID"?"🚫 AVOID":"👀 WATCH";
+  const sigCss   = ai.signal==="BUY"?"ai-buy":ai.signal==="AVOID"?"ai-avoid":"ai-watch";
+  const dqLabel  = ai.data_quality==="official"?"正式資料":ai.data_quality==="estimated"?"部分估算":"資料不足";
+  const dqCss    = ai.data_quality==="official"?"sq-full":ai.data_quality==="estimated"?"sq-partial":"sq-none";
+  const esLabel  = ai.entry_status==="good_entry"?"✅ 可觀察入場"
+                 : ai.entry_status==="over_extended"?"⚠️ 已偏離建議入場價，不建議追高"
+                 : ai.entry_status==="dangerous"?"🚨 價格接近止蝕區，風險偏高" : "";
+  const rrWarn   = (ai.risk_reward_ratio!=null&&ai.risk_reward_ratio<1.5)
+                 ? `<div style="font-family:var(--mono);font-size:11px;color:var(--up);margin-top:5px">⚠️ RR 比偏低（${ai.risk_reward_ratio}x），不建議追高</div>` : "";
+  const conf = ai.confidence??0;
+  const barC = conf>=75?"var(--up)":conf>=55?"var(--yellow)":"var(--down)";
+
+  html += `<div style="background:#0d1728;border:2px solid ${ai.signal==='BUY'?'rgba(0,184,107,.4)':ai.signal==='AVOID'?'rgba(232,56,79,.4)':'rgba(251,191,36,.4)'};border-radius:12px;padding:16px;margin-bottom:14px">
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em">🤖 四面向綜合交易建議</div>
+    <div style="display:flex;align-items:stretch;gap:14px;flex-wrap:wrap">
+      <div class="ai-signal-block ${sigCss}" style="flex:0 0 140px;padding:12px 8px">
+        <div class="ai-label" style="font-size:20px">${sigLabel}</div>
+        <div class="ai-conf-txt">${conf>0?conf+' / 100':'—'}</div>
+        <span class="sq-tag ${dqCss}" style="margin-top:5px">${dqLabel}</span>
+      </div>
+      <div style="flex:1;min-width:200px">
+        <div style="height:6px;background:#172946;border-radius:3px;overflow:hidden;margin-bottom:10px">
+          <div style="width:${conf}%;height:100%;background:${barC};border-radius:3px;transition:width .6s"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px">
+          <div class="aiq"><div class="aiq-lbl">建議入場</div><div class="aiq-val">${ai.entry_price!=null?Number(ai.entry_price).toFixed(2):'—'}</div></div>
+          <div class="aiq"><div class="aiq-lbl">目標價</div><div class="aiq-val up">${ai.target_price!=null?Number(ai.target_price).toFixed(2):'—'}</div></div>
+          <div class="aiq"><div class="aiq-lbl">止蝕價</div><div class="aiq-val down">${ai.stop_loss!=null?Number(ai.stop_loss).toFixed(2):'—'}</div></div>
+          <div class="aiq"><div class="aiq-lbl">RR 比</div><div class="aiq-val ${(ai.risk_reward_ratio??0)>=1.5?'up':'down'}">${ai.risk_reward_ratio!=null?ai.risk_reward_ratio+'x':'—'}</div></div>
+        </div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted)">建議持有：${ai.holding_days||'—'}</div>
+        ${esLabel?`<div style="font-family:var(--mono);font-size:11px;color:var(--yellow);margin-top:4px">${esLabel}</div>`:''}
+        ${rrWarn}
+      </div>
+    </div>
+    <div style="font-size:13px;color:var(--text);line-height:1.6;background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.1);border-radius:7px;padding:9px 12px;margin-top:10px">${ai.summary||'—'}</div>
+    ${ai.entry_reason?.length?`<div style="margin-top:8px;font-size:12px;color:var(--down)">${ai.entry_reason.map(r=>'✅ '+r).join(' &nbsp;')}</div>`:''}
+    ${ai.risk_reason?.length?`<div style="margin-top:4px;font-size:12px;color:var(--up)">${ai.risk_reason.map(r=>'⚠️ '+r).join('<br>')}</div>`:''}
+  </div>`;
+
+  // ══ 四面向總分橫條圖 ════════════════════════════════════════════════════
   const ovScore=ov?.overall_score;
-  let html=`<div class="d4-overall">
+  html+=`<div class="d4-overall">
     <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:10px">
       <div class="d4-ov-score ${ovScore!=null?(ovScore>=65?"up":ovScore>=50?"flat":"down"):""}">${ovScore!=null?Math.round(ovScore):"—"}</div>
       <div>
         <div style="font-family:var(--mono);font-size:14px;font-weight:700">${ov?.rating||"—"}</div>
-        <div style="font-family:var(--mono);font-size:11px;color:var(--muted)">四面向總分</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted)">四面向加權總分</div>
       </div>
     </div>
     <div class="d4-bars">
-      ${[["基本面",fu,"#3b82f6",100],["技術面",te,"var(--cyan)",100],["籌碼面",ch,"var(--purple)",100],["消息面",nw,"var(--yellow)",100]].map(([label,v,color])=>{
+      ${[["基本面",fu,"#3b82f6"],["技術面",te,"var(--cyan)"],["籌碼面",ch,"var(--purple)"],["消息面",nw,"var(--yellow)"]].map(([label,v,color])=>{
         const s=v?.score; const pct=s!=null?Math.min(100,Math.round(s)):0;
         return `<div class="d4-bar-item"><span class="d4-bar-label">${label}</span><div class="d4-bar-track"><div class="d4-bar-seg" style="width:${pct}%;background:${color}"></div></div><span class="d4-bar-val">${s!=null?Math.round(s):"—"}</span></div>`;
       }).join("")}
@@ -1120,7 +1163,7 @@ function render4D(a4, news, container){
     <div class="d4-ov-summary">${ov?.summary||"—"}</div>
   </div>`;
 
-  // 4 cards
+  // ══ 四張面向卡片 ══════════════════════════════════════════════════════════
   html+='<div class="d4-grid">';
   const cards=[
     {label:"💰 基本面",icon:"#3b82f6",data:fu,extras:()=>{
@@ -1129,11 +1172,11 @@ function render4D(a4, news, container){
       if(d.eps!=null)tags.push(`EPS:${d.eps}`);if(d.revenue_yoy!=null)tags.push(`YoY:${d.revenue_yoy>0?"+":""}${d.revenue_yoy}%`);
       return tags.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${tags.map(t=>`<span style="font-family:var(--mono);font-size:10px;padding:2px 7px;background:#172946;border:1px solid var(--line);border-radius:5px;color:var(--muted)">${t}</span>`).join("")}</div>`:"";
     }},
-    {label:"📈 技術面（詳細）",icon:"var(--cyan)",data:te,extras:()=>{
+    {label:"📈 技術面",icon:"var(--cyan)",data:te,extras:()=>{
       const d=te||{};return d.trend?`<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:5px">趨勢：${d.trend}｜支撐：${d.support||"—"}｜壓力：${d.resistance||"—"}${d.atr?`｜ATR：${d.atr}`:""}</div>`:"";
     }},
     {label:"🏦 籌碼面",icon:"var(--purple)",data:ch,extras:()=>{
-      const d=ch||{}; if(!d.foreign_net_buy&&!d.margin_change)return'<div class="chip-table"><tr><td class="lbl" colspan="2">籌碼資料暫時無法取得</td></tr></table>';
+      const d=ch||{};if(!d.foreign_net_buy&&!d.margin_change)return'<div style="font-size:11px;color:var(--muted);margin-top:5px">籌碼資料暫時無法取得</div>';
       const fmt=v=>v!=null?(v>0?`<span class="up">+${v.toLocaleString()}</span>`:`<span class="down">${v.toLocaleString()}</span>`):"—";
       return `<table class="chip-table">${[["外資",d.foreign_net_buy],["投信",d.investment_trust_net_buy],["自營商",d.dealer_net_buy],["三大法人",d.three_major_total],["融資變化",d.margin_change],["融券變化",d.short_change]].map(([l,v])=>`<tr><td class="lbl">${l}</td><td>${fmt(v)}</td></tr>`).join("")}</table>`;
     }},
@@ -1146,14 +1189,14 @@ function render4D(a4, news, container){
     }},
   ];
   cards.forEach(({label,icon,data,extras})=>{
-    const s=data?.score; const rat=data?.rating||"資料不足"; const pct=s!=null?Math.min(100,s):0;
+    const s=data?.score; const rat=data?.rating||"資料不足"; const pct2=s!=null?Math.min(100,s):0;
     html+=`<div class="d4-card">
       <div class="d4-card-title">${label}</div>
       <div style="display:flex;align-items:center">
         <span class="d4-score ${s!=null?(s>=70?"up":s>=50?"flat":"down"):""}">${s!=null?Math.round(s):"—"}</span>
         <span class="d4-rating ${rat}">${rat}</span>
       </div>
-      <div class="d4-bar"><div class="d4-bar-fill" style="width:${pct}%;background:${icon}"></div></div>
+      <div class="d4-bar"><div class="d4-bar-fill" style="width:${pct2}%;background:${icon}"></div></div>
       <div class="d4-reasons">${(data?.reasons||[]).slice(0,3).map(r=>`✅ ${r}<br>`).join("")}${(data?.risks||[]).slice(0,2).map(r=>`⚠️ <span style="color:var(--up)">${r}</span><br>`).join("")}</div>
       ${extras()}
     </div>`;

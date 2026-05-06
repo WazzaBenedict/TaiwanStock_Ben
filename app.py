@@ -930,6 +930,162 @@ def compute_overall_4d(fundamental, technical, chip, news) -> dict:
     return {"overall_score":overall_score,"rating":rating,"summary":summary,"weights":weights,"scores":scores}
 
 # ══════════════════════════════════════════════════════════════════════════════
+# ★ V9.2E: 四面向 AI 訊號（按需載入後計算，整合四面向分數）
+# ══════════════════════════════════════════════════════════════════════════════
+def compute_4d_ai_signal(
+    overall_4d: dict,
+    fund_4d:    dict,
+    tech_4d:    dict,
+    chip_4d:    dict,
+    news_4d:    dict,
+    latest_row: pd.Series | None,
+    cur_price:  float,
+    macro:      dict | None = None,
+) -> dict:
+    """
+    在四面向分析後，重新計算完整 AI 訊號。
+    整合各面向分數，回傳含 data_quality / entry_status 的完整建議。
+    """
+    macro = macro or {}
+
+    # ── 1. 資料品質評估 ────────────────────────────────────────────────────────
+    scores_available = [s for s in [fund_4d.get("score"), tech_4d.get("score"),
+                                    chip_4d.get("score"), news_4d.get("score")] if s is not None]
+    n_avail = len(scores_available)
+    if n_avail >= 3:
+        data_quality = "official"
+    elif n_avail >= 1:
+        data_quality = "estimated"
+    else:
+        data_quality = "insufficient"
+
+    # ── 2. 四面向綜合信心分數 ──────────────────────────────────────────────────
+    ov_score = overall_4d.get("overall_score")   # 0~100，已加權
+
+    # 技術面分數額外加權（趨勢最直接）
+    tech_score = tech_4d.get("score") or 0
+    chip_score = chip_4d.get("score") or 50      # 中性基準
+    news_sent  = news_4d.get("sentiment","中性")
+
+    # 初始信心 = 四面向總分
+    base_conf = ov_score if ov_score is not None else 50
+
+    # 新聞情緒調整
+    news_adj = 5 if news_sent == "利多" else (-8 if news_sent == "利空" else 0)
+    # 籌碼強弱調整
+    chip_adj = 5 if chip_score >= 65 else (-6 if chip_score < 40 else 0)
+    # 技術面強弱
+    tech_adj = 5 if tech_score >= 70 else (-5 if tech_score < 45 else 0)
+
+    confidence = max(0, min(100, round(base_conf + news_adj + chip_adj + tech_adj)))
+
+    # ── 3. Signal 決策 ────────────────────────────────────────────────────────
+    # 資料不足時不給 BUY
+    can_buy = (data_quality == "official")
+
+    if   confidence >= 75 and can_buy: signal = "BUY"
+    elif confidence >= 55:             signal = "WATCH"
+    else:                              signal = "AVOID"
+
+    # ── 4. 入場/目標/止蝕 ─────────────────────────────────────────────────────
+    def _g(col):
+        if latest_row is None or col not in latest_row.index: return None
+        v = latest_row.get(col)
+        return float(v) if pd.notna(v) else None
+
+    ma5  = _g("MA5"); ma20 = _g("MA20")
+    support    = tech_4d.get("support")    or (cur_price * 0.95 if cur_price else None)
+    resistance = tech_4d.get("resistance") or (cur_price * 1.06 if cur_price else None)
+    atr        = tech_4d.get("atr")
+
+    # 入場價：pullback 到 MA5 / MA20
+    if signal == "BUY":
+        if ma5  and cur_price > ma5:  entry_price = round(ma5, 2)
+        elif ma20 and cur_price > ma20: entry_price = round(ma20, 2)
+        else: entry_price = round(cur_price * 1.01, 2)
+        target_price = round(min(resistance, cur_price * 1.08), 2) if resistance else round(cur_price * 1.06, 2)
+    elif signal == "WATCH":
+        entry_price  = round(ma20, 2) if ma20 and cur_price > ma20 else round(cur_price, 2)
+        target_price = round(cur_price * 1.03, 2)
+    else:
+        entry_price  = None
+        target_price = None
+
+    # 止蝕：support 或 MA20 * 0.98 或 ATR-based
+    if ma20:
+        stop_loss = round(ma20 * 0.97, 2)
+    elif support and cur_price:
+        stop_loss = round(support * 0.99, 2)
+    elif cur_price:
+        stop_loss = round(cur_price * 0.95, 2)
+    else:
+        stop_loss = None
+
+    # RR 比
+    if target_price and stop_loss and entry_price and entry_price > stop_loss:
+        rr = round((target_price - entry_price) / (entry_price - stop_loss), 2)
+        risk_reward_ratio = rr if rr > 0 else None
+    else:
+        risk_reward_ratio = None
+
+    # ── 5. RR 比風險過濾 ────────────────────────────────────────────────────────
+    if signal == "BUY" and (risk_reward_ratio is None or risk_reward_ratio < 1.5):
+        signal = "WATCH"
+    if signal == "WATCH" and risk_reward_ratio is not None and risk_reward_ratio < 1.0:
+        signal = "AVOID"
+
+    # ── 6. entry_status（入場時機）────────────────────────────────────────────
+    entry_status = "normal"
+    if entry_price and cur_price and stop_loss:
+        dev = (cur_price - entry_price) / entry_price * 100
+        dist_to_stop = (cur_price - stop_loss) / cur_price * 100
+        if dist_to_stop < 2:
+            entry_status = "dangerous"
+        elif dev > 5:
+            entry_status = "over_extended"
+        elif -2 <= dev <= 2:
+            entry_status = "good_entry"
+
+    # ── 7. 理由整理 ────────────────────────────────────────────────────────────
+    entry_reason, risk_reason = [], []
+    if tech_score >= 65:  entry_reason.append(f"技術面偏強（{tech_score:.0f}分）")
+    if chip_score >= 65:  entry_reason.append(f"籌碼面偏強（{chip_score:.0f}分）")
+    if news_sent == "利多": entry_reason.append("消息面偏多")
+    if tech_score < 45:   risk_reason.append(f"技術面偏弱（{tech_score:.0f}分）")
+    if chip_score < 40:   risk_reason.append(f"籌碼面偏弱（{chip_score:.0f}分）")
+    if news_sent == "利空": risk_reason.append("消息面偏空，注意轉弱風險")
+    if data_quality != "official": risk_reason.append(f"資料品質：{data_quality}，訊號僅供參考")
+    if entry_status == "over_extended": risk_reason.append("已偏離建議入場價，不建議追高")
+    if entry_status == "dangerous":     risk_reason.append("價格接近止蝕區，風險偏高")
+    if risk_reward_ratio and risk_reward_ratio < 1.5: risk_reason.append(f"RR 比 {risk_reward_ratio}x 偏低")
+
+    # ── 8. 摘要 ────────────────────────────────────────────────────────────────
+    parts = []
+    for k, v, _ in [("技術面",tech_4d,None),("籌碼面",chip_4d,None),("消息面",news_4d,None),("基本面",fund_4d,None)]:
+        s = v.get("score")
+        parts.append(f"{k}{'偏強' if s and s>=70 else ('普通' if s and s>=50 else ('偏弱' if s else '資料不足'))}")
+    act = {"BUY":"整體條件符合，可考慮入場。","WATCH":"訊號偏正但尚未完全確認，建議觀察。","AVOID":"條件不足，建議保守觀望。"}
+    summary = "，".join(parts) + "。" + act.get(signal,"")
+
+    holding_map = {"BUY":"5-10 天","WATCH":"3-5 天","AVOID":"不建議持有"}
+
+    return {
+        "signal":            signal,
+        "confidence":        confidence,
+        "data_quality":      data_quality,
+        "entry_status":      entry_status,
+        "entry_price":       entry_price,
+        "target_price":      target_price,
+        "stop_loss":         stop_loss,
+        "risk_reward_ratio": risk_reward_ratio,
+        "holding_days":      holding_map[signal],
+        "summary":           summary,
+        "entry_reason":      entry_reason[:4],
+        "risk_reason":       risk_reason[:4],
+        "disclaimer":        "⚠️ 本工具僅供參考，非投資建議",
+    }
+
+# ══════════════════════════════════════════════════════════════════════════════
 # 建議入場價
 # ══════════════════════════════════════════════════════════════════════════════
 def compute_entry_price(row: pd.Series, current_price: float, signal: str) -> float | None:
@@ -1363,45 +1519,87 @@ async def get_stock(stock_id: str):
     if not re.match(r"^\d{4,6}$", stock_id): raise HTTPException(400, detail="股票代號格式錯誤，請輸入 4~6 位數字")
     return await _analyze_stock_core(stock_id)
 
-# ── 四面向分析（按需，獨立端點） ─────────────────────────────────────────────
+# ── 四面向分析（按需，獨立端點）V9.2E：新增 ai_signal + data_quality ─────────
 @app.get("/api/analysis-4d/{stock_id}")
 async def get_analysis_4d(stock_id: str):
     if not re.match(r"^\d{4,6}$", stock_id): raise HTTPException(400, detail="股票代號格式錯誤")
     try:
         api_name_t = asyncio.create_task(_fetch_stock_name_from_api(stock_id))
-        price_df, _ = await fetch_price_with_fallback(stock_id, lookback_days=400)
+        price_df, data_source = await fetch_price_with_fallback(stock_id, lookback_days=400)
         api_name = await api_name_t
         stock_name = get_stock_name(stock_id, api_name)
+        latest_row: pd.Series | None = None
+
+        rt = await fetch_realtime_quote(stock_id)
         if price_df.empty:
-            rt = await fetch_realtime_quote(stock_id)
-            cur_price = rt["price"] if rt and rt.get("price") else 0
+            cur_price = float(rt["price"]) if rt and rt.get("price") else 0.0
         else:
             price_df = compute_indicators(price_df)
-            rt = await fetch_realtime_quote(stock_id)
-            cur_price = float(rt["price"]) if rt and rt.get("price") else float(price_df.iloc[-1]["收盤價"])
-            latest = price_df.iloc[-1]
+            latest_row = price_df.iloc[-1]
+            cur_price  = float(rt["price"]) if rt and rt.get("price") else float(latest_row["收盤價"])
 
+        # 並行抓四面向資料
         news, fund_raw, chip_raw, margin_raw = await asyncio.gather(
             fetch_news(stock_id, stock_name),
             fetch_fundamental_data(stock_id),
             fetch_chip_data(stock_id),
             fetch_margin_data(stock_id),
         )
-        if price_df.empty:
-            tech_4d = {"score":None,"rating":"資料不足","reasons":[],"risks":[]}
+
+        if price_df.empty or latest_row is None:
+            tech_4d = {"score":None,"rating":"資料不足","trend":"—","reasons":[],"risks":[],
+                       "support":None,"resistance":None,"atr":None}
         else:
-            tech_4d = analyze_technical_4d(price_df, latest, cur_price)
+            tech_4d = analyze_technical_4d(price_df, latest_row, cur_price)
+
         fund_4d    = analyze_fundamental_4d(fund_raw)
         chip_4d    = analyze_chip_4d(chip_raw, margin_raw)
         news_4d    = analyze_news_4d(news)
         overall_4d = compute_overall_4d(fund_4d, tech_4d, chip_4d, news_4d)
+
+        # ★ V9.2E: 計算四面向整合 AI 訊號
+        try:
+            macro = await asyncio.wait_for(fetch_macro_context(), timeout=5)
+        except Exception:
+            macro = {"usd_twd": None, "dxy": None, "risk_note": ""}
+
+        ai_signal_4d = compute_4d_ai_signal(
+            overall_4d, fund_4d, tech_4d, chip_4d, news_4d,
+            latest_row, cur_price, macro
+        )
+
         return {
-            "stock_id": stock_id, "stock_name": stock_name,
-            "analysis_4d": {"fundamental":fund_4d,"technical":tech_4d,"chip":chip_4d,"news":news_4d,"overall":overall_4d},
+            "stock_id":   stock_id,
+            "stock_name": stock_name,
+            "cur_price":  cur_price,
+            "data_source": data_source,
+            "analysis_4d": {
+                "fundamental": fund_4d,
+                "technical":   tech_4d,
+                "chip":        chip_4d,
+                "news":        news_4d,
+                "overall":     overall_4d,
+            },
+            "ai_signal": ai_signal_4d,
             "news": news,
         }
     except Exception as e:
-        raise HTTPException(500, detail=f"四面向分析失敗：{str(e)}")
+        # 不回 HTTP 500，降級回傳
+        return {
+            "stock_id":   stock_id,
+            "stock_name": get_stock_name(stock_id),
+            "error":      str(e),
+            "analysis_4d": None,
+            "ai_signal": {
+                "signal":"WATCH","confidence":None,"data_quality":"insufficient",
+                "entry_status":"normal","entry_price":None,"target_price":None,
+                "stop_loss":None,"risk_reward_ratio":None,"holding_days":"不建議持有",
+                "summary":"四面向資料暫時無法取得。",
+                "entry_reason":[],"risk_reason":["資料暫時無法取得"],
+                "disclaimer":"⚠️ 本工具僅供參考，非投資建議",
+            },
+            "news": [],
+        }
 
 # ── 輕量 stock-lite ──────────────────────────────────────────────────────────
 @app.get("/api/stock-lite/{stock_id}")
@@ -1464,8 +1662,13 @@ async def check_alerts(body: WatchlistBody):
                 "target_price":ai.get("target_price"),"stop_loss":ai.get("stop_loss"),
                 "risk_reward_ratio":ai.get("risk_reward_ratio"),
                 "risk_level":ai.get("risk_model",{}).get("risk_level","—")})
-            rr = ai.get("risk_reward_ratio") or 0
-            if line_ok and ai.get("signal") == "BUY" and ai.get("confidence",0) >= 75 and rr >= 1.5:
+            rr   = ai.get("risk_reward_ratio") or 0
+            dq   = ai.get("score_quality", "none")   # stock-lite quality
+            conf = ai.get("confidence") or 0
+            # ★ V9.2E: 品質過濾 - official + conf≥75 + RR≥1.5
+            line_quality_ok = (conf >= 75 and rr >= 1.5 and
+                               dq == "full" and ai.get("signal") == "BUY")
+            if line_ok and line_quality_ok:
                 ls = LAST_ALERTS.get(stock_id)
                 if ls is None or (now - ls).total_seconds() >= ALERT_COOLDOWN_MINUTES * 60:
                     res = await send_line_message(_build_line_message(stock_id, stock_name, ai, cur_price))
@@ -1511,10 +1714,10 @@ def api_learning_retrain():
 # ── Health ───────────────────────────────────────────────────────────────────
 @app.get("/health")
 def health():
-    return {"status":"ok","version":"9.2-stable","time":datetime.now().isoformat(),
+    return {"status":"ok","version":"9.2.0","time":datetime.now().isoformat(),
             "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
             "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
             "price_sources":"Yahoo Finance → TWSE Official → FinMind",
             "stock_master_count":len(STOCK_MASTER),"stock_master_updated":_master_updated_at,
             "http_timeout":HTTP_TIMEOUT,
-            "features":["V9 stable core","Firestore watchlist","4D on-demand","AI learning","stock-lite","AI scan"]}
+            "features":["V9.2E stable core","Firestore watchlist","4D on-demand + ai_signal","AI learning","stock-lite","AI scan","data_quality","entry_status"]}
