@@ -642,47 +642,72 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 </div><!-- /wrap -->
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script type="module">
+<script>
 /* ══════════════════════════════════════════════════════════════════
-   Firebase Firestore 模組（ESM）
+   Firestore REST 同步（不依賴 Firebase SDK，避免 module 載入失敗導致按鈕全失效）
    ══════════════════════════════════════════════════════════════════ */
-import { initializeApp }      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc }
-  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {};
+const FIRESTORE_DOC_URL = FIREBASE_CONFIG.projectId
+  ? `https://firestore.googleapis.com/v1/projects/${FIREBASE_CONFIG.projectId}/databases/(default)/documents/watchlists/default?key=${FIREBASE_CONFIG.apiKey || ""}`
+  : "";
 
-const fbApp = initializeApp(window.FIREBASE_CONFIG);
-const db    = getFirestore(fbApp);
-const WL_DOC = doc(db, "watchlists", "default");
+function fsEncodeWatchlist(items){
+  return {
+    fields: {
+      watchlist: {
+        arrayValue: {
+          values: (items || []).map(x => ({
+            mapValue: {
+              fields: {
+                stock_id:   { stringValue: String(x.stock_id || x || "") },
+                stock_name: { stringValue: String(x.stock_name || getLocalName(x.stock_id || x) || x.stock_id || x || "") }
+              }
+            }
+          }))
+        }
+      },
+      updated_at: { stringValue: new Date().toISOString() }
+    }
+  };
+}
 
-/* ── Firestore 讀取 ─────────────────────────────────────────────── */
+function fsDecodeWatchlist(doc){
+  const vals = doc?.fields?.watchlist?.arrayValue?.values || [];
+  return vals.map(v => {
+    if (v.stringValue) return { stock_id: v.stringValue, stock_name: getLocalName(v.stringValue) || v.stringValue };
+    const f = v.mapValue?.fields || {};
+    const id = f.stock_id?.stringValue || "";
+    return { stock_id: id, stock_name: f.stock_name?.stringValue || getLocalName(id) || id };
+  }).filter(x => x.stock_id);
+}
+
 async function fsLoadWL() {
   try {
-    const snap = await getDoc(WL_DOC);
-    if (!snap.exists()) return null;
-    const data = snap.data();
-    const raw  = data.watchlist || [];
-    // 相容舊格式 ["2330","2357"] 和新格式 [{stock_id,stock_name}]
-    return raw.map(x => typeof x === "string"
-      ? { stock_id: x, stock_name: getLocalName(x) || x }
-      : { stock_id: x.stock_id, stock_name: x.stock_name || getLocalName(x.stock_id) || x.stock_id });
+    if (!FIRESTORE_DOC_URL) throw new Error("missing firebase config");
+    const r = await fetch(FIRESTORE_DOC_URL, { method: "GET" });
+    if (!r.ok) throw new Error(`Firestore HTTP ${r.status}`);
+    const d = await r.json();
+    return fsDecodeWatchlist(d);
   } catch(e) {
-    console.warn("Firestore read error:", e.message);
+    console.warn("Firestore REST read error:", e.message);
     return null;
   }
 }
 
-/* ── Firestore 寫入 ─────────────────────────────────────────────── */
 async function fsSaveWL(items) {
   setSyncBadge("ing");
   try {
-    await setDoc(WL_DOC, {
-      watchlist: items,
-      updated_at: new Date().toISOString()
+    if (!FIRESTORE_DOC_URL) throw new Error("missing firebase config");
+    const r = await fetch(FIRESTORE_DOC_URL, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fsEncodeWatchlist(items))
     });
+    if (!r.ok) throw new Error(`Firestore HTTP ${r.status}`);
     setSyncBadge("ok");
     return true;
   } catch(e) {
-    console.warn("Firestore write error:", e.message);
+    console.warn("Firestore REST write error:", e.message);
     setSyncBadge("err");
     return false;
   }
