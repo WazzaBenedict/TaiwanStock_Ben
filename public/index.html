@@ -783,9 +783,10 @@ function showPage(pageId) {
 // ── Sync badge ────────────────────────────────────────────────────
 function setSyncBadge(state) {
   const el = $("syncBadge"); if (!el) return;
-  if (state === "ok")  { el.textContent = "☁️ 已同步";  el.className = "sync-badge sync-ok"; }
-  if (state === "err") { el.textContent = "⚠️ 同步失敗，使用本機備份"; el.className = "sync-badge sync-err"; }
-  if (state === "ing") { el.textContent = "⏳ 同步中"; el.className = "sync-badge sync-ing"; }
+  if (state === "ok")       { el.textContent = "☁️ 已同步";          el.className = "sync-badge sync-ok"; }
+  if (state === "migrated") { el.textContent = "🔄 已從舊資料恢復並同步"; el.className = "sync-badge sync-ok"; }
+  if (state === "err")      { el.textContent = "⚠️ 同步失敗，使用本機備份"; el.className = "sync-badge sync-err"; }
+  if (state === "ing")      { el.textContent = "⏳ 同步中";           el.className = "sync-badge sync-ing"; }
 }
 
 // ── Stock master ──────────────────────────────────────────────────
@@ -835,20 +836,124 @@ function selectSuggest(id, name) {
   doSearch();
 }
 
-// ── Watchlist ─────────────────────────────────────────────────────
-function lsGetWL() {
-  try { return JSON.parse(localStorage.getItem("tw_wl_v10") || "[]")
-    .map(x => typeof x === "string" ? { stock_id: x, stock_name: getLocalName(x) || x } : x);
+// ── Watchlist V10.1 Migration ────────────────────────────────────
+
+/** 統一格式：{stock_id, stock_name}，相容舊格式 ["2330"] */
+function normalizeWatchlist(raw) {
+  if (!Array.isArray(raw)) return [];
+  const result = [], seen = new Set();
+  for (const item of raw) {
+    let sid, sname;
+    if (typeof item === "string") { sid = item.trim(); sname = getLocalName(sid) || sid; }
+    else if (item && typeof item === "object") {
+      sid = String(item.stock_id || item.id || "").trim();
+      sname = item.stock_name || item.name || getLocalName(sid) || sid;
+    }
+    if (sid && /^\d{4,6}$/.test(sid) && !seen.has(sid)) {
+      seen.add(sid); result.push({ stock_id: sid, stock_name: sname });
+    }
+  }
+  return result;
+}
+
+/** 合併多個自選股清單，去重 */
+function mergeWatchlists(...lists) {
+  const seen = new Set(), merged = [];
+  for (const list of lists) {
+    for (const item of (list || [])) {
+      if (item && item.stock_id && !seen.has(item.stock_id)) {
+        seen.add(item.stock_id); merged.push(item);
+      }
+    }
+  }
+  return merged;
+}
+
+/** 從所有 localStorage key 嘗試讀取舊自選股 */
+function loadLegacyWatchlist() {
+  const candidates = [];
+  const keys = ["tw_wl_v10","tw_wl_v9","watchlist","WL_KEY","tw_watchlist","wl"];
+  for (const key of keys) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      // 可能是 {watchlist:[...]} 或直接 [...]
+      const arr = Array.isArray(parsed) ? parsed
+                : Array.isArray(parsed?.watchlist) ? parsed.watchlist
+                : null;
+      if (arr && arr.length) candidates.push(...normalizeWatchlist(arr));
+    } catch {}
+  }
+  return normalizeWatchlist(candidates); // 去重
+}
+
+function lsSaveWL(items) {
+  try { localStorage.setItem("tw_wl_v10", JSON.stringify(items)); } catch {}
+}
+function getWLIds() { return WL.map(x => x.stock_id); }
+
+/** 從後端 /api/watchlist 讀取 */
+async function loadBackendWL() {
+  try {
+    const r = await apiFetch(`${API}/api/watchlist`, {}, 8000);
+    if (!r.ok) return [];
+    const d = await r.json();
+    return normalizeWatchlist(d.watchlist || []);
   } catch { return []; }
 }
-function lsSaveWL(items) { try { localStorage.setItem("tw_wl_v10", JSON.stringify(items)); } catch {} }
-function getWLIds() { return WL.map(x => x.stock_id); }
+
+/**
+ * V10.1 自動遷移：
+ * 1. Firestore 有資料 → 用 Firestore，合併 localStorage
+ * 2. Firestore 空/不存在 → 讀 localStorage + 後端，合併後回寫 Firestore
+ */
+async function migrateWatchlistIfNeeded() {
+  // 讀 Firestore
+  const fsRaw = await fsLoadWL();           // null=連線失敗, []=空, [...]= 有資料
+  const fsItems = fsRaw ? normalizeWatchlist(fsRaw) : [];
+  const fsHasData = fsItems.length > 0;
+
+  // 讀本機舊資料
+  const legacyItems = loadLegacyWatchlist();
+
+  // 讀後端（只有當 Firestore + localStorage 都空才需要）
+  let backendItems = [];
+  if (!fsHasData && !legacyItems.length) {
+    backendItems = await loadBackendWL();
+  }
+
+  // 合併
+  const merged = mergeWatchlists(fsItems, legacyItems, backendItems);
+
+  if (merged.length === 0) {
+    // 真的沒有任何資料
+    setSyncBadge("ok"); return merged;
+  }
+
+  const wasEmpty = !fsHasData;
+  const hadLegacy = legacyItems.length > 0 || backendItems.length > 0;
+
+  // 如果 Firestore 是空但本機/後端有資料 → 回寫 Firestore
+  if (wasEmpty && hadLegacy) {
+    const ok = await fsSaveWL(merged);
+    setSyncBadge(ok ? "migrated" : "err");
+  } else {
+    // Firestore 有資料，但本機也有 → 合併後更新
+    if (fsHasData && hadLegacy && merged.length > fsItems.length) {
+      await fsSaveWL(merged);
+    }
+    setSyncBadge(fsRaw !== null ? "ok" : "err");
+  }
+
+  // 永遠同步最新到 localStorage
+  lsSaveWL(merged);
+  return merged;
+}
 
 async function loadWatchlist() {
   setSyncBadge("ing");
-  const fsData = await fsLoadWL();
-  if (fsData !== null) { WL = fsData; lsSaveWL(WL); setSyncBadge("ok"); return; }
-  WL = lsGetWL(); setSyncBadge("err");
+  WL = await migrateWatchlistIfNeeded();
 }
 
 async function saveWatchlist() {
