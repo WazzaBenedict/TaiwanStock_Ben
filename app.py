@@ -12,7 +12,7 @@ from fastapi import FastAPI,HTTPException,Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app=FastAPI(title="台股監測 API V10",version="10.0.0")
+app=FastAPI(title="台股監測 API V10.1 Entry System",version="10.1.0")
 _raw=os.getenv("ALLOWED_ORIGINS","http://localhost:5500,http://127.0.0.1:5500,https://taiwanstock-ben.web.app,https://taiwanstock-ben.firebaseapp.com")
 ALLOWED_ORIGINS=[o.strip() for o in _raw.split(",") if o.strip()]
 DEV_MODE=os.getenv("DEV_MODE","false").lower()=="true"
@@ -78,7 +78,7 @@ STOCK_NAME_MAP:dict[str,str]={
 # AI 學習系統
 # ══════════════════════════════════════════════════════════════════════════════
 DEFAULT_WEIGHTS={"technical":0.35,"fundamental":0.25,"chip":0.25,"news":0.15,
-    "risk":0.10,"macro":0.05,"updated_at":"","version":"10.0.0","last_reason":"預設權重"}
+    "risk":0.10,"macro":0.05,"updated_at":"","version":"10.1.0","last_reason":"預設權重"}
 WEIGHT_LIMITS={"technical":(0.20,0.45),"fundamental":(0.10,0.35),"chip":(0.10,0.40),"news":(0.05,0.25)}
 
 def _rjf(path,default):
@@ -839,6 +839,135 @@ def compute_trade_status(ai:dict,cp:float,vol_info:dict|None=None)->str:
         return "WATCH"
     return "WATCH"
 
+# ══════════════════════════════════════════════════════════════════════════════
+# ★ V10.1: entry_status 可進場篩選系統
+# ══════════════════════════════════════════════════════════════════════════════
+
+ENTRY_STATUS_TEXT = {
+    "ENTERABLE":    "可進場",
+    "WAIT_PULLBACK":"等回檔",
+    "TOO_EXTENDED": "已過熱",
+    "BAD_RR":       "RR不足",
+    "WEAK_SETUP":   "條件不足",
+    "NO_DATA":      "資料不足",
+}
+
+def compute_entry_status(ai:dict, cp:float, chg_pct:float|None=None,
+                         rsi:float|None=None, ma20:float|None=None,
+                         price_df:pd.DataFrame|None=None) -> dict:
+    """
+    計算進場狀態 entry_status，回傳完整 entry_status_dict。
+    用於 AI signal lite 與 scan/ai。
+    """
+    ep  = ai.get("entry_price")
+    tp  = ai.get("target_price")
+    sl  = ai.get("stop_loss")
+    rr  = ai.get("risk_reward_ratio") or 0
+    sig = ai.get("signal","WATCH")
+
+    # 預設值
+    distance_to_entry_pct = None
+    upside_pct            = None
+    downside_to_stop_pct  = None
+
+    if ep and ep > 0 and cp > 0:
+        distance_to_entry_pct = round((cp - ep) / ep * 100, 2)
+    if tp and cp > 0:
+        upside_pct = round((tp - cp) / cp * 100, 2)
+    if sl and cp > 0:
+        downside_to_stop_pct = round((cp - sl) / cp * 100, 2)
+
+    reasons: list[str] = []
+
+    # ── 無資料 ───────────────────────────────────────────────────────────────
+    if sig == "AVOID" or ai.get("score_quality") == "none" or cp <= 0:
+        return {"entry_status":"NO_DATA","entry_status_text":"資料不足",
+                "can_enter":False,"distance_to_entry_pct":distance_to_entry_pct,
+                "upside_pct":upside_pct,"downside_to_stop_pct":downside_to_stop_pct,
+                "too_extended_reasons":reasons}
+
+    # ── RR 不足 ──────────────────────────────────────────────────────────────
+    if rr < 1.5:
+        reasons.append(f"RR比 {rr}x 不足（需≥1.5）")
+        return {"entry_status":"BAD_RR","entry_status_text":"RR不足",
+                "can_enter":False,"distance_to_entry_pct":distance_to_entry_pct,
+                "upside_pct":upside_pct,"downside_to_stop_pct":downside_to_stop_pct,
+                "too_extended_reasons":reasons}
+
+    # ── 上漲空間不足 ─────────────────────────────────────────────────────────
+    if upside_pct is not None and upside_pct < 5:
+        reasons.append(f"距目標價剩 {upside_pct:.1f}%，空間不足（需≥5%）")
+
+    # ── RSI 過熱 ─────────────────────────────────────────────────────────────
+    if rsi and rsi > 72:
+        reasons.append(f"RSI {rsi:.1f} 過熱（需≤72）")
+
+    # ── 今日漲幅過熱 ─────────────────────────────────────────────────────────
+    if chg_pct and chg_pct > 5:
+        reasons.append(f"今日漲幅 {chg_pct:.1f}% 過熱（需≤5%）")
+
+    # ── 偏離 MA20 過多 ───────────────────────────────────────────────────────
+    if ma20 and ma20 > 0 and cp > 0:
+        pct_above_ma20 = (cp - ma20) / ma20 * 100
+        if pct_above_ma20 > 8:
+            reasons.append(f"現價高於 MA20 {pct_above_ma20:.1f}%（需≤8%）")
+
+    # ── 近期漲幅 ─────────────────────────────────────────────────────────────
+    if price_df is not None and not price_df.empty and cp > 0:
+        closes = price_df["收盤價"].dropna()
+        if len(closes) >= 5:
+            gain5 = (cp - float(closes.iloc[-5])) / float(closes.iloc[-5]) * 100
+            if gain5 > 12:
+                reasons.append(f"近5日漲幅 {gain5:.1f}%，可能過熱（需≤12%）")
+        if len(closes) >= 10:
+            gain10 = (cp - float(closes.iloc[-10])) / float(closes.iloc[-10]) * 100
+            if gain10 > 18:
+                reasons.append(f"近10日漲幅 {gain10:.1f}%，可能過熱（需≤18%）")
+
+    # ── 偏離建議入場價 ───────────────────────────────────────────────────────
+    if distance_to_entry_pct is not None and distance_to_entry_pct > 3:
+        reasons.append(f"現價高於建議入場價 {distance_to_entry_pct:.1f}%（需≤3%）")
+
+    # ── 止蝕距離過遠 ─────────────────────────────────────────────────────────
+    if downside_to_stop_pct is not None and downside_to_stop_pct > 6:
+        reasons.append(f"止蝕距現價 {downside_to_stop_pct:.1f}%，風險偏大（需≤6%）")
+
+    # ── 結論 ─────────────────────────────────────────────────────────────────
+    if reasons:
+        # 分類：是過熱、還是等回檔
+        extended_kws = ["過熱","漲幅","MA20","近5日","近10日"]
+        is_extended = any(any(kw in r for kw in extended_kws) for r in reasons)
+        if is_extended:
+            status = "TOO_EXTENDED" if (rsi and rsi > 72) or (chg_pct and chg_pct > 5) else "WAIT_PULLBACK"
+        else:
+            status = "WAIT_PULLBACK"
+        return {"entry_status":status,"entry_status_text":ENTRY_STATUS_TEXT[status],
+                "can_enter":False,"distance_to_entry_pct":distance_to_entry_pct,
+                "upside_pct":upside_pct,"downside_to_stop_pct":downside_to_stop_pct,
+                "too_extended_reasons":reasons}
+
+    # ── 全部通過 → 可進場 ────────────────────────────────────────────────────
+    if sig == "WATCH":
+        return {"entry_status":"WEAK_SETUP","entry_status_text":"條件不足",
+                "can_enter":False,"distance_to_entry_pct":distance_to_entry_pct,
+                "upside_pct":upside_pct,"downside_to_stop_pct":downside_to_stop_pct,
+                "too_extended_reasons":[]}
+
+    return {"entry_status":"ENTERABLE","entry_status_text":"可進場",
+            "can_enter":True,"distance_to_entry_pct":distance_to_entry_pct,
+            "upside_pct":upside_pct,"downside_to_stop_pct":downside_to_stop_pct,
+            "too_extended_reasons":[]}
+
+
+def _enrich_ai_with_entry(ai:dict, cp:float, chg_pct:float|None=None,
+                           rsi_val:float|None=None, ma20_val:float|None=None,
+                           price_df:pd.DataFrame|None=None) -> dict:
+    """將 entry_status 欄位注入 ai dict，不改變原有欄位。"""
+    es = compute_entry_status(ai, cp, chg_pct, rsi_val, ma20_val, price_df)
+    ai.update(es)
+    return ai
+
+
 # ★ V10: Momentum Breakout
 def check_momentum_breakout(row:pd.Series,vol_info:dict)->bool:
     def _g(col):return float(row[col]) if col in row.index and pd.notna(row.get(col)) else None
@@ -914,13 +1043,22 @@ def compute_ai_signal_lite(row:pd.Series,winrate_info:dict,cp:float,macro:dict|N
         if signal=="BUY" and(rr is None or rr<1.5):signal="WATCH";tp=round(cp*1.03,2)
         return signal,ep,tp,sl,rr
 
-    # ★ Momentum Breakout 優先
+    # ★ V10.1 Momentum Breakout + 風控
     if vol_info and check_momentum_breakout(row,vol_info):
         ep=round(ma5,2) if ma5 else round(cp,2)
         tp=round(cp*1.06,2);sl=round(ma20*0.97,2) if ma20 else round(cp*0.95,2)
         rr=round((tp-ep)/(ep-sl),2) if ep and sl and ep>sl else None
         conf=82
-        ts=compute_trade_status({"signal":"BUY","confidence":conf,"risk_reward_ratio":rr,"entry_price":ep,"score_quality":"full"},cp,vol_info)
+        # 風控：過熱時降為 BUY_PULLBACK
+        chgp_val=float(rt.get("change_pct") or 0)
+        ma20_pct=(cp-ma20)/ma20*100 if ma20 and ma20>0 else 0
+        dist_entry=(cp-ep)/ep*100 if ep and ep>0 else 0
+        upside=(tp-cp)/cp*100 if tp and cp>0 else 0
+        mb_ok=(rsi is None or rsi<=72) and chgp_val<=5 and ma20_pct<=8 and (rr or 0)>=1.5 and upside>=5 and dist_entry<=3
+        if mb_ok:
+            ts="BUY_NOW"
+        else:
+            ts="BUY_PULLBACK"
         return _mk("BUY",conf,"full","正式分數","Momentum Breakout",ep,tp,sl,rr,ts,"Momentum Breakout")
 
     # Layer 1 正式分數
@@ -1063,6 +1201,11 @@ async def _analyze_stock_core(stock_id:str)->dict:
         except:macro={"usd_twd":None,"dxy":None,"risk_note":"","macro_adj":0}
         ai=compute_ai_signal_lite(latest,wr,cp,macro=macro,price_df_len=len(df),realtime_quote=rt,vol_info=vi,price_df=df)
         mtf=compute_multi_timeframe(df,latest,cp)
+        # V10.1: enrich with entry_status
+        rsi_cv=float(latest["RSI"]) if "RSI" in latest.index and pd.notna(latest.get("RSI")) else None
+        ma20_cv=float(latest["MA20"]) if "MA20" in latest.index and pd.notna(latest.get("MA20")) else None
+        chgp_cv=(_f(rt.get("change_pct"),2) if rt and rt.get("change_pct") is not None else chgp)
+        ai=_enrich_ai_with_entry(ai,cp,chgp_cv,rsi_cv,ma20_cv,df)
         record_ai_signal(stock_id,sname,ai,None,source="stock")
         chart_data=[]
         for _,row in df.tail(60).iterrows():
@@ -1114,6 +1257,15 @@ async def _analyze_stock_lite(stock_id:str,macro:dict|None=None)->dict:
             ai=compute_ai_signal_lite(latest,wri,cp,macro=macro,price_df_len=len(df),realtime_quote=rt,vol_info=vi,price_df=df)
         elif cp>0:
             ai=compute_ai_signal_lite(pd.Series(),{"winrate":0,"trials":0,"wins":0},cp,macro=macro,price_df_len=0,realtime_quote=rt)
+        # V10.1: enrich with entry_status
+        rsi_v=None;ma20_v=None
+        if not df.empty and len(df)>0:
+            try:
+                latest2=df.iloc[-1]
+                rsi_v=float(latest2["RSI"]) if "RSI" in latest2.index and pd.notna(latest2.get("RSI")) else None
+                ma20_v=float(latest2["MA20"]) if "MA20" in latest2.index and pd.notna(latest2.get("MA20")) else None
+            except:pass
+        ai=_enrich_ai_with_entry(ai,cp,chgp,rsi_v,ma20_v,df if not df.empty else None)
         record_ai_signal(stock_id,sname,ai,None,source="stock-lite")
         return{"stock_id":stock_id,"stock_name":sname,"price":price,"change":change,"change_pct":chgp,
                "realtime_quote":rt,"ai_signal":ai,"data_source":hs if not df.empty else "TWSE MIS","lite":True}
@@ -1243,33 +1395,53 @@ async def api_market_sentiment():
     except Exception as e:return{"error":str(e),"buy_count":0,"watch_count":0,"avoid_count":0,"sentiment":"中性⚠️"}
 
 @app.get("/api/scan/ai")
-async def ai_scan(min_score:int=Query(75,ge=0,le=100),max_stocks:int=Query(40,ge=5,le=80)):
+async def ai_scan(min_score:int=Query(70,ge=0,le=100),max_stocks:int=Query(40,ge=5,le=80)):
+    """V10.1: AI 選股 + entry_filter，分 ENTERABLE / WAIT_PULLBACK 兩區。"""
     t0=time.time();pool=list(dict.fromkeys(AI_SCAN_POOL))[:max_stocks]
     try:macro=await asyncio.wait_for(fetch_macro_context(),timeout=6)
     except:macro={}
-    results,errors=[],[]
+    enterable=[];pullback=[];errors=[]
     for sid in pool:
         try:
             r=await _analyze_stock_lite(sid,macro);ai=r.get("ai_signal",{})
-            if(ai.get("confidence") or 0)<min_score:continue
-            results.append({"stock_id":sid,"stock_name":r["stock_name"],
-                "signal":ai.get("signal","WATCH"),"confidence":ai.get("confidence",0),
-                "trade_status":ai.get("trade_status","WATCH"),"strategy_type":ai.get("strategy_type",""),
+            conf=ai.get("confidence") or 0
+            if conf<min_score:continue
+            es=ai.get("entry_status","NO_DATA")
+            item={"stock_id":sid,"stock_name":r["stock_name"],
+                "signal":ai.get("signal","WATCH"),"confidence":conf,
+                "trade_status":ai.get("trade_status","WATCH"),
+                "entry_status":es,"entry_status_text":ai.get("entry_status_text",ENTRY_STATUS_TEXT.get(es,"—")),
+                "can_enter":ai.get("can_enter",False),
+                "strategy_type":ai.get("strategy_type",""),
                 "risk_level":ai.get("risk_model",{}).get("risk_level","—"),
                 "price":r.get("price"),"change_pct":r.get("change_pct"),
                 "entry_price":ai.get("entry_price"),"target_price":ai.get("target_price"),
                 "stop_loss":ai.get("stop_loss"),"risk_reward_ratio":ai.get("risk_reward_ratio"),
-                "score_quality":ai.get("score_quality","none"),"summary":ai.get("summary","")})
+                "distance_to_entry_pct":ai.get("distance_to_entry_pct"),
+                "upside_pct":ai.get("upside_pct"),
+                "score_quality":ai.get("score_quality","none"),
+                "too_extended_reasons":ai.get("too_extended_reasons",[]),
+                "summary":ai.get("summary","")}
+            if es=="ENTERABLE":enterable.append(item)
+            elif es in("WAIT_PULLBACK","TOO_EXTENDED"):pullback.append(item)
         except Exception as e:errors.append({"stock_id":sid,"error":str(e)})
-    rank={"BUY":3,"WATCH":2,"AVOID":1}
-    results.sort(key=lambda x:(rank.get(x["signal"],0),x["confidence"]),reverse=True)
-    return{"scanned":len(pool),"found":len(results),"min_score":min_score,"results":results,
-           "errors":errors,"error_count":len(errors),"duration_seconds":round(time.time()-t0,1),"timestamp":datetime.now().isoformat()}
+    # 排序
+    def sort_enter(x):
+        rr=x.get("risk_reward_ratio") or 0
+        dist=abs(x.get("distance_to_entry_pct") or 99)
+        conf=x.get("confidence") or 0
+        return (-rr,-dist,conf)  # RR高、距離近、信心高
+    def sort_pullback(x):return (-(x.get("confidence") or 0))
+    enterable.sort(key=sort_enter);pullback.sort(key=sort_pullback)
+    return{"scanned":len(pool),"enterable_count":len(enterable),"pullback_count":len(pullback),
+           "min_score":min_score,"enterable":enterable,"pullback":pullback,
+           "errors":errors,"error_count":len(errors),
+           "duration_seconds":round(time.time()-t0,1),"timestamp":datetime.now().isoformat()}
 
 @app.post("/api/alerts/test")
 async def test_line():
     _cc()
-    result=await send_line_message("✅ 台股監測 V10 Trading System - LINE 通知測試成功！")
+    result=await send_line_message("✅ 台股監測 V10.1 Entry System - LINE 通知測試成功！")
     if not result["success"]:raise HTTPException(500,detail=result["message"])
     return result
 
@@ -1290,7 +1462,9 @@ async def check_alerts(body:WatchlistBody):
                 "risk_level":ai.get("risk_model",{}).get("risk_level","—")})
             rr2=ai.get("risk_reward_ratio") or 0;conf=ai.get("confidence") or 0
             dq=ai.get("score_quality","none");ts=ai.get("trade_status","WATCH")
-            lok=(conf>=75 and rr2>=1.5 and dq=="full" and ai.get("signal")=="BUY" and ts in("BUY_NOW","BUY_PULLBACK"))
+            es2=ai.get("entry_status","NO_DATA");up2=ai.get("upside_pct") or 0
+            lok=(conf>=75 and rr2>=1.5 and dq=="full" and ai.get("signal")=="BUY"
+                 and es2=="ENTERABLE" and up2>=5)
             if lo and lok:
                 ls=LAST_ALERTS.get(sid)
                 if ls is None or(now-ls).total_seconds()>=ALERT_COOLDOWN_MINUTES*60:
@@ -1330,12 +1504,12 @@ def api_learning_retrain():return retrain_ai_weights()
 
 @app.get("/health")
 def health():
-    return{"status":"ok","version":"10.0.0","time":datetime.now().isoformat(),
+    return{"status":"ok","version":"10.1.0","time":datetime.now().isoformat(),
            "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
            "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
            "price_sources":"Yahoo Finance → TWSE Official → FinMind",
            "stock_master_count":len(STOCK_MASTER),"stock_master_updated":_mua,
            "http_timeout":HTTP_TIMEOUT,
-           "features":["V10 Trading System","trade_status BUY_NOW/BUY_PULLBACK/WATCH/AVOID",
+           "features":["V10.1 Entry System","trade_status BUY_NOW/BUY_PULLBACK/WATCH/AVOID",
                        "Momentum Breakout","multi_timeframe","macro_api","market_sentiment",
                        "Firestore watchlist","4D on-demand","AI learning","stock-lite","sharpe_ratio"]}
