@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>台股 MONITOR V9.2 Enhanced Stable</title>
+<title>台股 V10 Trading System</title>
 <script src="config.js"></script>
 <style>
 :root{
@@ -260,6 +260,37 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+
+/* ══ V10 Tab Navigation ══════════════════════════════════════════ */
+.nav-tabs{display:flex;gap:4px;padding:0 16px;background:rgba(7,16,28,.95);border-bottom:1px solid var(--line);position:sticky;top:54px;z-index:9;overflow-x:auto}
+.nav-tab{font-family:var(--mono);font-size:12px;font-weight:600;padding:10px 16px;color:var(--muted);cursor:pointer;border:none;background:transparent;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s;min-height:0}
+.nav-tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+.nav-tab:hover:not(.active){color:var(--text)}
+.page{display:none}.page.active{display:block}
+/* ══ trade_status badges ════════════════════════════════════════ */
+.ts-badge{display:inline-block;font-family:var(--mono);font-size:13px;font-weight:700;padding:4px 12px;border-radius:8px;letter-spacing:.05em}
+.ts-BUY_NOW{background:rgba(0,184,107,.15);color:var(--down);border:1px solid rgba(0,184,107,.4)}
+.ts-BUY_PULLBACK{background:rgba(251,191,36,.12);color:var(--yellow);border:1px solid rgba(251,191,36,.35)}
+.ts-WATCH{background:rgba(251,191,36,.08);color:var(--yellow);border:1px solid rgba(251,191,36,.25)}
+.ts-AVOID{background:rgba(232,56,79,.1);color:var(--up);border:1px solid rgba(232,56,79,.3)}
+/* ══ Macro panel ════════════════════════════════════════════════ */
+.macro-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin:12px 0}
+.macro-item{background:#0d1728;border:1px solid var(--line);border-radius:9px;padding:11px 14px}
+.macro-label{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.08em}
+.macro-val{font-family:var(--mono);font-size:20px;font-weight:700}
+.macro-adj{font-family:var(--mono);font-size:11px;margin-top:4px}
+/* ══ Market sentiment ═══════════════════════════════════════════ */
+.sentiment-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 0}
+.sent-big{font-family:var(--mono);font-size:24px;font-weight:700}
+.sent-bar{flex:1;min-width:180px;height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.sent-fill{height:100%;border-radius:4px;transition:width .6s}
+/* ══ Multi timeframe ════════════════════════════════════════════ */
+.mtf-row{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+.mtf-item{background:#0d1728;border:1px solid var(--line);border-radius:8px;padding:10px 14px;text-align:center;min-width:100px}
+.mtf-label{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:4px}
+.mtf-val{font-family:var(--mono);font-size:16px;font-weight:700}
+.bull-txt{color:var(--up)!important}.bear-txt{color:var(--down)!important}.neu-txt{color:var(--yellow)!important}
+
 </style>
 </head>
 <body>
@@ -267,13 +298,24 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="logo">
     <span class="live-dot"></span>
     台股<span style="color:var(--down)">MONITOR</span>
-    <span class="ver">V9.2 Enhanced</span>
+    <span class="ver">V10 Trading</span>
   </div>
   <span class="clock" id="clock"></span>
 </header>
 
 <div class="wrap">
+<!-- V10 Navigation -->
+<nav class="nav-tabs">
+  <button class="nav-tab active" onclick="showPage('p-trade',this)">📈 交易</button>
+  <button class="nav-tab" onclick="showPage('p-4d',this)">🔍 四面向</button>
+  <button class="nav-tab" onclick="showPage('p-market',this)">🌐 市場</button>
+  <button class="nav-tab" onclick="showPage('p-learn',this)">🧠 AI學習</button>
+</nav>
+
+<!-- Page 1: 主交易頁 -->
+<div class="page active" id="p-trade">
 <!-- Search -->
+
 <div class="search-wrap">
   <div class="search-input-wrap">
     <input type="text" id="sid" placeholder="輸入股票代號或名稱，如 2330" maxlength="10" autocomplete="off"/>
@@ -356,6 +398,14 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       </div>
       <div id="volAlert" style="margin-top:8px"></div>
       <div id="rsiAlert" style="margin-top:4px"></div>
+    <div id="mtfPanel" style="display:none">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin:8px 0 5px;text-transform:uppercase">多時間框架</div>
+      <div class="mtf-row">
+        <div class="mtf-item"><div class="mtf-label">日線</div><div class="mtf-val" id="mtfDaily">—</div></div>
+        <div class="mtf-item"><div class="mtf-label">週線</div><div class="mtf-val" id="mtfWeekly">—</div></div>
+        <div class="mtf-item"><div class="mtf-label">綜合</div><div class="mtf-val" id="mtfOverall">—</div></div>
+      </div>
+    </div>
     </div>
     <div class="section" style="margin:0">
       <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.1em">技術評分</div>
@@ -393,6 +443,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <!-- AI Card -->
   <div class="section full" style="margin-bottom:14px">
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.1em">🤖 AI 策略訊號（技術面輕量版）</div>
+    <div style="margin-bottom:10px"><span class="ts-badge ts-WATCH" id="tradeStatusBadge">👀 WATCH 觀望</span></div>
     <div class="ai-hero">
       <div class="ai-signal-block" id="aiBadge">
         <div class="ai-label" id="aiLabel">—</div>
@@ -498,6 +549,65 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   </div>
 </div><!-- /dash -->
 
+
+</div><!-- /p-trade -->
+
+<!-- Page 2: 四面向分析 -->
+<div class="page" id="p-4d">
+  <div class="section" style="margin-top:14px">
+    <div class="section-title">
+      <span>🔍 四面向分析</span>
+      <button class="purple-btn sm" id="btnLoad4dPage" onclick="load4dPage()">載入四面向分析</button>
+    </div>
+    <div style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:10px" id="p4dStock">請先在交易頁查詢股票</div>
+    <div id="p4dContainer">
+      <div class="d4-status info">請先在「交易」頁查詢股票，再回到此頁按「載入四面向分析」。</div>
+    </div>
+    <div class="section" id="p4dNewsSection" style="display:none;margin-top:14px">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.1em">📰 最新相關新聞</div>
+      <div id="p4dNews"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Page 3: 市場總覽 -->
+<div class="page" id="p-market">
+  <div class="section" style="margin-top:14px">
+    <div class="section-title">
+      <span>🌐 宏觀指標</span>
+      <button class="ghost sm" onclick="loadMacro()">🔄 更新</button>
+    </div>
+    <div class="macro-grid" id="macroGrid">
+      <div class="macro-item"><div class="macro-label">載入中</div><div class="macro-val" style="font-size:14px;color:var(--muted)">—</div></div>
+    </div>
+    <div style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:8px 0" id="macroNote">—</div>
+  </div>
+  <div class="section" style="margin-top:14px">
+    <div class="section-title">
+      <span>📊 市場情緒</span>
+      <button class="ghost sm" onclick="loadSentiment()">🔄 更新</button>
+    </div>
+    <div class="sentiment-row">
+      <div class="sent-big" id="sentLabel">—</div>
+      <div style="flex:1;min-width:180px">
+        <div class="sent-bar"><div class="sent-fill" id="sentBar" style="width:0%;background:var(--down)"></div></div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:5px" id="sentDetail">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="section" style="margin-top:14px">
+    <div class="section-title">🤖 AI 選股結果</div>
+    <div id="aiScanBox" style="display:none">
+      <div class="grid-cards" id="aiScanGrid"></div>
+    </div>
+    <div id="aiScanPlaceholder" style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:12px">
+      按「AI 選股」後結果會顯示在這裡
+    </div>
+  </div>
+</div>
+
+<!-- Page 4: AI 學習中心 -->
+<div class="page" id="p-learn">
 <!-- AI Learning Center -->
 <div class="section" id="learnSection">
   <div class="section-title">
@@ -521,6 +631,8 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="info" style="margin-top:9px">AI 記錄 BUY / WATCH 訊號，5 天後評估實際表現；樣本達 30 筆後才微調權重（單次最多 ±2%），保守避免亂學。</div>
   <div id="learnMsg" class="history" style="margin-top:9px">尚無訊號紀錄</div>
 </div>
+
+</div><!-- /p-learn -->
 
 <div style="text-align:center;padding:20px;font-size:11px;color:var(--muted);font-family:var(--mono);border-top:1px solid var(--line);margin-top:10px;line-height:2.2">
   ⚠️ 本工具僅供技術分析學習參考，不構成任何投資建議。<br>
@@ -889,7 +1001,9 @@ async function aiScan(){
   if(isAiScanning){alert("AI 選股掃描中，請稍候");return;}
   isAiScanning=true; $("btnAiScan").disabled=true;
   $("aiScanBox").style.display="block";
+  $("aiScanPlaceholder").style.display="none";
   $("aiScanGrid").innerHTML='<div class="empty">AI 選股掃描中（約 30~120 秒）…</div>';
+  showPage("p-market", document.querySelector('.nav-tab:nth-child(3)'));
   let wakeT=setTimeout(()=>{$("aiScanGrid").innerHTML+='<div class="empty">後端喚醒中或資料源較慢，請稍候</div>'},10000);
   try{
     const r=await apiFetch(`${API}/api/scan/ai?min_score=75&max_stocks=40`,{},120000);
@@ -1362,6 +1476,111 @@ if(autoOn)startAutoTimer();
   checkLineStatus();
   loadWeights();
 })();
+
+/* ══════════════════════════════════════════════════════════════════
+   V10: Page navigation
+   ══════════════════════════════════════════════════════════════════ */
+function showPage(pageId,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active'));
+  const p=document.getElementById(pageId);if(p)p.classList.add('active');
+  if(btn)btn.classList.add('active');
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   V10: Multi-timeframe display
+   ══════════════════════════════════════════════════════════════════ */
+function renderMTF(mtf){
+  if(!mtf){$("mtfPanel").style.display="none";return;}
+  $("mtfPanel").style.display="block";
+  const clr=v=>v==="多"||v==="多頭"?"bull-txt":v==="空"||v==="空頭"?"bear-txt":"neu-txt";
+  const el=document.getElementById("mtfDaily");if(el){el.textContent=mtf.daily_trend||"—";el.className="mtf-val "+(clr(mtf.daily_trend||""));}
+  const el2=document.getElementById("mtfWeekly");if(el2){el2.textContent=mtf.weekly_trend||"—";el2.className="mtf-val "+(clr(mtf.weekly_trend||""));}
+  const el3=document.getElementById("mtfOverall");if(el3){el3.textContent=mtf.overall||"—";el3.className="mtf-val "+(clr(mtf.overall||""));}
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   V10: Macro panel
+   ══════════════════════════════════════════════════════════════════ */
+async function loadMacro(){
+  const grid=$("macroGrid");if(!grid)return;
+  grid.innerHTML='<div class="macro-item"><div class="macro-label">載入中</div><div class="macro-val" style="font-size:14px;color:var(--muted)">…</div></div>';
+  try{
+    const r=await apiFetch(`${API_BASE_URL}/api/macro`,{},12000);
+    const d=await r.json();
+    const items=[
+      {label:"USD/TWD",key:"usd_twd",d:3},
+      {label:"DXY 美元",key:"dxy",d:2},
+      {label:"NASDAQ Fut",key:"nasdaq_futures",d:0},
+      {label:"SOX",key:"sox",d:0},
+      {label:"美債10Y%",key:"us10y",d:2},
+    ];
+    grid.innerHTML=items.map(it=>{
+      const v=d[it.key];const vt=v!=null?Number(v).toFixed(it.d):"—";
+      const adj=d.macro_adj||0;
+      return `<div class="macro-item">
+        <div class="macro-label">${it.label}</div>
+        <div class="macro-val">${vt}</div>
+      </div>`;
+    }).join("");
+    const noteEl=$("macroNote");
+    if(noteEl){
+      const adj=d.macro_adj||0;
+      noteEl.textContent=d.risk_note+(adj?`  宏觀調整：${adj>0?"+":""}${adj}`:"");
+      noteEl.style.color=adj>=0?"var(--down)":"var(--up)";
+    }
+  }catch(e){if(grid)grid.innerHTML='<div class="macro-item"><div class="macro-label" style="color:var(--muted)">宏觀資料暫時無法取得</div></div>';}
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   V10: Market sentiment
+   ══════════════════════════════════════════════════════════════════ */
+async function loadSentiment(){
+  try{
+    const r=await apiFetch(`${API_BASE_URL}/api/market-sentiment`,{},30000);
+    const d=await r.json();
+    const lbl=$("sentLabel");if(lbl)lbl.textContent=d.sentiment||"—";
+    const bar=$("sentBar");if(bar){bar.style.width=(d.buy_pct||0)+"%";bar.style.background=d.buy_pct>=50?"var(--down)":"var(--up)";}
+    const det=$("sentDetail");
+    if(det)det.textContent=`BUY ${d.buy_count} / WATCH ${d.watch_count} / AVOID ${d.avoid_count}（共掃描 ${d.total} 檔）`;
+  }catch(e){const lbl=$("sentLabel");if(lbl)lbl.textContent="部分資料暫時無法取得";}
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   V10: 4D page loader
+   ══════════════════════════════════════════════════════════════════ */
+async function load4dPage(){
+  if(!CURRENT_ID){alert("請先在交易頁查詢股票");return;}
+  const stockEl=$("p4dStock");if(stockEl)stockEl.textContent=`分析中：${WL_CACHE[CURRENT_ID]?.name||CURRENT_ID} (${CURRENT_ID})`;
+  const container=$("p4dContainer");
+  container.innerHTML='<div class="d4-status info">四面向分析載入中（含基本面/籌碼/消息）…</div>';
+  try{
+    const r=await apiFetch(`${API_BASE_URL}/api/analysis-4d/${CURRENT_ID}`,{},90000);
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.detail||"四面向分析失敗");}
+    const d=await r.json();
+    render4D(d.analysis_4d,d.news||[],container,d.ai_signal||{});
+    const ns=$("p4dNewsSection");if(ns)ns.style.display="block";
+    const nd=$("p4dNews");if(nd)nd.innerHTML=renderNews(d.news||[]);
+  }catch(e){container.innerHTML=`<div class="d4-status info warn">⚠️ 四面向分析暫時無法取得：${e.message}</div>`;}
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Override renderStock to also call renderMTF
+   ══════════════════════════════════════════════════════════════════ */
+const _origRenderStock=renderStock;
+function renderStock(d){
+  _origRenderStock(d);
+  renderMTF(d.multi_timeframe||null);
+}
+
+/* Auto-load macro and sentiment on market page visit */
+document.querySelectorAll('.nav-tab').forEach(btn=>{
+  const orig=btn.getAttribute('onclick');
+  if(orig&&orig.includes('p-market')){
+    btn.setAttribute('onclick',orig.replace(')',')')+";loadMacro();loadSentiment();");
+  }
+});
+
 </script>
 </body>
 </html>
