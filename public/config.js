@@ -1,6 +1,11 @@
 /**
- * 台股監測工具 V9 Stable + Firestore
+ * 台股監測工具 V10.2 Personal Trading System
  * API 設定與 Firebase 設定
+ *
+ * ★ V10.2 新增：Google Auth
+ *   Firebase Console 需要：
+ *   1. Authentication → Sign-in methods → 啟用 Google Provider
+ *   2. Authentication → Authorized domains → 加入 taiwanstock-ben.web.app
  */
 window.API_BASE_URL = "https://taiwanstock-ben-1.onrender.com";
 

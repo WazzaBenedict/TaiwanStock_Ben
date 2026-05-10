@@ -1,5 +1,5 @@
 """
-台股監測後端 V10 Trading System
+台股監測後端 V10.2 Personal Trading System
 新增：trade_status / Momentum Breakout / 多時間框架 / 宏觀 API / 市場情緒
 保留：V9.2 全部功能（Firestore watchlist / AI 學習 / 四面向 / stock-lite）
 """
@@ -12,7 +12,7 @@ from fastapi import FastAPI,HTTPException,Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app=FastAPI(title="台股監測 API V10.1 Entry System",version="10.1.0")
+app=FastAPI(title="台股監測 API V10.2 Personal",version="10.2.0")
 _raw=os.getenv("ALLOWED_ORIGINS","http://localhost:5500,http://127.0.0.1:5500,https://taiwanstock-ben.web.app,https://taiwanstock-ben.firebaseapp.com")
 ALLOWED_ORIGINS=[o.strip() for o in _raw.split(",") if o.strip()]
 DEV_MODE=os.getenv("DEV_MODE","false").lower()=="true"
@@ -78,7 +78,7 @@ STOCK_NAME_MAP:dict[str,str]={
 # AI 學習系統
 # ══════════════════════════════════════════════════════════════════════════════
 DEFAULT_WEIGHTS={"technical":0.35,"fundamental":0.25,"chip":0.25,"news":0.15,
-    "risk":0.10,"macro":0.05,"updated_at":"","version":"10.1.0","last_reason":"預設權重"}
+    "risk":0.10,"macro":0.05,"updated_at":"","version":"10.2.0","last_reason":"預設權重"}
 WEIGHT_LIMITS={"technical":(0.20,0.45),"fundamental":(0.10,0.35),"chip":(0.10,0.40),"news":(0.05,0.25)}
 
 def _rjf(path,default):
@@ -1131,7 +1131,7 @@ async def send_line_message(msg:str)->dict:
 def _blm(sid,name,ai,price):
     disp=f"{name} ({sid})" if name and name!=sid else sid
     ts=ai.get("trade_status","WATCH");tl={"BUY_NOW":"✅ 可布局","BUY_PULLBACK":"⏳ 等回檔"}.get(ts,"👀 觀察")
-    return(f"📈 V10 AI 交易訊號\n股票：{disp}\n狀態：{tl}\n訊號：{ai['signal']}\n信心：{ai['confidence']}/100\n"
+    return(f"📈 V10.2 AI 交易訊號\n股票：{disp}\n狀態：{tl}\n訊號：{ai['signal']}\n信心：{ai['confidence']}/100\n"
            f"即時價：{price}  入場：{ai.get('entry_price') or '—'}\n目標：{ai.get('target_price')}  止蝕：{ai.get('stop_loss')}\n"
            f"RR：{ai.get('risk_reward_ratio')}x  持有：{ai.get('holding_days','—')}\n{ai.get('disclaimer','⚠️ 非投資建議')}")
 
@@ -1441,7 +1441,7 @@ async def ai_scan(min_score:int=Query(70,ge=0,le=100),max_stocks:int=Query(40,ge
 @app.post("/api/alerts/test")
 async def test_line():
     _cc()
-    result=await send_line_message("✅ 台股監測 V10.1 Entry System - LINE 通知測試成功！")
+    result=await send_line_message("✅ 台股監測 V10.2 Personal - LINE 通知測試成功！")
     if not result["success"]:raise HTTPException(500,detail=result["message"])
     return result
 
@@ -1504,12 +1504,12 @@ def api_learning_retrain():return retrain_ai_weights()
 
 @app.get("/health")
 def health():
-    return{"status":"ok","version":"10.1.0","time":datetime.now().isoformat(),
+    return{"status":"ok","version":"10.2.0","time":datetime.now().isoformat(),
            "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
            "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
            "price_sources":"Yahoo Finance → TWSE Official → FinMind",
            "stock_master_count":len(STOCK_MASTER),"stock_master_updated":_mua,
            "http_timeout":HTTP_TIMEOUT,
-           "features":["V10.1 Entry System","trade_status BUY_NOW/BUY_PULLBACK/WATCH/AVOID",
+           "features":["V10.2 Personal Trading System","trade_status BUY_NOW/BUY_PULLBACK/WATCH/AVOID",
                        "Momentum Breakout","multi_timeframe","macro_api","market_sentiment",
                        "Firestore watchlist","4D on-demand","AI learning","stock-lite","sharpe_ratio"]}

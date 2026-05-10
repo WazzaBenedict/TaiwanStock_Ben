@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>台股 V10.1 Entry System</title>
+<title>台股 V10.2 Personal</title>
 <script src="config.js"></script>
 <style>
 :root{
@@ -314,6 +314,35 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .scan-reasons{font-size:11px;color:var(--up);margin-top:6px;line-height:1.6}
 .empty-scan{font-family:var(--mono);font-size:13px;color:var(--down);padding:18px;text-align:center;line-height:2}
 
+
+/* ══ V10.2 K線圖 ═════════════════════════════════════════════════ */
+.kline-wrap{width:100%;border-radius:10px;overflow:hidden;background:#0d1728;border:1px solid var(--line);margin-bottom:14px}
+.kline-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;font-family:var(--mono);font-size:12px;color:var(--muted);border-bottom:1px solid var(--line)}
+.kline-container{width:100%;height:420px;position:relative}
+.kline-placeholder{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-family:var(--mono);font-size:13px}
+@media(max-width:768px){.kline-container{height:320px}}
+/* ══ V10.2 帳戶頁 ═══════════════════════════════════════════════ */
+.account-card{background:#0d1728;border:1px solid var(--line);border-radius:14px;padding:24px;text-align:center;max-width:480px;margin:20px auto}
+.account-avatar{width:72px;height:72px;border-radius:50%;border:2px solid var(--cyan);margin:0 auto 14px;display:block;object-fit:cover}
+.account-name{font-size:20px;font-weight:700;margin-bottom:4px}
+.account-email{font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:16px}
+.account-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0;text-align:left}
+.account-meta-item{background:#172946;border-radius:8px;padding:9px 12px}
+.account-meta-lbl{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:3px}
+.account-meta-val{font-family:var(--mono);font-size:13px;font-weight:600}
+.auth-hint{font-size:13px;color:var(--muted);line-height:1.8;margin:16px 0;padding:14px;background:#172946;border-radius:8px;text-align:left}
+.google-btn{display:flex;align-items:center;gap:10px;background:white;color:#1f1f1f;border-radius:9px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer;border:none;margin:12px auto;min-height:0}
+.google-btn:hover{background:#f5f5f5;transform:translateY(-1px)}
+.google-btn svg{flex-shrink:0}
+/* ══ V10.2 同步狀態擴充 ══════════════════════════════════════════ */
+.sync-user{background:rgba(0,212,255,.12);color:var(--cyan);border:1px solid rgba(0,212,255,.3)}
+.sync-local{background:rgba(100,116,139,.15);color:var(--muted);border:1px solid var(--line)}
+/* ══ 4D 展開式（主交易頁）══════════════════════════════════════ */
+.d4-toggle-btn{width:100%;background:transparent;border:1px dashed rgba(167,139,250,.4);color:var(--purple);border-radius:10px;padding:12px;font-family:var(--mono);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;min-height:0;margin-bottom:14px;transition:all .2s}
+.d4-toggle-btn:hover{background:rgba(167,139,250,.08);border-color:var(--purple)}
+.d4-expand{display:none}
+.d4-expand.open{display:block}
+
 </style>
 </head>
 <body>
@@ -321,7 +350,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="logo">
     <span class="live-dot"></span>
     台股<span style="color:var(--down)">MONITOR</span>
-    <span class="ver">V10.1 Entry</span>
+    <span class="ver">V10.2 Personal</span>
   </div>
   <span class="clock" id="clock"></span>
 </header>
@@ -330,9 +359,9 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 <!-- V10 Navigation -->
 <nav class="nav-tabs">
   <button class="nav-tab active" data-page="p-trade">📈 交易</button>
-  <button class="nav-tab" data-page="p-4d">🔍 四面向</button>
   <button class="nav-tab" data-page="p-market">🌐 市場</button>
   <button class="nav-tab" data-page="p-learn">🧠 AI學習</button>
+  <button class="nav-tab" data-page="p-account">👤 我的帳戶</button>
 </nav>
 
 <!-- Page 1: 主交易頁 -->
@@ -552,6 +581,17 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
     </div>
   </div>
 
+  <!-- ★ V10.2 K線圖 (Lightweight Charts) -->
+  <div class="kline-wrap full" id="klineWrap" style="display:none;margin-bottom:14px">
+    <div class="kline-header">
+      <span>📊 K 線圖（台股：漲紅跌綠）</span>
+      <span id="klineStatus" style="color:var(--muted);font-size:11px"></span>
+    </div>
+    <div class="kline-container" id="klineContainer">
+      <div class="kline-placeholder" id="klinePlaceholder">K 線資料暫時無法取得</div>
+    </div>
+  </div>
+
   <!-- Charts -->
   <div class="section full" style="margin-bottom:14px">
     <div class="tabs">
@@ -574,25 +614,19 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 </div><!-- /dash -->
 
 
-</div><!-- /p-trade -->
-
-<!-- Page 2: 四面向分析 -->
-<div class="page" id="p-4d">
-  <div class="section" style="margin-top:14px">
-    <div class="section-title">
-      <span>🔍 四面向分析</span>
-      <button class="purple-btn sm" id="btnLoad4dPage">載入四面向分析</button>
+<!-- 四面向分析（主交易頁展開式） -->
+  <div id="d4ExpandSection" style="display:none;margin-bottom:14px">
+    <button class="d4-toggle-btn" id="btnLoad4d">🔍 載入四面向分析</button>
+    <div class="d4-expand" id="d4Container">
+      <div class="d4-status info" style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:12px;text-align:center;background:#0d1728;border-radius:9px">按「載入四面向分析」查看基本面、技術面、籌碼面、消息面。</div>
     </div>
-    <div style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:10px" id="p4dStock">請先在交易頁查詢股票</div>
-    <div id="p4dContainer">
-      <div class="d4-status info">請先在「交易」頁查詢股票，再回到此頁按「載入四面向分析」。</div>
-    </div>
-    <div class="section" id="p4dNewsSection" style="display:none;margin-top:14px">
-      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.1em">📰 最新相關新聞</div>
-      <div id="p4dNews"></div>
+    <div id="d4NewsSection" style="display:none;margin-top:14px">
+      <div class="section"><div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.1em">📰 最新相關新聞</div>
+      <div id="d4News"></div></div>
     </div>
   </div>
-</div>
+
+</div><!-- /p-trade -->
 
 <!-- Page 3: 市場總覽 -->
 <div class="page" id="p-market">
@@ -658,6 +692,53 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 
 </div><!-- /p-learn -->
 
+<!-- Page 4: 我的帳戶 -->
+<div class="page" id="p-account">
+<div class="wrap" style="padding-top:16px;padding-bottom:16px">
+  <!-- 未登入 -->
+  <div id="accountGuest" style="display:block">
+    <div class="account-card">
+      <div style="font-size:40px;margin-bottom:16px">👤</div>
+      <div class="account-name">尚未登入</div>
+      <div class="auth-hint">
+        ✨ 登入 Google 帳號後可以：<br>
+        • 跨裝置同步自選股（手機、電腦都能看）<br>
+        • 自選股不會因清除快取消失<br>
+        • 自動從舊資料恢復自選股
+      </div>
+      <button class="google-btn" id="btnGoogleLogin">
+        <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        使用 Google 帳號登入
+      </button>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px">目前使用本機模式，自選股僅儲存在此裝置</div>
+    </div>
+  </div>
+  <!-- 已登入 -->
+  <div id="accountUser" style="display:none">
+    <div class="account-card">
+      <img class="account-avatar" id="userAvatar" src="" alt="頭像"/>
+      <div class="account-name" id="userName">—</div>
+      <div class="account-email" id="userEmail">—</div>
+      <div class="account-meta">
+        <div class="account-meta-item"><div class="account-meta-lbl">UID</div><div class="account-meta-val" id="userUid">—</div></div>
+        <div class="account-meta-item"><div class="account-meta-lbl">自選股數</div><div class="account-meta-val" id="userWlCount">—</div></div>
+        <div class="account-meta-item"><div class="account-meta-lbl">最後同步</div><div class="account-meta-val" id="userLastSync">—</div></div>
+        <div class="account-meta-item"><div class="account-meta-lbl">資料品質</div><div class="account-meta-val">Firestore ☁️</div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+        <button class="ghost" id="btnManualSync">☁️ 手動同步自選股</button>
+        <button class="ghost" id="btnRestoreLegacy">🔄 從舊資料恢復</button>
+        <button class="danger sm" id="btnLogout">登出</button>
+      </div>
+    </div>
+    <div class="section" style="max-width:480px;margin:16px auto">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:8px">Firestore 路徑：users/{uid}/watchlist/main</div>
+      <div style="font-family:var(--mono);font-size:12px;color:var(--muted)">登入後自選股自動同步到你的 Google 帳號，跨裝置都能使用。</div>
+    </div>
+  </div>
+</div>
+</div><!-- /p-account -->
+
 <div style="text-align:center;padding:20px;font-size:11px;color:var(--muted);font-family:var(--mono);border-top:1px solid var(--line);margin-top:10px;line-height:2.2">
   ⚠️ 本工具僅供技術分析學習參考，不構成任何投資建議。<br>
   台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
@@ -667,178 +748,185 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 
 
 <!-- Firebase compat (non-module, for global window.firebase) -->
+<!-- Firebase compat SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!-- Lightweight Charts K線圖 -->
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 /* ══════════════════════════════════════════════════════════════════
-   V10.1 Entry System - 完整前端 JS
-   - 移除 type="module" 避免 onclick 找不到 function
-   - Firebase 改用 CDN global (compat mode)
-   - 所有事件綁定改用 safeBind + DOMContentLoaded
-   - entry_status 兩區 AI 選股 UI
+   V10.2 Personal Trading System - 完整前端 JS
+   - Firebase Auth Google Login
+   - 每人專屬 users/{uid}/watchlist/main
+   - Lightweight Charts K 線圖
+   - 四面向分析移回主交易頁（展開式）
+   - safeBind + DOMContentLoaded
    ══════════════════════════════════════════════════════════════════ */
 
-// ── 安全綁定 ─────────────────────────────────────────────────────
 function safeBind(id, event, handler) {
   const el = document.getElementById(id);
   if (el) el.addEventListener(event, handler);
 }
 
-// ── 全域常數 ─────────────────────────────────────────────────────
 const API = window.API_BASE_URL || "https://taiwanstock-ben-1.onrender.com";
 const FB_CFG = window.FIREBASE_CONFIG || {};
 
-// ── 狀態 ─────────────────────────────────────────────────────────
 let WL = [], WL_CACHE = {}, CURRENT_ID = null, STOCK_DICT = {};
 let wlLeft = 30, wlTimer = null, isRefreshWL = false;
 let autoOn = localStorage.getItem("tw_auto_v10") === "1";
 let autoLeft = 300, autoTimer = null;
-let charts = {};
+let charts = {}, lwChart = null, lwVolSeries = null;
+let CURRENT_USER = null;   // Firebase Auth user
+let db = null, auth = null;
 
-// ── Firebase / Firestore（compat CDN，不需要 type="module"）──────
-let db = null;
-let WL_DOC_REF = null;
-
+// ── Firebase Auth & Firestore init ────────────────────────────────
 function initFirebase() {
   try {
-    if (typeof firebase !== "undefined" && FB_CFG.projectId) {
-      if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
-      db = firebase.firestore();
-      WL_DOC_REF = db.collection("watchlists").doc("default");
-    }
-  } catch(e) { console.warn("Firebase init failed:", e.message); }
+    if (typeof firebase === "undefined" || !FB_CFG.projectId) return;
+    if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
+    db   = firebase.firestore();
+    auth = firebase.auth();
+
+    auth.onAuthStateChanged(async user => {
+      CURRENT_USER = user;
+      renderAccountUI(user);
+      if (user) {
+        await migrateWatchlistIfNeeded(user.uid);
+        WL = await loadWLForUser(user.uid) || WL;
+        renderWL();
+        if (user.photoURL) {
+          const av = document.getElementById("userAvatar");
+          if (av) av.src = user.photoURL;
+        }
+      }
+    });
+  } catch(e) { console.warn("Firebase init:", e.message); }
 }
 
-async function fsLoadWL() {
-  if (!WL_DOC_REF) return null;
+// ── Auth functions ────────────────────────────────────────────────
+async function googleLogin() {
+  if (!auth) { alert("Firebase 尚未初始化"); return; }
   try {
-    const snap = await WL_DOC_REF.get();
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await auth.signInWithPopup(provider);
+  } catch(e) { console.warn("Google login:", e.message); }
+}
+
+async function googleLogout() {
+  if (!auth) return;
+  try { await auth.signOut(); WL = lsGetWL(); renderWL(); setSyncBadge("local"); }
+  catch(e) { console.warn("Logout:", e.message); }
+}
+
+function renderAccountUI(user) {
+  const guest = document.getElementById("accountGuest");
+  const logged = document.getElementById("accountUser");
+  if (!guest || !logged) return;
+  if (user) {
+    guest.style.display = "none";
+    logged.style.display = "block";
+    setTxt("userName", user.displayName || "—");
+    setTxt("userEmail", user.email || "—");
+    setTxt("userUid", (user.uid || "").slice(0, 8) + "…");
+    setTxt("userWlCount", WL.length + " 檔");
+    setSyncBadge("ok");
+  } else {
+    guest.style.display = "block";
+    logged.style.display = "none";
+    setSyncBadge("local");
+  }
+}
+
+// ── Firestore 路徑：users/{uid}/watchlist/main ────────────────────
+function userWLRef(uid) {
+  if (!db || !uid) return null;
+  return db.collection("users").doc(uid).collection("watchlist").doc("main");
+}
+function userProfileRef(uid) {
+  if (!db || !uid) return null;
+  return db.collection("users").doc(uid).collection("profile").doc("main");
+}
+// 舊路徑（migration source only）
+function legacyDefaultRef() {
+  if (!db) return null;
+  return db.collection("watchlists").doc("default");
+}
+
+async function loadWLForUser(uid) {
+  const ref = userWLRef(uid);
+  if (!ref) return null;
+  try {
+    const snap = await ref.get();
     if (!snap.exists) return null;
     const raw = snap.data().watchlist || [];
-    return raw.map(x => typeof x === "string"
-      ? { stock_id: x, stock_name: getLocalName(x) || x }
-      : { stock_id: x.stock_id, stock_name: x.stock_name || getLocalName(x.stock_id) || x.stock_id });
-  } catch(e) { console.warn("Firestore read:", e.message); return null; }
+    return normalizeWatchlist(raw);
+  } catch(e) { console.warn("loadWLForUser:", e.message); return null; }
 }
 
-async function fsSaveWL(items) {
+async function saveWLForUser(uid, items) {
+  const ref = userWLRef(uid);
+  if (!ref) return false;
   setSyncBadge("ing");
-  if (!WL_DOC_REF) { setSyncBadge("err"); return false; }
   try {
-    await WL_DOC_REF.set({ watchlist: items, updated_at: new Date().toISOString() });
+    await ref.set({ watchlist: items, updated_at: new Date().toISOString() });
+    setTxt("userLastSync", new Date().toLocaleTimeString("zh-TW"));
+    setTxt("userWlCount", items.length + " 檔");
     setSyncBadge("ok"); return true;
   } catch(e) { setSyncBadge("err"); return false; }
 }
 
-// ── 工具 ─────────────────────────────────────────────────────────
-const $ = id => document.getElementById(id);
-const f = (n, d=2) => n == null || Number.isNaN(Number(n)) ? "—" : Number(n).toFixed(d);
-const pct = n => n == null ? "—" : (Number(n) > 0 ? "+" : "") + Number(n).toFixed(2) + "%";
-const fvol = n => n ? Math.round(n/1000).toLocaleString() + "張" : "—";
-const cc = v => Number(v) > 0 ? "up" : Number(v) < 0 ? "down" : "flat";
-const twcc = v => Number(v) > 0 ? "tw-up" : Number(v) < 0 ? "tw-down" : "tw-flat";
-const sigIcon = s => s === "BUY" ? "📈 BUY" : s === "AVOID" ? "🚫 AVOID" : "👀 WATCH";
-const sigCls  = s => s === "BUY" ? "buy" : s === "AVOID" ? "avoid" : "watch-sig";
-const sleep   = ms => new Promise(r => setTimeout(r, ms));
-const dsn     = (id, name) => name && name !== id ? `${name} (${id})` : id;
-const fmtD    = s => { try { return new Date(s).toLocaleDateString("zh-TW"); } catch { return s; } };
-function getLocalName(id) { return STOCK_DICT[id]?.name || null; }
-
-function setTxt(id, v) { const el = $(id); if (el) el.textContent = v; }
-function addCls(id, cls) {
-  const el = $(id); if (!el) return;
-  el.classList.remove("up","down","flat","tw-up","tw-down","tw-flat");
-  if (cls) el.classList.add(cls);
-}
-function showErr(m) { const el = $("err"); if (el) { el.textContent = "⚠️ " + m; el.style.display = "block"; } }
-function hideErr() { const el = $("err"); if (el) el.style.display = "none"; }
-
-// ── apiFetch ─────────────────────────────────────────────────────
-async function apiFetch(url, opt={}, timeout=30000) {
-  const c = new AbortController(), t = setTimeout(() => c.abort(), timeout);
-  try { return await fetch(url, { ...opt, signal: c.signal }); }
-  catch(e) {
-    if (e.name === "AbortError") {
-      const err = new Error("請求逾時，Render 免費服務可能正在喚醒，請稍後再試。");
-      err.name = "TimeoutError"; throw err;
-    }
-    throw e;
-  } finally { clearTimeout(t); }
-}
-
-// ── Page navigation ───────────────────────────────────────────────
-function showPage(pageId) {
-  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
-  document.querySelectorAll(".nav-tab").forEach(b => b.classList.remove("active"));
-  const p = $(pageId); if (p) p.classList.add("active");
-  // Activate corresponding tab
-  document.querySelectorAll(".nav-tab").forEach(b => {
-    if (b.dataset.page === pageId) b.classList.add("active");
-  });
-  // Auto-load market data
-  if (pageId === "p-market") { loadMacro(); loadSentiment(); }
-}
-
-// ── Sync badge ────────────────────────────────────────────────────
-function setSyncBadge(state) {
-  const el = $("syncBadge"); if (!el) return;
-  if (state === "ok")       { el.textContent = "☁️ 已同步";          el.className = "sync-badge sync-ok"; }
-  if (state === "migrated") { el.textContent = "🔄 已從舊資料恢復並同步"; el.className = "sync-badge sync-ok"; }
-  if (state === "err")      { el.textContent = "⚠️ 同步失敗，使用本機備份"; el.className = "sync-badge sync-err"; }
-  if (state === "ing")      { el.textContent = "⏳ 同步中";           el.className = "sync-badge sync-ing"; }
-}
-
-// ── Stock master ──────────────────────────────────────────────────
-async function loadStockMaster() {
+async function saveUserProfile(user) {
+  const ref = userProfileRef(user.uid);
+  if (!ref) return;
   try {
-    const r = await apiFetch(`${API}/api/stocks/master`, {}, 15000);
-    if (r.ok) { const d = await r.json(); STOCK_DICT = d.stocks || {}; }
-  } catch(e) { console.warn("master load:", e.message); }
-}
-
-// ── Search suggest ────────────────────────────────────────────────
-let suggestTimer = null;
-function initSearchSuggest() {
-  const inp = $("sid"), box = $("suggestBox");
-  if (!inp || !box) return;
-  inp.addEventListener("input", () => {
-    clearTimeout(suggestTimer);
-    const q = inp.value.trim();
-    if (q.length < 1) { box.style.display = "none"; return; }
-    suggestTimer = setTimeout(() => fetchSuggest(q), 280);
-  });
-  inp.addEventListener("blur", () => setTimeout(() => { if (box) box.style.display = "none"; }, 200));
-  inp.addEventListener("keydown", e => { if (e.key === "Enter") doSearch(); });
-}
-
-async function fetchSuggest(q) {
-  try {
-    const r = await apiFetch(`${API}/api/stocks/search?q=${encodeURIComponent(q)}`, {}, 8000);
-    if (!r.ok) return;
-    const d = await r.json(); showSuggest(d.results || []);
+    const now = new Date().toISOString();
+    const snap = await ref.get();
+    await ref.set({
+      uid: user.uid, email: user.email,
+      displayName: user.displayName, photoURL: user.photoURL,
+      last_login: now,
+      created_at: snap.exists ? snap.data().created_at : now
+    }, { merge: true });
   } catch(e) {}
 }
 
-function showSuggest(results) {
-  const box = $("suggestBox"); if (!box) return;
-  if (!results.length) { box.style.display = "none"; return; }
-  box.innerHTML = results.map(r =>
-    `<div class="suggest-item" onclick="selectSuggest('${r.stock_id}','${r.stock_name}')">
-      <span class="si-name">${r.stock_name}</span><span class="si-id">${r.stock_id}</span>
-    </div>`).join("");
-  box.style.display = "block";
+// ── Migration：登入後合併所有舊資料 ──────────────────────────────
+async function migrateWatchlistIfNeeded(uid) {
+  try {
+    const userItems = await loadWLForUser(uid) || [];
+    const legacyItems = loadLegacyWatchlist();
+    let backendItems = [];
+    if (!userItems.length && !legacyItems.length) {
+      try {
+        const r = await apiFetch(`${API}/api/watchlist`, {}, 8000);
+        if (r.ok) { const d = await r.json(); backendItems = normalizeWatchlist(d.watchlist || []); }
+      } catch {}
+    }
+    // Try old Firestore path
+    let oldFsItems = [];
+    try {
+      const ref = legacyDefaultRef();
+      if (ref) {
+        const snap = await ref.get();
+        if (snap.exists) oldFsItems = normalizeWatchlist(snap.data().watchlist || []);
+      }
+    } catch {}
+    const merged = mergeWatchlists(userItems, legacyItems, backendItems, oldFsItems);
+    if (merged.length > 0) {
+      if (merged.length > userItems.length) {
+        await saveWLForUser(uid, merged);
+        setSyncBadge("migrated");
+      }
+      lsSaveWL(merged);
+      await saveUserProfile(CURRENT_USER);
+    }
+    WL = merged.length ? merged : (userItems.length ? userItems : WL);
+  } catch(e) { console.warn("migrate:", e.message); }
 }
 
-function selectSuggest(id, name) {
-  const inp = $("sid"); if (inp) inp.value = id;
-  const box = $("suggestBox"); if (box) box.style.display = "none";
-  doSearch();
-}
-
-// ── Watchlist V10.1 Migration ────────────────────────────────────
-
-/** 統一格式：{stock_id, stock_name}，相容舊格式 ["2330"] */
 function normalizeWatchlist(raw) {
   if (!Array.isArray(raw)) return [];
   const result = [], seen = new Set();
@@ -856,7 +944,6 @@ function normalizeWatchlist(raw) {
   return result;
 }
 
-/** 合併多個自選股清單，去重 */
 function mergeWatchlists(...lists) {
   const seen = new Set(), merged = [];
   for (const list of lists) {
@@ -869,156 +956,183 @@ function mergeWatchlists(...lists) {
   return merged;
 }
 
-/** 從所有 localStorage key 嘗試讀取舊自選股 */
 function loadLegacyWatchlist() {
+  const keys = ["tw_wl_v10","tw_wl_v9","watchlist","WL_KEY","tw_watchlist"];
   const candidates = [];
-  const keys = ["tw_wl_v10","tw_wl_v9","watchlist","WL_KEY","tw_watchlist","wl"];
   for (const key of keys) {
     try {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
       const parsed = JSON.parse(raw);
-      // 可能是 {watchlist:[...]} 或直接 [...]
-      const arr = Array.isArray(parsed) ? parsed
-                : Array.isArray(parsed?.watchlist) ? parsed.watchlist
-                : null;
+      const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.watchlist) ? parsed.watchlist : null;
       if (arr && arr.length) candidates.push(...normalizeWatchlist(arr));
     } catch {}
   }
-  return normalizeWatchlist(candidates); // 去重
+  return normalizeWatchlist(candidates);
 }
 
-function lsSaveWL(items) {
-  try { localStorage.setItem("tw_wl_v10", JSON.stringify(items)); } catch {}
+// ── Sync badge ────────────────────────────────────────────────────
+function setSyncBadge(state) {
+  const el = document.getElementById("syncBadge"); if (!el) return;
+  const map = {
+    ok:       ["☁️ 已同步",         "sync-badge sync-ok"],
+    migrated: ["🔄 已從舊資料恢復",  "sync-badge sync-ok"],
+    err:      ["⚠️ 同步失敗，使用本機備份","sync-badge sync-err"],
+    ing:      ["⏳ 同步中",          "sync-badge sync-ing"],
+    local:    ["👤 未登入，本機模式", "sync-badge sync-local"],
+  };
+  const [txt, cls] = map[state] || map.err;
+  el.textContent = txt; el.className = cls;
 }
-function getWLIds() { return WL.map(x => x.stock_id); }
 
-/** 從後端 /api/watchlist 讀取 */
-async function loadBackendWL() {
-  try {
-    const r = await apiFetch(`${API}/api/watchlist`, {}, 8000);
-    if (!r.ok) return [];
-    const d = await r.json();
-    return normalizeWatchlist(d.watchlist || []);
+// ── localStorage ─────────────────────────────────────────────────
+function lsGetWL() {
+  try { return JSON.parse(localStorage.getItem("tw_wl_v10") || "[]")
+    .map(x => typeof x === "string" ? { stock_id: x, stock_name: getLocalName(x) || x } : x);
   } catch { return []; }
 }
-
-/**
- * V10.1 自動遷移：
- * 1. Firestore 有資料 → 用 Firestore，合併 localStorage
- * 2. Firestore 空/不存在 → 讀 localStorage + 後端，合併後回寫 Firestore
- */
-async function migrateWatchlistIfNeeded() {
-  // 讀 Firestore
-  const fsRaw = await fsLoadWL();           // null=連線失敗, []=空, [...]= 有資料
-  const fsItems = fsRaw ? normalizeWatchlist(fsRaw) : [];
-  const fsHasData = fsItems.length > 0;
-
-  // 讀本機舊資料
-  const legacyItems = loadLegacyWatchlist();
-
-  // 讀後端（只有當 Firestore + localStorage 都空才需要）
-  let backendItems = [];
-  if (!fsHasData && !legacyItems.length) {
-    backendItems = await loadBackendWL();
-  }
-
-  // 合併
-  const merged = mergeWatchlists(fsItems, legacyItems, backendItems);
-
-  if (merged.length === 0) {
-    // 真的沒有任何資料
-    setSyncBadge("ok"); return merged;
-  }
-
-  const wasEmpty = !fsHasData;
-  const hadLegacy = legacyItems.length > 0 || backendItems.length > 0;
-
-  // 如果 Firestore 是空但本機/後端有資料 → 回寫 Firestore
-  if (wasEmpty && hadLegacy) {
-    const ok = await fsSaveWL(merged);
-    setSyncBadge(ok ? "migrated" : "err");
-  } else {
-    // Firestore 有資料，但本機也有 → 合併後更新
-    if (fsHasData && hadLegacy && merged.length > fsItems.length) {
-      await fsSaveWL(merged);
-    }
-    setSyncBadge(fsRaw !== null ? "ok" : "err");
-  }
-
-  // 永遠同步最新到 localStorage
-  lsSaveWL(merged);
-  return merged;
-}
+function lsSaveWL(items) { try { localStorage.setItem("tw_wl_v10", JSON.stringify(items)); } catch {} }
+function getWLIds() { return WL.map(x => x.stock_id); }
 
 async function loadWatchlist() {
   setSyncBadge("ing");
-  WL = await migrateWatchlistIfNeeded();
+  if (CURRENT_USER) {
+    const items = await loadWLForUser(CURRENT_USER.uid);
+    WL = items && items.length ? items : lsGetWL();
+    setSyncBadge("ok");
+  } else {
+    WL = loadLegacyWatchlist();
+    if (!WL.length) WL = lsGetWL();
+    setSyncBadge("local");
+  }
 }
 
 async function saveWatchlist() {
   lsSaveWL(WL);
-  const ok = await fsSaveWL(WL);
-  if (!ok) {
-    try { await apiFetch(`${API}/api/watchlist`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({watchlist:WL})}, 10000); } catch {}
+  if (CURRENT_USER) { await saveWLForUser(CURRENT_USER.uid, WL); }
+  else {
+    try { await apiFetch(`${API}/api/watchlist`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({watchlist:WL})},10000); } catch {}
   }
 }
 
+// ── Stock master ──────────────────────────────────────────────────
+async function loadStockMaster() {
+  try {
+    const r = await apiFetch(`${API}/api/stocks/master`, {}, 15000);
+    if (r.ok) { const d = await r.json(); STOCK_DICT = d.stocks || {}; }
+  } catch(e) {}
+}
+function getLocalName(id) { return STOCK_DICT[id]?.name || null; }
+
+// ── Utils ─────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const f  = (n,d=2) => n==null||Number.isNaN(Number(n)) ? "—" : Number(n).toFixed(d);
+const pct = n => n==null ? "—" : (Number(n)>0?"+":"") + Number(n).toFixed(2)+"%";
+const fvol= n => n ? Math.round(n/1000).toLocaleString()+"張" : "—";
+const cc  = v => Number(v)>0?"up":Number(v)<0?"down":"flat";
+const twcc= v => Number(v)>0?"tw-up":Number(v)<0?"tw-down":"tw-flat";
+const sigIcon = s => s==="BUY"?"📈 BUY":s==="AVOID"?"🚫 AVOID":"👀 WATCH";
+const sigCls  = s => s==="BUY"?"buy":s==="AVOID"?"avoid":"watch-sig";
+const sleep   = ms => new Promise(r=>setTimeout(r,ms));
+const dsn     = (id,name) => name&&name!==id?`${name} (${id})`:id;
+const fmtD    = s => { try{return new Date(s).toLocaleDateString("zh-TW");}catch{return s;} };
+
+function setTxt(id,v){const el=$(id);if(el)el.textContent=v;}
+function addCls(id,cls){const el=$(id);if(!el)return;el.classList.remove("up","down","flat","tw-up","tw-down","tw-flat");if(cls)el.classList.add(cls);}
+function showErr(m){const el=$("err");if(el){el.textContent="⚠️ "+m;el.style.display="block";}}
+function hideErr(){const el=$("err");if(el)el.style.display="none";}
+
+async function apiFetch(url,opt={},timeout=30000) {
+  const c=new AbortController(),t=setTimeout(()=>c.abort(),timeout);
+  try{return await fetch(url,{...opt,signal:c.signal});}
+  catch(e){if(e.name==="AbortError"){const err=new Error("請求逾時，Render 可能正在喚醒，請稍後再試。");err.name="TimeoutError";throw err;}throw e;}
+  finally{clearTimeout(t);}
+}
+
+// ── Page navigation ───────────────────────────────────────────────
+function showPage(pageId) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".nav-tab").forEach(b => b.classList.remove("active"));
+  const p = $(pageId); if(p) p.classList.add("active");
+  document.querySelectorAll(".nav-tab").forEach(b => { if(b.dataset.page===pageId) b.classList.add("active"); });
+  if(pageId==="p-market"){loadMacro();loadSentiment();}
+  if(pageId==="p-account"){renderAccountUI(CURRENT_USER);}
+}
+
+// ── Search suggest ────────────────────────────────────────────────
+let suggestTimer=null;
+function initSearchSuggest(){
+  const inp=$("sid"),box=$("suggestBox");if(!inp||!box)return;
+  inp.addEventListener("input",()=>{
+    clearTimeout(suggestTimer);const q=inp.value.trim();
+    if(q.length<1){box.style.display="none";return;}
+    suggestTimer=setTimeout(()=>fetchSuggest(q),280);
+  });
+  inp.addEventListener("blur",()=>setTimeout(()=>{if(box)box.style.display="none";},200));
+  inp.addEventListener("keydown",e=>{if(e.key==="Enter")doSearch();});
+}
+async function fetchSuggest(q){
+  try{const r=await apiFetch(`${API}/api/stocks/search?q=${encodeURIComponent(q)}`,{},8000);
+  if(!r.ok)return;const d=await r.json();showSuggest(d.results||[]);}catch{}
+}
+function showSuggest(results){
+  const box=$("suggestBox");if(!box)return;
+  if(!results.length){box.style.display="none";return;}
+  box.innerHTML=results.map(r=>`<div class="suggest-item" data-id="${r.stock_id}" data-name="${r.stock_name}"><span class="si-name">${r.stock_name}</span><span class="si-id">${r.stock_id}</span></div>`).join("");
+  box.style.display="block";
+  box.querySelectorAll(".suggest-item").forEach(el=>{
+    el.addEventListener("click",()=>{const inp=$("sid");if(inp)inp.value=el.dataset.id;box.style.display="none";doSearch();});
+  });
+}
+
 // ── WL sort ───────────────────────────────────────────────────────
-function sortWL(ids) {
-  function sortKey(c) {
-    if (!c || c.noData) return 60;
-    const sig = c.signal || "WATCH", q = c.scoreQuality || "none";
-    if (sig === "BUY"   && q === "full")    return 10;
-    if (sig === "WATCH" && q === "full")    return 20;
-    if (sig === "WATCH" && q === "partial") return 30;
-    if (sig === "AVOID" && q === "full")    return 40;
-    if (sig === "AVOID" && q === "partial") return 45;
-    if (q === "none")                       return 50;
-    return 55;
+function sortWL(ids){
+  function sortKey(c){
+    if(!c||c.noData)return 60;
+    const sig=c.signal||"WATCH",q=c.scoreQuality||"none";
+    if(sig==="BUY"   &&q==="full")return 10;
+    if(sig==="WATCH" &&q==="full")return 20;
+    if(sig==="WATCH" &&q==="partial")return 30;
+    if(sig==="AVOID" &&q==="full")return 40;
+    if(sig==="AVOID" &&q==="partial")return 45;
+    if(q==="none")return 50;return 55;
   }
-  return [...ids].sort((a, b) => {
-    const A = WL_CACHE[a] || {}, B = WL_CACHE[b] || {};
-    if (A.error && !B.error) return 1; if (!A.error && B.error) return -1;
-    const kA = sortKey(A), kB = sortKey(B);
-    if (kA !== kB) return kA - kB;
-    const cA = A.confidence ?? -1, cB = B.confidence ?? -1;
-    if (cB !== cA) return cB - cA;
-    return (B.changePct ?? -999) - (A.changePct ?? -999);
+  return [...ids].sort((a,b)=>{
+    const A=WL_CACHE[a]||{},B=WL_CACHE[b]||{};
+    if(A.error&&!B.error)return 1;if(!A.error&&B.error)return -1;
+    const kA=sortKey(A),kB=sortKey(B);if(kA!==kB)return kA-kB;
+    const cA=A.confidence??-1,cB=B.confidence??-1;if(cB!==cA)return cB-cA;
+    return(B.changePct??-999)-(A.changePct??-999);
   });
 }
 
 // ── WL card ───────────────────────────────────────────────────────
-function cardHTML(id) {
-  const c = WL_CACHE[id], wlItem = WL.find(x => x.stock_id === id) || {};
-  const nameFallback = wlItem.stock_name || getLocalName(id) || id;
-  if (!c) return `<div class="card" id="wc-${id}" onclick="loadStock('${id}')">
+function cardHTML(id){
+  const c=WL_CACHE[id],wlItem=WL.find(x=>x.stock_id===id)||{};
+  const nameFallback=wlItem.stock_name||getLocalName(id)||id;
+  if(!c)return`<div class="card" id="wc-${id}" data-load="${id}">
     <div class="card-top"><div class="card-names"><div class="card-name">${getLocalName(id)||id}</div><div class="card-id">${id}</div></div>
-    <button class="card-del" onclick="removeWL('${id}',event)">×</button></div>
+    <button class="card-del" data-del="${id}">×</button></div>
     <div class="card-price-row"><span class="card-price tw-flat" style="font-size:13px;color:var(--muted)">讀取中…</span></div>
     <div class="conf-bar"><div class="conf-bar-fill" style="width:0%"></div></div></div>`;
-  if (c.noData) return `<div class="card" id="wc-${id}" onclick="loadStock('${id}')">
+  if(c.noData)return`<div class="card" id="wc-${id}" data-load="${id}">
     <div class="card-top"><div class="card-names"><div class="card-name">${dsn(id,c.name||nameFallback)}</div><div class="card-id">${id}</div></div>
-    <button class="card-del" onclick="removeWL('${id}',event)">×</button></div>
+    <button class="card-del" data-del="${id}">×</button></div>
     <div class="card-price-row"><span class="card-price tw-flat" style="font-size:13px;color:var(--muted)">暫時無資料</span></div>
-    <div class="card-sig-row"><span class="card-conf" style="color:var(--muted);font-size:11px">點擊查詢</span></div>
     <div class="conf-bar"><div class="conf-bar-fill" style="width:0%"></div></div></div>`;
-  const clr = twcc(c.changePct), pT = c.price != null ? f(c.price) : "—", cT = pct(c.changePct);
-  const sig = c.signal || "WATCH", cls = sigCls(sig);
-  const conf = c.confidence ?? null, confTxt = conf != null ? conf + "/100" : "—", confW = conf != null ? conf : 0;
-  const quality = c.scoreQuality || "none";
-  const barC = quality === "full" ? (conf >= 75 ? "var(--up)" : conf >= 55 ? "var(--yellow)" : "var(--down)") : quality === "partial" ? "var(--yellow)" : "var(--flat)";
-  const qualityTag = quality === "full" ? `<span class="sq-tag sq-full">正式分數</span>`
-    : quality === "partial" ? `<span class="sq-tag sq-partial">估算分</span><span class="sq-tag sq-nd">資料不足</span>`
-    : `<span class="sq-tag sq-none">無資料</span>`;
-  const nm = dsn(id, c.name || nameFallback);
-  const ep = c.entryPrice != null ? `<div class="card-ep">入場 ${f(c.entryPrice)} 目標 ${c.targetPrice ? f(c.targetPrice) : "—"} 止蝕 ${c.stopLoss ? f(c.stopLoss) : "—"}</div>` : "";
-  // V10.1: entry_status badge
-  const es = c.entryStatus || ""; const esText = c.entryStatusText || "";
-  const esBadge = es ? `<span class="es-badge es-${es}">${esText}</span>` : "";
-  return `<div class="card ${cls}${id === CURRENT_ID ? " selected" : ""}" id="wc-${id}" onclick="loadStock('${id}')">
+  const clr=twcc(c.changePct),pT=c.price!=null?f(c.price):"—",cT=pct(c.changePct);
+  const sig=c.signal||"WATCH",cls=sigCls(sig);
+  const conf=c.confidence??null,confTxt=conf!=null?conf+"/100":"—",confW=conf!=null?conf:0;
+  const quality=c.scoreQuality||"none";
+  const barC=quality==="full"?(conf>=75?"var(--up)":conf>=55?"var(--yellow)":"var(--down)"):quality==="partial"?"var(--yellow)":"var(--flat)";
+  const qualityTag=quality==="full"?`<span class="sq-tag sq-full">正式分數</span>`:quality==="partial"?`<span class="sq-tag sq-partial">估算分</span><span class="sq-tag sq-nd">資料不足</span>`:`<span class="sq-tag sq-none">無資料</span>`;
+  const es=c.entryStatus||"",esText=c.entryStatusText||"";
+  const esBadge=es?`<span class="es-badge es-${es}">${esText}</span>`:"";
+  const nm=dsn(id,c.name||nameFallback);
+  const ep=c.entryPrice!=null?`<div class="card-ep">入場 ${f(c.entryPrice)} 目標 ${c.targetPrice?f(c.targetPrice):"—"} 止蝕 ${c.stopLoss?f(c.stopLoss):"—"}</div>`:"";
+  return`<div class="card ${cls}${id===CURRENT_ID?" selected":""}" id="wc-${id}" data-load="${id}">
     <div class="card-top"><div class="card-names"><div class="card-name">${nm}</div><div class="card-id">${id}</div></div>
-    <button class="card-del" onclick="removeWL('${id}',event)">×</button></div>
+    <button class="card-del" data-del="${id}">×</button></div>
     <div class="card-price-row"><span class="card-price ${clr}">${pT}</span><span class="card-chg ${clr}">${cT}</span></div>
     ${ep}
     <div class="card-sig-row"><span class="sig-badge">${sigIcon(sig)}</span><span class="card-conf">${confTxt}</span>${esBadge}</div>
@@ -1026,283 +1140,311 @@ function cardHTML(id) {
     <div class="conf-bar"><div class="conf-bar-fill" style="width:${confW}%;background:${barC}"></div></div></div>`;
 }
 
-function renderWL() {
-  const wlC = $("wlCount"); if (wlC) wlC.textContent = `${WL.length} 檔`;
-  const g = $("wlGrid");
-  if (!g) return;
-  g.innerHTML = WL.length ? sortWL(getWLIds()).map(cardHTML).join("") :
-    '<div class="empty">尚無自選股<br><span class="mini">輸入股票代號後按「＋ 加入自選」即可監控</span></div>';
+function renderWL(){
+  const wlC=$("wlCount");if(wlC)wlC.textContent=`${WL.length} 檔`;
+  const g=$("wlGrid");if(!g)return;
+  g.innerHTML=WL.length?sortWL(getWLIds()).map(cardHTML).join(""):'<div class="empty">尚無自選股<br><span class="mini">輸入股票代號後按「＋ 加入自選」即可監控</span></div>';
+  // Bind card events after render
+  g.querySelectorAll("[data-load]").forEach(el=>{
+    el.addEventListener("click",e=>{if(!e.target.closest("[data-del]"))loadStock(el.dataset.load);});
+  });
+  g.querySelectorAll("[data-del]").forEach(btn=>{
+    btn.addEventListener("click",e=>{e.stopPropagation();removeWL(btn.dataset.del);});
+  });
 }
 
-async function fetchOneWL(id) {
-  const wlItem = WL.find(x => x.stock_id === id) || {};
-  try {
-    const r = await apiFetch(`${API}/api/stock-lite/${id}`, {}, 20000);
-    if (!r.ok) throw new Error("status " + r.status);
-    const d = await r.json(); const ai = d.ai_signal || {};
-    WL_CACHE[id] = {
-      name: d.stock_name || getLocalName(id) || id,
-      price: d.price ?? null, changePct: d.change_pct ?? null,
-      signal: ai.signal || null, confidence: ai.confidence ?? null,
-      scoreQuality: ai.score_quality || "none",
-      entryPrice: ai.entry_price ?? null, targetPrice: ai.target_price ?? null,
-      stopLoss: ai.stop_loss ?? null,
-      entryStatus: ai.entry_status || "", entryStatusText: ai.entry_status_text || "",
-      canEnter: ai.can_enter || false,
-      error: false, noData: false,
-    };
-    const item = WL.find(x => x.stock_id === id);
-    if (item && d.stock_name && d.stock_name !== id) item.stock_name = d.stock_name;
-  } catch(e) {
-    if (!WL_CACHE[id]) WL_CACHE[id] = { name: wlItem.stock_name || getLocalName(id) || id, error: false, noData: true };
-  }
+async function fetchOneWL(id){
+  const wlItem=WL.find(x=>x.stock_id===id)||{};
+  try{
+    const r=await apiFetch(`${API}/api/stock-lite/${id}`,{},20000);
+    if(!r.ok)throw new Error("status "+r.status);
+    const d=await r.json();const ai=d.ai_signal||{};
+    WL_CACHE[id]={name:d.stock_name||getLocalName(id)||id,price:d.price??null,changePct:d.change_pct??null,
+      signal:ai.signal||null,confidence:ai.confidence??null,scoreQuality:ai.score_quality||"none",
+      entryPrice:ai.entry_price??null,targetPrice:ai.target_price??null,stopLoss:ai.stop_loss??null,
+      entryStatus:ai.entry_status||"",entryStatusText:ai.entry_status_text||"",
+      canEnter:ai.can_enter||false,error:false,noData:false};
+    const item=WL.find(x=>x.stock_id===id);
+    if(item&&d.stock_name&&d.stock_name!==id)item.stock_name=d.stock_name;
+  }catch(e){if(!WL_CACHE[id])WL_CACHE[id]={name:wlItem.stock_name||getLocalName(id)||id,error:false,noData:true};}
 }
 
-async function refreshWL() {
-  if (isRefreshWL) return; isRefreshWL = true;
-  const ids = getWLIds(); if (!ids.length) { isRefreshWL = false; return; }
-  try {
-    for (let i = 0; i < ids.length; i += 2) {
-      await Promise.allSettled(ids.slice(i, i+2).map(id => fetchOneWL(id).catch(() => {})));
-      renderWL();
-      if (i + 2 < ids.length) await sleep(500);
-    }
-  } finally { isRefreshWL = false; }
+async function refreshWL(){
+  if(isRefreshWL)return;isRefreshWL=true;
+  const ids=getWLIds();if(!ids.length){isRefreshWL=false;return;}
+  try{for(let i=0;i<ids.length;i+=2){await Promise.allSettled(ids.slice(i,i+2).map(id=>fetchOneWL(id).catch(()=>{})));renderWL();if(i+2<ids.length)await sleep(500);}}
+  finally{isRefreshWL=false;}
 }
 
-function startWLTimer() {
-  clearInterval(wlTimer); wlLeft = 30;
-  wlTimer = setInterval(() => {
+function startWLTimer(){
+  clearInterval(wlTimer);wlLeft=30;
+  wlTimer=setInterval(()=>{
     wlLeft--;
-    const bar = $("wlBar"); if (bar) bar.style.width = Math.max(0, wlLeft/30*100) + "%";
-    const tick = $("wlTick"); if (tick) tick.textContent = `${Math.max(0,wlLeft)}s 後刷新`;
-    if (wlLeft <= 0) { wlLeft = 30; const bar2 = $("wlBar"); if (bar2) bar2.style.width = "100%"; refreshWL(); }
-  }, 1000);
+    const bar=$("wlBar");if(bar)bar.style.width=Math.max(0,wlLeft/30*100)+"%";
+    const tick=$("wlTick");if(tick)tick.textContent=`${Math.max(0,wlLeft)}s 後刷新`;
+    if(wlLeft<=0){wlLeft=30;if(bar)bar.style.width="100%";refreshWL();}
+  },1000);
 }
 
-async function addWL() {
-  const inp = $("sid"); const id = inp ? inp.value.trim() : "";
-  if (!/^\d{4,6}$/.test(id)) { showErr("請輸入 4~6 位股票代號"); return; }
-  if (WL.find(x => x.stock_id === id)) { showErr(`${id} 已在自選股`); return; }
-  const name = getLocalName(id) || id;
-  WL.push({ stock_id: id, stock_name: name });
-  renderWL(); await saveWatchlist(); await fetchOneWL(id); renderWL();
+async function addWL(){
+  const inp=$("sid");const id=inp?inp.value.trim():"";
+  if(!/^\d{4,6}$/.test(id)){showErr("請輸入 4~6 位股票代號");return;}
+  if(WL.find(x=>x.stock_id===id)){showErr(`${id} 已在自選股`);return;}
+  WL.push({stock_id:id,stock_name:getLocalName(id)||id});
+  renderWL();await saveWatchlist();await fetchOneWL(id);renderWL();
 }
 
-function removeWL(id, e) {
-  e.stopPropagation();
-  WL = WL.filter(x => x.stock_id !== id); delete WL_CACHE[id];
-  renderWL(); saveWatchlist();
+async function removeWL(id){
+  WL=WL.filter(x=>x.stock_id!==id);delete WL_CACHE[id];
+  renderWL();await saveWatchlist();
 }
 
-function loadStock(id) { const inp = $("sid"); if (inp) inp.value = id; doSearch(); }
+function loadStock(id){const inp=$("sid");if(inp)inp.value=id;doSearch();}
 
 // ── Scan alerts ───────────────────────────────────────────────────
-async function scanAlerts(silent=false) {
-  const ids = getWLIds();
-  if (!ids.length) {
-    if (!silent) { const el=$("scanResult"); if(el){el.className="scan-result warn";el.textContent="⚠️ 自選股清單是空的";el.style.display="block";} } return null;
-  }
-  const el = $("scanResult"); let wakeT = null;
-  if (!silent) { if(el){el.className="scan-result";el.textContent=`⏳ 掃描中（${ids.length} 檔）…`;el.style.display="block";}
-    wakeT = setTimeout(() => { if(el)el.textContent += "\n後端喚醒中或資料源較慢，請稍候…"; }, 10000); }
-  try {
-    const r = await apiFetch(`${API}/api/alerts/check`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({watchlist:ids}) }, 120000);
-    if (wakeT) clearTimeout(wakeT);
-    const d = await r.json();
-    const alerts = d.alerts || [], sentLine = d.sent_line || [], checked = d.checked || ids.length, lineOk = d.line_enabled, errCnt = d.error_count || 0, dur = d.duration_seconds || 0;
+async function scanAlerts(silent=false){
+  const ids=getWLIds();
+  if(!ids.length){if(!silent){const el=$("scanResult");if(el){el.className="scan-result warn";el.textContent="⚠️ 自選股清單是空的";el.style.display="block";}}return null;}
+  const el=$("scanResult");let wakeT=null;
+  if(!silent&&el){el.className="scan-result";el.textContent=`⏳ 掃描中（${ids.length} 檔）…`;el.style.display="block";
+    wakeT=setTimeout(()=>{if(el)el.textContent+="\n後端喚醒中，請稍候…";},10000);}
+  try{
+    const r=await apiFetch(`${API}/api/alerts/check`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({watchlist:ids})},120000);
+    if(wakeT)clearTimeout(wakeT);const d=await r.json();
+    const alerts=d.alerts||[],sentLine=d.sent_line||[],checked=d.checked||ids.length,lineOk=d.line_enabled,errCnt=d.error_count||0,dur=d.duration_seconds||0;
     let txt;
-    if (!alerts.length) { txt = `✅ 掃描完成 ${checked} 檔（${dur}s）${errCnt > 0 ? `，${errCnt} 檔讀取失敗` : ""}\n目前自選股沒有符合條件的買點。`; }
-    else {
-      const lines = alerts.map(a => { const sent = sentLine.includes(a.stock_id) ? "  📲 已推播" : ""; return `📈 ${dsn(a.stock_id,a.stock_name)}  信心：${a.confidence}/100${sent}\n   ${a.summary||""}`; });
-      txt = `📊 掃描 ${checked} 檔（${dur}s），發現 ${alerts.length} 個買點${errCnt > 0 ? `，${errCnt} 檔讀取失敗` : ""}\n\n` + lines.join("\n\n");
-      if (sentLine.length) txt += `\n\n✅ LINE 已推播：${sentLine.join("、")}`;
-      else if (!lineOk) txt += "\n\n（LINE 未設定）";
+    if(!alerts.length)txt=`✅ 掃描完成 ${checked} 檔（${dur}s）${errCnt>0?`，${errCnt} 檔讀取失敗`:""}\n目前自選股沒有符合條件的買點。`;
+    else{
+      const lines=alerts.map(a=>{const sent=sentLine.includes(a.stock_id)?"  📲 已推播":"";return`📈 ${dsn(a.stock_id,a.stock_name)}  信心：${a.confidence}/100${sent}\n   ${a.summary||""}`;});
+      txt=`📊 掃描 ${checked} 檔（${dur}s），發現 ${alerts.length} 個買點${errCnt>0?`，${errCnt} 檔讀取失敗`:""}\n\n`+lines.join("\n\n");
+      if(sentLine.length)txt+=`\n\n✅ LINE 已推播：${sentLine.join("、")}`;
+      else if(!lineOk)txt+="\n\n（LINE 未設定）";
     }
-    if (!silent && el) { el.className = "scan-result ok"; el.textContent = txt; el.style.display = "block"; }
-    return { txt, alerts, sentLine, checked };
-  } catch(e) {
-    if (wakeT) clearTimeout(wakeT);
-    if (!silent && el) { el.className = "scan-result fail"; el.textContent = `❌ ${e.message || "掃描失敗"}`; el.style.display = "block"; }
-    return null;
-  }
+    if(!silent&&el){el.className="scan-result ok";el.textContent=txt;el.style.display="block";}
+    return{txt,alerts,sentLine,checked};
+  }catch(e){if(wakeT)clearTimeout(wakeT);if(!silent&&el){el.className="scan-result fail";el.textContent=`❌ ${e.message||"掃描失敗"}`;el.style.display="block";}return null;}
 }
 
-// ── AI scan with entry filter ─────────────────────────────────────
-async function aiScan() {
-  const box = $("aiScanBox"), ph = $("aiScanPlaceholder");
-  if (box) box.style.display = "block";
-  if (ph) ph.style.display = "none";
-  const grid = $("aiScanGrid"); if (grid) grid.innerHTML = '<div class="empty">AI 選股掃描中（約 30~120 秒）…</div>';
-  const btnAi = $("btnAiScan"); if (btnAi) btnAi.disabled = true;
-  let wakeT = setTimeout(() => { if (grid) grid.innerHTML += '<div class="empty" style="color:var(--yellow)">後端喚醒中，請稍候…</div>'; }, 10000);
+// ── AI scan ───────────────────────────────────────────────────────
+async function aiScan(){
+  const box=$("aiScanBox"),ph=$("aiScanPlaceholder");
+  if(box)box.style.display="block";if(ph)ph.style.display="none";
+  const grid=$("aiScanGrid");if(grid)grid.innerHTML='<div class="empty">AI 選股掃描中（約 30~120 秒）…</div>';
+  const btnAi=$("btnAiScan");if(btnAi)btnAi.disabled=true;
   showPage("p-market");
-  try {
-    const r = await apiFetch(`${API}/api/scan/ai?min_score=70&max_stocks=40`, {}, 120000);
-    clearTimeout(wakeT);
-    const d = await r.json();
-    renderAIScan(d, grid);
-  } catch(e) {
-    clearTimeout(wakeT);
-    if (grid) grid.innerHTML = `<div class="empty">❌ ${e.message||"掃描失敗"}</div>`;
-  } finally { if (btnAi) btnAi.disabled = false; }
+  let wakeT=setTimeout(()=>{if(grid)grid.innerHTML+='<div class="empty" style="color:var(--yellow)">後端喚醒中，請稍候…</div>';},10000);
+  try{
+    const r=await apiFetch(`${API}/api/scan/ai?min_score=70&max_stocks=40`,{},120000);
+    clearTimeout(wakeT);const d=await r.json();renderAIScan(d,grid);
+  }catch(e){clearTimeout(wakeT);if(grid)grid.innerHTML=`<div class="empty">❌ ${e.message||"掃描失敗"}</div>`;}
+  finally{if(btnAi)btnAi.disabled=false;}
 }
 
-function renderAIScan(data, container) {
-  if (!container) return;
-  const {enterable, pullback, enterable_count, pullback_count, scanned, duration_seconds} = data;
-  let html = `<div style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:6px 0 10px">掃描 ${scanned} 檔，耗時 ${duration_seconds}s</div>`;
-
-  // 第一區：可進場
-  html += `<div class="scan-section">
-    <div class="scan-section-title"><span style="color:var(--down)">✅ 可進場候選</span><span class="sq-tag sq-full">${enterable_count} 檔</span></div>`;
-  if (!enterable || !enterable.length) {
-    html += '<div class="empty-scan">目前沒有符合可進場條件的股票，避免追高是正確的。</div>';
-  } else {
-    html += '<div class="grid-cards">' + enterable.map(r => scanCard(r, true)).join("") + '</div>';
+function renderAIScan(data,container){
+  if(!container)return;
+  const{enterable,pullback,enterable_count,pullback_count,scanned,duration_seconds}=data;
+  let html=`<div style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:6px 0 10px">掃描 ${scanned} 檔，耗時 ${duration_seconds}s</div>`;
+  html+=`<div class="scan-section"><div class="scan-section-title"><span style="color:var(--down)">✅ 可進場候選</span><span class="sq-tag sq-full">${enterable_count} 檔</span></div>`;
+  if(!enterable||!enterable.length)html+='<div class="empty-scan">目前沒有符合可進場條件的股票，避免追高是正確的。</div>';
+  else html+='<div class="grid-cards">'+enterable.map(r=>scanCard(r,true)).join("")+'</div>';
+  html+='</div>';
+  if(pullback&&pullback.length){
+    html+=`<div class="scan-section"><div class="scan-section-title"><span style="color:var(--yellow)">⏳ 等回檔觀察</span><span class="sq-tag sq-partial">${pullback_count} 檔</span></div><div class="grid-cards">${pullback.map(r=>scanCard(r,false)).join("")}</div></div>`;
   }
-  html += '</div>';
-
-  // 第二區：等回檔
-  if (pullback && pullback.length) {
-    html += `<div class="scan-section">
-      <div class="scan-section-title"><span style="color:var(--yellow)">⏳ 等回檔觀察</span><span class="sq-tag sq-partial">${pullback_count} 檔</span></div>
-      <div class="grid-cards">${pullback.map(r => scanCard(r, false)).join("")}</div>
-    </div>`;
-  }
-  container.innerHTML = html;
+  container.innerHTML=html;
+  container.querySelectorAll("[data-load]").forEach(el=>{el.addEventListener("click",()=>loadStock(el.dataset.load));});
 }
 
-function scanCard(r, enterable) {
-  const clr = twcc(r.change_pct);
-  const es = r.entry_status || "WEAK_SETUP";
-  const esText = r.entry_status_text || es;
-  const rr = r.risk_reward_ratio;
-  const dist = r.distance_to_entry_pct;
-  const up = r.upside_pct;
-  const reasons = r.too_extended_reasons || [];
-  return `<div class="scan-card" onclick="loadStock('${r.stock_id}')">
-    <div class="scan-card-top">
-      <div><div class="scan-card-name">${dsn(r.stock_id, r.stock_name)}</div><div class="scan-card-id">${r.stock_id}</div></div>
-      <span class="es-badge es-${es}">${esText}</span>
-    </div>
-    <div class="card-price-row"><span class="scan-card-price ${clr}">${r.price != null ? f(r.price) : "—"}</span><span class="card-chg ${clr}">${pct(r.change_pct)}</span></div>
+function scanCard(r,enterable){
+  const clr=twcc(r.change_pct);const es=r.entry_status||"WEAK_SETUP";const esText=r.entry_status_text||es;
+  const rr=r.risk_reward_ratio;const dist=r.distance_to_entry_pct;const up=r.upside_pct;
+  const reasons=r.too_extended_reasons||[];
+  return`<div class="scan-card" data-load="${r.stock_id}">
+    <div class="scan-card-top"><div><div class="scan-card-name">${dsn(r.stock_id,r.stock_name)}</div><div class="scan-card-id">${r.stock_id}</div></div>
+    <span class="es-badge es-${es}">${esText}</span></div>
+    <div class="card-price-row"><span class="scan-card-price ${clr}">${r.price!=null?f(r.price):"—"}</span><span class="card-chg ${clr}">${pct(r.change_pct)}</span></div>
     <div class="scan-meta">
-      <div><span class="lbl">入場</span> <span class="val">${r.entry_price != null ? f(r.entry_price) : "—"}</span></div>
-      <div><span class="lbl">距入場</span> <span class="val ${dist != null && dist > 0 ? "up" : dist != null && dist < 0 ? "down" : ""}">${dist != null ? (dist > 0 ? "+" : "") + dist.toFixed(1) + "%" : "—"}</span></div>
-      <div><span class="lbl">目標</span> <span class="val up">${r.target_price != null ? f(r.target_price) : "—"}</span></div>
-      <div><span class="lbl">上漲空間</span> <span class="val down">${up != null ? "+" + up.toFixed(1) + "%" : "—"}</span></div>
-      <div><span class="lbl">止蝕</span> <span class="val down">${r.stop_loss != null ? f(r.stop_loss) : "—"}</span></div>
-      <div><span class="lbl">RR</span> <span class="val ${(rr||0) >= 1.5 ? "down" : "up"}">${rr != null ? rr + "x" : "—"}</span></div>
+      <div><span class="lbl">入場</span> <span class="val">${r.entry_price!=null?f(r.entry_price):"—"}</span></div>
+      <div><span class="lbl">距入場</span> <span class="val ${dist!=null&&dist>0?"up":dist!=null&&dist<0?"down":""}">${dist!=null?(dist>0?"+":"")+dist.toFixed(1)+"%":"—"}</span></div>
+      <div><span class="lbl">目標</span> <span class="val up">${r.target_price!=null?f(r.target_price):"—"}</span></div>
+      <div><span class="lbl">上漲空間</span> <span class="val down">${up!=null?"+"+up.toFixed(1)+"%":"—"}</span></div>
+      <div><span class="lbl">止蝕</span> <span class="val down">${r.stop_loss!=null?f(r.stop_loss):"—"}</span></div>
+      <div><span class="lbl">RR</span> <span class="val ${(rr||0)>=1.5?"down":"up"}">${rr!=null?rr+"x":"—"}</span></div>
     </div>
-    ${reasons.length ? `<div class="scan-reasons">⚠️ ${reasons.slice(0,2).join(" ／ ")}</div>` : ""}
+    ${reasons.length?`<div class="scan-reasons">⚠️ ${reasons.slice(0,2).join(" ／ ")}</div>`:""}
   </div>`;
 }
 
-// ── Auto LINE monitor ─────────────────────────────────────────────
-function updateAutoUI() {
-  const btn = $("btnAuto");
-  if (autoOn) { if (btn) { btn.textContent = "已開啟"; btn.className = "green-btn sm"; } }
-  else { if (btn) { btn.textContent = "已關閉"; btn.className = "ghost sm"; } }
+// ── Auto LINE ─────────────────────────────────────────────────────
+function updateAutoUI(){
+  const btn=$("btnAuto");
+  if(autoOn){if(btn){btn.textContent="已開啟";btn.className="green-btn sm";}}
+  else{if(btn){btn.textContent="已關閉";btn.className="ghost sm";}}
 }
-
-function toggleAuto() {
-  autoOn = !autoOn; localStorage.setItem("tw_auto_v10", autoOn ? "1" : "0");
+function toggleAuto(){
+  autoOn=!autoOn;localStorage.setItem("tw_auto_v10",autoOn?"1":"0");
   updateAutoUI();
-  if (autoOn) { startAutoTimer(); const el=$("autoLastR");if(el){el.style.display="block";el.textContent="已開啟，5 分鐘後首次掃描…";} }
-  else { clearInterval(autoTimer); autoTimer = null; setTxt("autoCountdown","—"); const el=$("autoLastR");if(el)el.style.display="none"; }
+  if(autoOn){startAutoTimer();const el=$("autoLastR");if(el){el.style.display="block";el.textContent="已開啟，5 分鐘後首次掃描…";}}
+  else{clearInterval(autoTimer);autoTimer=null;setTxt("autoCountdown","—");const el=$("autoLastR");if(el)el.style.display="none";}
+}
+function startAutoTimer(){
+  clearInterval(autoTimer);autoLeft=300;
+  autoTimer=setInterval(async()=>{
+    autoLeft--;const m=Math.floor(autoLeft/60),s=autoLeft%60;
+    setTxt("autoCountdown",`${m}:${s.toString().padStart(2,"0")}`);
+    if(autoLeft<=0){autoLeft=300;setTxt("autoLastT",new Date().toLocaleTimeString("zh-TW"));
+      const r=await scanAlerts(true);
+      if(r){setTxt("autoScanned",r.checked+"檔");setTxt("autoPushed",r.sentLine.length+"檔");
+        const el=$("autoLastR");if(el){el.style.display="block";el.textContent=r.txt;el.style.color=r.alerts.length>0?"var(--up)":"var(--muted)";}}}
+  },1000);
 }
 
-function startAutoTimer() {
-  clearInterval(autoTimer); autoLeft = 300;
-  autoTimer = setInterval(async () => {
-    autoLeft--;
-    const m = Math.floor(autoLeft/60), s = autoLeft % 60;
-    setTxt("autoCountdown", `${m}:${s.toString().padStart(2,"0")}`);
-    if (autoLeft <= 0) {
-      autoLeft = 300;
-      setTxt("autoLastT", new Date().toLocaleTimeString("zh-TW"));
-      const r = await scanAlerts(true);
-      if (r) {
-        setTxt("autoScanned", r.checked + "檔"); setTxt("autoPushed", r.sentLine.length + "檔");
-        const el = $("autoLastR");
-        if (el) { el.style.display = "block"; el.textContent = r.txt; el.style.color = r.alerts.length > 0 ? "var(--up)" : "var(--muted)"; }
-      }
+// ── ★ V10.2 K 線圖（Lightweight Charts）─────────────────────────
+function destroyChart(){
+  if(lwChart){try{lwChart.remove();}catch{}lwChart=null;lwVolSeries=null;}
+}
+
+function renderCandlestickChart(chartData,aiSignal){
+  const container=$("klineContainer");const wrap=$("klineWrap");const ph=$("klinePlaceholder");
+  if(!wrap||!container){return;}
+  if(!chartData||!chartData.length){
+    if(wrap)wrap.style.display="none";return;
+  }
+  wrap.style.display="block";
+  destroyChart();
+  if(ph)ph.style.display="none";
+  try{
+    const h=window.innerWidth<=768?320:420;
+    container.style.height=h+"px";
+    lwChart=LightweightCharts.createChart(container,{
+      width:container.offsetWidth,height:h,
+      layout:{background:{color:"#0d1728"},textColor:"#6f86a8"},
+      grid:{vertLines:{color:"rgba(29,49,80,.5)"},horzLines:{color:"rgba(29,49,80,.5)"}},
+      crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+      rightPriceScale:{borderColor:"#1d3150"},
+      timeScale:{borderColor:"#1d3150",timeVisible:true},
+    });
+    // K線（台股：漲紅跌綠）
+    const candleSeries=lwChart.addCandlestickSeries({
+      upColor:"#e8384f",downColor:"#00b86b",
+      borderUpColor:"#e8384f",borderDownColor:"#00b86b",
+      wickUpColor:"#e8384f",wickDownColor:"#00b86b",
+    });
+    const candleData=chartData.filter(d=>d.open&&d.high&&d.low&&d.close).map(d=>({
+      time:d.date,open:d.open,high:d.high,low:d.low,close:d.close
+    }));
+    if(candleData.length)candleSeries.setData(candleData);
+    // MA5
+    const ma5=lwChart.addLineSeries({color:"#fbbf24",lineWidth:1,priceLineVisible:false});
+    ma5.setData(chartData.filter(d=>d.ma5!=null).map(d=>({time:d.date,value:d.ma5})));
+    // MA20
+    const ma20=lwChart.addLineSeries({color:"#f97316",lineWidth:1,priceLineVisible:false});
+    ma20.setData(chartData.filter(d=>d.ma20!=null).map(d=>({time:d.date,value:d.ma20})));
+    // MA60
+    const ma60=lwChart.addLineSeries({color:"#e8384f",lineWidth:1,lineStyle:2,priceLineVisible:false});
+    ma60.setData(chartData.filter(d=>d.ma60!=null).map(d=>({time:d.date,value:d.ma60})));
+    // 水平線：入場/目標/止蝕
+    const ai=aiSignal||{};
+    if(ai.entry_price&&candleData.length){
+      candleSeries.createPriceLine({price:ai.entry_price,color:"#fbbf24",lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:"入場"});
     }
-  }, 1000);
+    if(ai.target_price&&candleData.length){
+      candleSeries.createPriceLine({price:ai.target_price,color:"#e8384f",lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:"目標"});
+    }
+    if(ai.stop_loss&&candleData.length){
+      candleSeries.createPriceLine({price:ai.stop_loss,color:"#00b86b",lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:"止蝕"});
+    }
+    // 成交量（小chart）
+    const volPanel=lwChart.addHistogramSeries({
+      color:"rgba(0,212,255,.3)",priceFormat:{type:"volume"},priceScaleId:"vol",
+      scaleMargins:{top:0.8,bottom:0},
+    });
+    const volData=chartData.filter(d=>d.volume!=null&&d.close!=null).map(d=>({
+      time:d.date,value:d.volume,
+      color:d.close>=(d.open||d.close)?"rgba(232,56,79,.4)":"rgba(0,184,107,.4)"
+    }));
+    if(volData.length)volPanel.setData(volData);
+    lwChart.timeScale().fitContent();
+    const statusEl=$("klineStatus");if(statusEl)statusEl.textContent=`${candleData.length} 根`;
+    // Responsive resize
+    const ro=new ResizeObserver(()=>{if(lwChart&&container)lwChart.applyOptions({width:container.offsetWidth});});
+    ro.observe(container);
+  }catch(e){console.warn("kline error:",e.message);if(wrap)wrap.style.display="none";}
 }
 
 // ── Main search ───────────────────────────────────────────────────
-async function doSearch() {
-  const inp = $("sid"); const id = inp ? inp.value.trim() : "";
-  if (!/^\d{4,6}$/.test(id)) { showErr("請輸入 4~6 位股票代號"); return; }
-  const box = $("suggestBox"); if (box) box.style.display = "none";
-  hideErr();
-  CURRENT_ID = id; const btId = $("btId"); if (btId) btId.value = id;
+async function doSearch(){
+  const inp=$("sid");const id=inp?inp.value.trim():"";
+  if(!/^\d{4,6}$/.test(id)){showErr("請輸入 4~6 位股票代號");return;}
+  const box=$("suggestBox");if(box)box.style.display="none";
+  hideErr();CURRENT_ID=id;const btId=$("btId");if(btId)btId.value=id;
 
   // Reset 4D
-  const p4dC = $("p4dContainer");
-  if (p4dC) p4dC.innerHTML = '<div class="d4-status info">為保持查詢速度，四面向分析不會自動載入。<br>按「載入四面向分析」查看詳細。</div>';
-  const p4dNS = $("p4dNewsSection"); if (p4dNS) p4dNS.style.display = "none";
-  const dash = $("dash"); if (dash) dash.style.display = "none";
+  const d4C=$("d4Container");if(d4C){d4C.classList.remove("open");d4C.innerHTML='<div class="d4-status info" style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:12px;text-align:center;background:#0d1728;border-radius:9px">按「載入四面向分析」查看基本面、技術面、籌碼面、消息面。</div>';}
+  const d4NS=$("d4NewsSection");if(d4NS)d4NS.style.display="none";
+  const d4ES=$("d4ExpandSection");if(d4ES)d4ES.style.display="none";
+  const dash=$("dash");if(dash)dash.style.display="none";
+  destroyChart();
 
   // Step 1: stock-lite
-  try {
-    const r1 = await apiFetch(`${API}/api/stock-lite/${id}`, {}, 20000);
-    if (r1.ok) {
-      const d1 = await r1.json(); renderStockLite(d1);
-      const ai1 = d1.ai_signal || {};
-      WL_CACHE[id] = { name: d1.stock_name || id, price: d1.price ?? null, changePct: d1.change_pct ?? null,
-        signal: ai1.signal || null, confidence: ai1.confidence ?? null, scoreQuality: ai1.score_quality || "none",
-        entryPrice: ai1.entry_price ?? null, targetPrice: ai1.target_price ?? null, stopLoss: ai1.stop_loss ?? null,
-        entryStatus: ai1.entry_status || "", entryStatusText: ai1.entry_status_text || "",
-        canEnter: ai1.can_enter || false, error: false, noData: false };
+  try{
+    const r1=await apiFetch(`${API}/api/stock-lite/${id}`,{},20000);
+    if(r1.ok){
+      const d1=await r1.json();renderStockLite(d1);
+      const ai1=d1.ai_signal||{};
+      WL_CACHE[id]={name:d1.stock_name||id,price:d1.price??null,changePct:d1.change_pct??null,
+        signal:ai1.signal||null,confidence:ai1.confidence??null,scoreQuality:ai1.score_quality||"none",
+        entryPrice:ai1.entry_price??null,targetPrice:ai1.target_price??null,stopLoss:ai1.stop_loss??null,
+        entryStatus:ai1.entry_status||"",entryStatusText:ai1.entry_status_text||"",
+        canEnter:ai1.can_enter||false,error:false,noData:false};
       renderWL();
     }
-  } catch(e) { console.warn("stock-lite:", e.message); }
+  }catch(e){console.warn("stock-lite:",e.message);}
 
   // Step 2: full stock
-  let wakeT = null;
-  try {
-    wakeT = setTimeout(() => showErr("⏳ Render 免費方案可能正在喚醒（約 30 秒），請耐心等待…"), 10000);
-    const r2 = await apiFetch(`${API}/api/stock/${id}`, {}, 45000);
-    clearTimeout(wakeT); hideErr();
-    if (!r2.ok) { const e = await r2.json().catch(() => ({})); throw new Error(e.detail || `HTTP ${r2.status}`); }
-    const d2 = await r2.json(); renderStock(d2);
-    const ai2 = d2.ai_signal || {};
-    WL_CACHE[id] = { name: d2.stock_name || id, price: d2.price?.close ?? null, changePct: d2.price?.change_pct ?? null,
-      signal: ai2.signal || null, confidence: ai2.confidence ?? null, scoreQuality: ai2.score_quality || "none",
-      entryPrice: ai2.entry_price ?? null, targetPrice: ai2.target_price ?? null, stopLoss: ai2.stop_loss ?? null,
-      entryStatus: ai2.entry_status || "", entryStatusText: ai2.entry_status_text || "",
-      canEnter: ai2.can_enter || false, error: false, noData: false };
-    renderWL(); checkLineStatus();
-  } catch(e) {
-    if (wakeT) clearTimeout(wakeT);
-    const dash2 = $("dash");
-    if (dash2 && dash2.style.display === "block") {
-      const dSrc = $("dSource"); if (dSrc) dSrc.textContent = "部分資料暫時無法取得";
-    } else { showErr("查詢失敗：" + e.message); }
+  let wakeT=null;
+  try{
+    wakeT=setTimeout(()=>showErr("⏳ Render 免費方案可能正在喚醒（約 30 秒），請耐心等待…"),10000);
+    const r2=await apiFetch(`${API}/api/stock/${id}`,{},45000);
+    clearTimeout(wakeT);hideErr();
+    if(!r2.ok){const e=await r2.json().catch(()=>({}));throw new Error(e.detail||`HTTP ${r2.status}`);}
+    const d2=await r2.json();renderStock(d2);
+    const ai2=d2.ai_signal||{};
+    WL_CACHE[id]={name:d2.stock_name||id,price:d2.price?.close??null,changePct:d2.price?.change_pct??null,
+      signal:ai2.signal||null,confidence:ai2.confidence??null,scoreQuality:ai2.score_quality||"none",
+      entryPrice:ai2.entry_price??null,targetPrice:ai2.target_price??null,stopLoss:ai2.stop_loss??null,
+      entryStatus:ai2.entry_status||"",entryStatusText:ai2.entry_status_text||"",
+      canEnter:ai2.can_enter||false,error:false,noData:false};
+    renderWL();checkLineStatus();
+    // Render K-line
+    renderCandlestickChart(d2.chart_data||[],d2.ai_signal||{});
+    // Show 4D section
+    if(d4ES)d4ES.style.display="block";
+  }catch(e){
+    if(wakeT)clearTimeout(wakeT);
+    const dash2=$("dash");if(dash2&&dash2.style.display==="block"){const dSrc=$("dSource");if(dSrc)dSrc.textContent="部分資料暫時無法取得";}
+    else showErr("查詢失敗："+e.message);
   }
 }
 
 // ── renderStockLite ───────────────────────────────────────────────
-function renderStockLite(d) {
-  const dash = $("dash"); if (dash) dash.style.display = "block";
-  const ai = d.ai_signal || {}, rt = d.realtime_quote || {};
-  setTxt("dId", d.stock_id); setTxt("dName", dsn(d.stock_id, d.stock_name));
-  setTxt("dSource", "股票資料載入中…");
-  const price = d.price, chg = d.change, chgP = d.change_pct;
-  setTxt("dClose", price != null ? f(price) : "—"); addCls("dClose", cc(chg || 0));
-  setTxt("dChg", chg != null ? `${chg > 0 ? "+" : ""}${f(chg)} (${pct(chgP)})` : "—"); addCls("dChg", cc(chg || 0));
-  setTxt("dConc", "載入中…"); const ce = $("dConc"); if (ce) ce.className = "conclusion neu";
-  const rtEl = $("rtInfo"); if (rtEl) rtEl.innerHTML = rt?.price != null ? `<span class="pill pill-ok">⚡ ${rt.source||"TWSE MIS"}</span>` : `<span class="pill pill-warn">休市或無成交</span>`;
+function renderStockLite(d){
+  const dash=$("dash");if(dash)dash.style.display="block";
+  const ai=d.ai_signal||{},rt=d.realtime_quote||{};
+  setTxt("dId",d.stock_id);setTxt("dName",dsn(d.stock_id,d.stock_name));
+  setTxt("dSource","股票資料載入中…");
+  const price=d.price,chg=d.change,chgP=d.change_pct;
+  setTxt("dClose",price!=null?f(price):"—");addCls("dClose",cc(chg||0));
+  setTxt("dChg",chg!=null?`${chg>0?"+":""}${f(chg)} (${pct(chgP)})`:"—");addCls("dChg",cc(chg||0));
+  setTxt("dConc","載入中…");const ce=$("dConc");if(ce)ce.className="conclusion neu";
+  const rtEl=$("rtInfo");if(rtEl)rtEl.innerHTML=rt?.price!=null?`<span class="pill pill-ok">⚡ ${rt.source||"TWSE MIS"}</span>`:`<span class="pill pill-warn">休市或無成交</span>`;
   renderAI(ai);
 }
 
 // ── renderStock ───────────────────────────────────────────────────
-function renderStock(d) {
+function renderStock(d){
   const p=d.price||{},ind=d.indicators||{},bt=d.backtest||{},sc=d.score||{},vol=d.volume||{},rt=d.realtime_quote||null,ai=d.ai_signal||{};
-  if (d.data_warning) showErr(d.data_warning);
+  if(d.data_warning)showErr(d.data_warning);
   setTxt("dId",d.stock_id);setTxt("dName",dsn(d.stock_id,d.stock_name));setTxt("dDate","資料日期："+d.last_date);
   setTxt("dSource",d.data_source?`來源: ${d.data_source}`:"");
   const mEl=$("dMode");if(mEl){mEl.textContent=p.mode==="realtime"?"⚡ 即時":"📅 日線";mEl.className=p.mode==="realtime"?"mode-rt":"mode-daily";}
@@ -1316,21 +1458,21 @@ function renderStock(d) {
   const ra=$("rsiAlert");if(ra)ra.innerHTML=d.rsi_alert?`<span class="pill ${d.rsi_alert.includes("過熱")?"pill-hot":"pill-warn"}">${d.rsi_alert}</span>`:"";
   setTxt("dMa5",f(ind.ma5));setTxt("dMa20",f(ind.ma20));setTxt("dMa60",f(ind.ma60));
   setTxt("dRsi",f(ind.rsi));addCls("dRsi",ind.rsi>50?"up":"down");
-  setTxt("dMacd",f(ind.macd,4));setTxt("dSig",f(ind.signal,4));setTxt("dHist",f(ind.hist,4));addCls("dHist",ind.hist>0?"up":"down");addCls("dMacd",ind.macd>ind.signal?"up":"down");
+  setTxt("dMacd",f(ind.macd,4));setTxt("dSig",f(ind.signal,4));setTxt("dHist",f(ind.hist,4));
+  addCls("dHist",ind.hist>0?"up":"down");addCls("dMacd",ind.macd>ind.signal?"up":"down");
   setTxt("dBbU",f(ind.bb_upper));setTxt("dBbL",f(ind.bb_lower));
   setTxt("dScore",sc.score||0);addCls("dScore",sc.score>=4?"up":sc.score<=2?"down":"flat");
   const dots=$("scoreDots");if(dots){dots.innerHTML="";for(let i=0;i<5;i++){const dot=document.createElement("div");dot.className="dot"+(i<(sc.score||0)?" on":"");dots.appendChild(dot);}}
   const srEl=$("scoreReasons");if(srEl)srEl.innerHTML=(sc.reasons||[]).map(r=>`<div class="reason">${r}</div>`).join("");
   setTxt("dWr",(bt.winrate||0)+"%");addCls("dWr",bt.winrate>=60?"up":bt.winrate<45?"down":"flat");
   setTxt("dWrSub",bt.trials?"近一年回測結果":"樣本不足");setTxt("dTrials",bt.trials||0);setTxt("dWins",bt.wins||0);
-  renderAI(ai);
-  renderMTF(d.multi_timeframe||null);
-  killCharts(); mkCharts(d.chart_data||[]);
+  renderAI(ai);renderMTF(d.multi_timeframe||null);
+  killCharts();mkCharts(d.chart_data||[]);
   const dash=$("dash");if(dash)dash.style.display="block";
 }
 
 // ── renderAI ──────────────────────────────────────────────────────
-function renderAI(ai) {
+function renderAI(ai){
   const badge=$("aiBadge");if(badge)badge.className="ai-signal-block "+(ai.signal==="BUY"?"ai-buy":ai.signal==="AVOID"?"ai-avoid":"ai-watch");
   setTxt("aiLabel",sigIcon(ai.signal||"WATCH"));setTxt("aiConf",`信心 ${ai.confidence??0} / 100`);
   const barEl=$("confBar");if(barEl){barEl.style.width=(ai.confidence||0)+"%";barEl.style.background=(ai.confidence||0)>=75?"var(--up)":(ai.confidence||0)>=55?"var(--yellow)":"var(--down)";}
@@ -1339,29 +1481,16 @@ function renderAI(ai) {
   setTxt("aiSl",ai.stop_loss!=null?f(ai.stop_loss):"—");
   const rrEl=$("aiRr");if(rrEl){if(ai.risk_reward_ratio!=null){rrEl.textContent=ai.risk_reward_ratio+"x";rrEl.className="aiq-val "+(ai.risk_reward_ratio>=1.5?"down":"up");}else{rrEl.textContent="—";rrEl.className="aiq-val";}}
   setTxt("aiSummary",ai.summary||"—");
-  // V10.1 entry_status
-  const tsEl=$("tradeStatusBadge");
-  if(tsEl){
-    const ts=ai.trade_status||"WATCH";
-    const tsLbl={"BUY_NOW":"✅ BUY_NOW 可布局","BUY_PULLBACK":"⏳ BUY_PULLBACK 等回檔","WATCH":"👀 WATCH 觀望","AVOID":"🚫 AVOID 不建議"};
-    tsEl.textContent=tsLbl[ts]||ts;tsEl.className="ts-badge ts-"+ts;
-  }
-  const esEl=$("entryStatusBadge");
-  if(esEl){
-    const es=ai.entry_status||"";const esText=ai.entry_status_text||"";
-    if(es){esEl.textContent=esText;esEl.className="es-badge es-"+es;esEl.style.display="inline-block";}
-    else esEl.style.display="none";
-  }
-  $("aiEntry").innerHTML=(ai.entry_reason||[]).length?(ai.entry_reason.map(r=>`<div class="ai-reason">✅ ${r}</div>`).join("")):"<div class=\"ai-reason\" style=\"color:var(--muted)\">無</div>";
-  $("aiRisk").innerHTML=(ai.risk_reason||[]).length?(ai.risk_reason.map(r=>`<div class="ai-reason">⚠️ ${r}</div>`).join("")):"<div class=\"ai-reason\" style=\"color:var(--down)\">暫無明顯風險</div>";
+  const tsEl=$("tradeStatusBadge");if(tsEl){const ts=ai.trade_status||"WATCH";const tsLbl={"BUY_NOW":"✅ BUY_NOW 可布局","BUY_PULLBACK":"⏳ BUY_PULLBACK 等回檔","WATCH":"👀 WATCH 觀望","AVOID":"🚫 AVOID 不建議"};tsEl.textContent=tsLbl[ts]||ts;tsEl.className="ts-badge ts-"+ts;}
+  const esEl=$("entryStatusBadge");if(esEl){const es=ai.entry_status||"";if(es){esEl.textContent=ai.entry_status_text||es;esEl.className="es-badge es-"+es;esEl.style.display="inline-block";}else esEl.style.display="none";}
+  const aiEntryEl=$("aiEntry");if(aiEntryEl)aiEntryEl.innerHTML=(ai.entry_reason||[]).length?(ai.entry_reason.map(r=>`<div class="ai-reason">✅ ${r}</div>`).join("")):"<div class=\"ai-reason\" style=\"color:var(--muted)\">無</div>";
+  const aiRiskEl=$("aiRisk");if(aiRiskEl)aiRiskEl.innerHTML=(ai.risk_reason||[]).length?(ai.risk_reason.map(r=>`<div class="ai-reason">⚠️ ${r}</div>`).join("")):"<div class=\"ai-reason\" style=\"color:var(--down)\">暫無明顯風險</div>";
   setTxt("aiDisc",ai.disclaimer||"");
-  // too_extended_reasons
-  const terEl=$("tooExtendedReasons");
-  if(terEl){const reasons=ai.too_extended_reasons||[];terEl.innerHTML=reasons.length?reasons.map(r=>`<div class="ai-reason">🚫 ${r}</div>`).join(""):"";terEl.style.display=reasons.length?"block":"none";}
+  const terEl=$("tooExtendedReasons");if(terEl){const reasons=ai.too_extended_reasons||[];terEl.innerHTML=reasons.length?reasons.map(r=>`<div class="ai-reason">🚫 ${r}</div>`).join(""):"";terEl.style.display=reasons.length?"block":"none";}
 }
 
 // ── renderMTF ─────────────────────────────────────────────────────
-function renderMTF(mtf) {
+function renderMTF(mtf){
   const panel=$("mtfPanel");if(!mtf){if(panel)panel.style.display="none";return;}
   if(panel)panel.style.display="block";
   const clr=v=>v==="多"||v==="多頭"?"bull-txt":v==="空"||v==="空頭"?"bear-txt":"neu-txt";
@@ -1370,33 +1499,31 @@ function renderMTF(mtf) {
   const el3=$("mtfOverall");if(el3){el3.textContent=mtf.overall||"—";el3.className="mtf-val "+(clr(mtf.overall||""));}
 }
 
-// ── 4D analysis ───────────────────────────────────────────────────
-async function load4dPage() {
-  if (!CURRENT_ID) { alert("請先在交易頁查詢股票"); return; }
-  const stockEl=$("p4dStock");if(stockEl)stockEl.textContent=`分析中：${WL_CACHE[CURRENT_ID]?.name||CURRENT_ID} (${CURRENT_ID})`;
-  const container=$("p4dContainer");if(container)container.innerHTML='<div class="d4-status info">四面向分析載入中…</div>';
-  try {
+// ── 4D analysis（主交易頁展開式）────────────────────────────────
+async function load4d(){
+  if(!CURRENT_ID){alert("請先查詢股票");return;}
+  const container=$("d4Container");if(container)container.classList.add("open");
+  if(container)container.innerHTML='<div class="d4-status info" style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:12px;text-align:center;background:#0d1728;border-radius:9px">四面向分析載入中（含基本面/籌碼/消息）…</div>';
+  const btn=$("btnLoad4d");if(btn)btn.textContent="🔄 重新載入";
+  try{
     const r=await apiFetch(`${API}/api/analysis-4d/${CURRENT_ID}`,{},90000);
     if(!r.ok)throw new Error("四面向分析失敗");
     const d=await r.json();
     if(container)render4D(d.analysis_4d,d.news||[],container,d.ai_signal||{});
-    const ns=$("p4dNewsSection");if(ns)ns.style.display="block";
-    const nd=$("p4dNews");if(nd)nd.innerHTML=renderNews(d.news||[]);
-  } catch(e){if(container)container.innerHTML=`<div class="d4-status info warn">⚠️ 四面向分析暫時無法取得：${e.message}</div>`;}
+    const ns=$("d4NewsSection");if(ns)ns.style.display="block";
+    const nd=$("d4News");if(nd)nd.innerHTML=renderNews(d.news||[]);
+  }catch(e){if(container)container.innerHTML=`<div class="d4-status info warn" style="font-family:var(--mono);font-size:12px;padding:12px;background:#0d1728;border-radius:9px;color:var(--up)">⚠️ 四面向分析暫時無法取得：${e.message}</div>`;}
 }
 
 // ── render4D ──────────────────────────────────────────────────────
 function render4D(a4,news,container,aiSig){
-  if(!a4){if(container)container.innerHTML='<div class="d4-status info warn">四面向資料不可用</div>';return;}
+  if(!a4){if(container)container.innerHTML='<div style="color:var(--muted);font-family:var(--mono);font-size:12px;padding:12px">四面向資料不可用</div>';return;}
   const{fundamental:fu,technical:te,chip:ch,news:nw,overall:ov}=a4;const ai=aiSig||{};
   let html='';
-  // Trade advice card
   const sigLabel=ai.signal==="BUY"?"📈 BUY":ai.signal==="AVOID"?"🚫 AVOID":"👀 WATCH";
   const sigCss=ai.signal==="BUY"?"ai-buy":ai.signal==="AVOID"?"ai-avoid":"ai-watch";
   const dqLabel=ai.data_quality==="official"?"正式資料":ai.data_quality==="estimated"?"部分估算":"資料不足";
   const dqCss=ai.data_quality==="official"?"sq-full":ai.data_quality==="estimated"?"sq-partial":"sq-none";
-  const esLabel=ai.entry_status==="good_entry"?"✅ 可觀察入場":ai.entry_status==="over_extended"?"⚠️ 已偏離建議入場價，不建議追高":ai.entry_status==="dangerous"?"🚨 價格接近止蝕區，風險偏高":"";
-  const rrWarn=(ai.risk_reward_ratio!=null&&ai.risk_reward_ratio<1.5)?`<div style="font-family:var(--mono);font-size:11px;color:var(--up);margin-top:5px">⚠️ RR 比偏低（${ai.risk_reward_ratio}x），不建議追高</div>`:"";
   const conf=ai.confidence??0;const barC=conf>=75?"var(--up)":conf>=55?"var(--yellow)":"var(--down)";
   html+=`<div style="background:#0d1728;border:2px solid ${ai.signal==="BUY"?"rgba(0,184,107,.4)":ai.signal==="AVOID"?"rgba(232,56,79,.4)":"rgba(251,191,36,.4)"};border-radius:12px;padding:16px;margin-bottom:14px">
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em">🤖 四面向綜合交易建議</div>
@@ -1415,15 +1542,12 @@ function render4D(a4,news,container,aiSig){
           <div class="aiq"><div class="aiq-lbl">RR 比</div><div class="aiq-val ${(ai.risk_reward_ratio??0)>=1.5?"down":"up"}">${ai.risk_reward_ratio!=null?ai.risk_reward_ratio+"x":"—"}</div></div>
         </div>
         <div style="font-family:var(--mono);font-size:11px;color:var(--muted)">建議持有：${ai.holding_days||"—"}</div>
-        ${esLabel?`<div style="font-family:var(--mono);font-size:11px;color:var(--yellow);margin-top:4px">${esLabel}</div>`:""}
-        ${rrWarn}
       </div>
     </div>
     <div style="font-size:13px;color:var(--text);line-height:1.6;background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.1);border-radius:7px;padding:9px 12px;margin-top:10px">${ai.summary||"—"}</div>
     ${ai.entry_reason?.length?`<div style="margin-top:8px;font-size:12px;color:var(--down)">${ai.entry_reason.map(r=>"✅ "+r).join(" &nbsp;")}</div>`:""}
     ${ai.risk_reason?.length?`<div style="margin-top:4px;font-size:12px;color:var(--up)">${ai.risk_reason.map(r=>"⚠️ "+r).join("<br>")}</div>`:""}
   </div>`;
-  // Overall
   const ovScore=ov?.overall_score;
   html+=`<div class="d4-overall">
     <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:10px">
@@ -1433,11 +1557,10 @@ function render4D(a4,news,container,aiSig){
     <div class="d4-bars">${[["基本面",fu,"#3b82f6"],["技術面",te,"var(--cyan)"],["籌碼面",ch,"var(--purple)"],["消息面",nw,"var(--yellow)"]].map(([label,v,color])=>{const s=v?.score;const p2=s!=null?Math.min(100,Math.round(s)):0;return`<div class="d4-bar-item"><span class="d4-bar-label">${label}</span><div class="d4-bar-track"><div class="d4-bar-seg" style="width:${p2}%;background:${color}"></div></div><span class="d4-bar-val">${s!=null?Math.round(s):"—"}</span></div>`;}).join("")}</div>
     <div class="d4-ov-summary">${ov?.summary||"—"}</div>
   </div>`;
-  // 4 cards
   html+='<div class="d4-grid">';
   const cards=[
     {label:"💰 基本面",icon:"#3b82f6",data:fu,extras:()=>{const d=fu||{};const tags=[];if(d.per!=null)tags.push(`PE:${d.per}`);if(d.roe!=null)tags.push(`ROE:${d.roe}%`);if(d.eps!=null)tags.push(`EPS:${d.eps}`);if(d.revenue_yoy!=null)tags.push(`YoY:${d.revenue_yoy>0?"+":""}${d.revenue_yoy}%`);return tags.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${tags.map(t=>`<span style="font-family:var(--mono);font-size:10px;padding:2px 7px;background:#172946;border:1px solid var(--line);border-radius:5px;color:var(--muted)">${t}</span>`).join("")}</div>`:"";}},
-    {label:"📈 技術面",icon:"var(--cyan)",data:te,extras:()=>{const d=te||{};return d.trend?`<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:5px">趨勢：${d.trend}｜支撐：${d.support||"—"}｜壓力：${d.resistance||"—"}${d.atr?`｜ATR：${d.atr}`:""}</div>`:""}},
+    {label:"📈 技術面",icon:"var(--cyan)",data:te,extras:()=>{const d=te||{};return d.trend?`<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:5px">趨勢：${d.trend}｜支撐：${d.support||"—"}｜壓力：${d.resistance||"—"}${d.atr?`｜ATR：${d.atr}`:""}</div>`:"";}},
     {label:"🏦 籌碼面",icon:"var(--purple)",data:ch,extras:()=>{const d=ch||{};if(!d.foreign_net_buy&&!d.margin_change)return'<div style="font-size:11px;color:var(--muted);margin-top:5px">籌碼資料暫時無法取得</div>';const fmt=v=>v!=null?(v>0?`<span class="up">+${v.toLocaleString()}</span>`:`<span class="down">${v.toLocaleString()}</span>`):"—";return`<table class="chip-table">${[["外資",d.foreign_net_buy],["投信",d.investment_trust_net_buy],["自營商",d.dealer_net_buy],["三大法人",d.three_major_total],["融資變化",d.margin_change],["融券變化",d.short_change]].map(([l,v])=>`<tr><td class="lbl">${l}</td><td>${fmt(v)}</td></tr>`).join("")}</table>`;}},
     {label:"📰 消息面",icon:"var(--yellow)",data:nw,extras:()=>{const d=nw||{};const tags=[`<span style="font-family:var(--mono);font-size:10px;padding:2px 7px;background:rgba(232,56,79,.12);border:1px solid rgba(232,56,79,.25);border-radius:5px;color:var(--up)">利多 ${d.bullish_count||0}</span>`,`<span style="font-family:var(--mono);font-size:10px;padding:2px 7px;background:rgba(0,184,107,.1);border:1px solid rgba(0,184,107,.25);border-radius:5px;color:var(--down)">利空 ${d.bearish_count||0}</span>`,`<span style="font-family:var(--mono);font-size:10px;padding:2px 7px;background:#172946;border:1px solid var(--line);border-radius:5px;color:var(--muted)">中性 ${d.neutral_count||0}</span>`].join("");return`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${tags}</div>${d.risk_keywords?.length?`<div style="font-family:var(--mono);font-size:11px;color:var(--up);margin-top:5px">⚠️ 風險字詞：${d.risk_keywords.join("、")}</div>`:""}`;}},
   ];
@@ -1457,20 +1580,19 @@ async function loadMacro(){
   grid.innerHTML='<div class="macro-item"><div class="macro-label">載入中</div><div class="macro-val" style="font-size:14px;color:var(--muted)">…</div></div>';
   try{
     const r=await apiFetch(`${API}/api/macro`,{},12000);const d=await r.json();
-    const items=[{label:"USD/TWD",key:"usd_twd",d:3},{label:"DXY 美元",key:"dxy",d:2},{label:"NASDAQ Fut",key:"nasdaq_futures",d:0},{label:"SOX",key:"sox",d:0},{label:"美債10Y%",key:"us10y",d:2}];
-    grid.innerHTML=items.map(it=>{const v=d[it.key];const vt=v!=null?Number(v).toFixed(it.d):"—";return`<div class="macro-item"><div class="macro-label">${it.label}</div><div class="macro-val">${vt}</div></div>`;}).join("");
+    const items=[{label:"USD/TWD",key:"usd_twd",dd:3},{label:"DXY 美元",key:"dxy",dd:2},{label:"NASDAQ Fut",key:"nasdaq_futures",dd:0},{label:"SOX",key:"sox",dd:0},{label:"美債10Y%",key:"us10y",dd:2}];
+    grid.innerHTML=items.map(it=>{const v=d[it.key];const vt=v!=null?Number(v).toFixed(it.dd):"—";return`<div class="macro-item"><div class="macro-label">${it.label}</div><div class="macro-val">${vt}</div></div>`;}).join("");
     const noteEl=$("macroNote");if(noteEl){const adj=d.macro_adj||0;noteEl.textContent=d.risk_note+(adj?`  宏觀調整：${adj>0?"+":""}${adj}`:"");noteEl.style.color=adj>=0?"var(--down)":"var(--up)";}
-  }catch(e){if(grid)grid.innerHTML='<div class="macro-item"><div class="macro-label" style="color:var(--muted)">宏觀資料暫時無法取得</div></div>';}
+  }catch{if(grid)grid.innerHTML='<div class="macro-item"><div class="macro-label" style="color:var(--muted)">宏觀資料暫時無法取得</div></div>';}
 }
 
-// ── Market sentiment ──────────────────────────────────────────────
 async function loadSentiment(){
   try{
     const r=await apiFetch(`${API}/api/market-sentiment`,{},30000);const d=await r.json();
     const lbl=$("sentLabel");if(lbl)lbl.textContent=d.sentiment||"—";
     const bar=$("sentBar");if(bar){bar.style.width=(d.buy_pct||0)+"%";bar.style.background=d.buy_pct>=50?"var(--down)":"var(--up)";}
     const det=$("sentDetail");if(det)det.textContent=`BUY ${d.buy_count} / WATCH ${d.watch_count} / AVOID ${d.avoid_count}（共掃描 ${d.total} 檔）`;
-  }catch(e){const lbl=$("sentLabel");if(lbl)lbl.textContent="部分資料暫時無法取得";}
+  }catch{}
 }
 
 // ── LINE ──────────────────────────────────────────────────────────
@@ -1479,7 +1601,7 @@ async function checkLineStatus(){
   const dot=$("lineDot"),txt=$("lineStatusTxt");
   if(d.line_configured&&d.line_enabled){if(dot)dot.classList.add("on");if(txt){txt.textContent="LINE 通知已啟用";txt.style.color="var(--down)";}}
   else{if(dot)dot.classList.remove("on");if(txt){txt.textContent=d.line_configured?"LINE 已設定但未啟用":"LINE 尚未設定（Render 環境變數）";txt.style.color="var(--muted)";}}
-  }catch(e){setTxt("lineStatusTxt","無法確認 LINE 狀態");}
+  }catch{}
 }
 async function testLine(){
   const r2=$("lineResult");if(r2){r2.textContent="發送中…";r2.style.color="var(--muted)";}
@@ -1509,21 +1631,21 @@ async function runBt(){
   finally{if(loading)loading.style.display="none";}
 }
 
-// ── Tabs ──────────────────────────────────────────────────────────
+// ── Chart tabs ────────────────────────────────────────────────────
 function swTab(name,btn){
   document.querySelectorAll(".tab").forEach(b=>b.classList.remove("on"));
   document.querySelectorAll(".tpane").forEach(p=>p.classList.remove("on"));
   if(btn)btn.classList.add("on");const tp=$("tp-"+name);if(tp)tp.classList.add("on");
 }
 
-// ── Charts ────────────────────────────────────────────────────────
+// ── Chart.js charts ───────────────────────────────────────────────
 function killCharts(){Object.values(charts).forEach(c=>{try{c.destroy()}catch{}});charts={};}
 const CX={responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
   plugins:{legend:{labels:{color:"#6f86a8",font:{family:"Consolas",size:11},boxWidth:14}},
     tooltip:{backgroundColor:"#0d1728",borderColor:"#1d3150",borderWidth:1,titleColor:"#e5eefc",bodyColor:"#6f86a8",titleFont:{family:"Consolas"},bodyFont:{family:"Consolas",size:11}}},
   scales:{x:{grid:{color:"rgba(29,49,80,.5)"},ticks:{color:"#6f86a8",font:{family:"Consolas",size:10},maxTicksLimit:10}},
     y:{grid:{color:"rgba(29,49,80,.5)"},ticks:{color:"#6f86a8",font:{family:"Consolas",size:10}}}}};
-const clone=()=>JSON.parse(JSON.stringify(CX));
+const cloneOpt=()=>JSON.parse(JSON.stringify(CX));
 
 function mkCharts(data){
   if(!data||!data.length)return;const lbl=data.map(d=>d.date);
@@ -1533,14 +1655,11 @@ function mkCharts(data){
     {label:"MA5",data:data.map(d=>d.ma5),borderColor:"#fbbf24",borderWidth:1,pointRadius:0,tension:.3},
     {label:"MA20",data:data.map(d=>d.ma20),borderColor:"#f97316",borderWidth:1,pointRadius:0,tension:.3},
     {label:"MA60",data:data.map(d=>d.ma60),borderColor:"#e8384f",borderWidth:1,pointRadius:0,tension:.3},
-    ...(data[0]?.bb_upper?[
-      {label:"BB上",data:data.map(d=>d.bb_upper),borderColor:"rgba(167,139,250,.4)",borderWidth:1,borderDash:[3,3],pointRadius:0,tension:.3},
-      {label:"BB下",data:data.map(d=>d.bb_lower),borderColor:"rgba(167,139,250,.4)",borderWidth:1,borderDash:[3,3],pointRadius:0,tension:.3},
-    ]:[])
-  ]},options:clone()});
-  const chVol=$("chVol");if(chVol)charts.vol=new Chart(chVol,{type:"bar",data:{labels:lbl,datasets:[{label:"成交量",data:data.map(d=>d.volume),backgroundColor:data.map((d,i)=>i===0||d.close>=(data[i-1]?.close??d.close)?"rgba(232,56,79,.6)":"rgba(0,184,107,.6)"),borderWidth:0}]},options:clone()});
-  const chRsi=$("chRsi");if(chRsi)charts.rsi=new Chart(chRsi,{type:"line",data:{labels:lbl,datasets:[{label:"RSI(14)",data:data.map(d=>d.rsi),borderColor:"#a78bfa",borderWidth:1.5,pointRadius:0,tension:.4},{label:"超買(70)",data:data.map(()=>70),borderColor:"rgba(232,56,79,.4)",borderWidth:1,borderDash:[4,4],pointRadius:0},{label:"超賣(30)",data:data.map(()=>30),borderColor:"rgba(0,184,107,.4)",borderWidth:1,borderDash:[4,4],pointRadius:0}]},options:clone()});
-  const chMacd=$("chMacd");if(chMacd)charts.macd=new Chart(chMacd,{type:"bar",data:{labels:lbl,datasets:[{type:"bar",label:"Histogram",data:data.map(d=>d.hist),backgroundColor:data.map(d=>d.hist>=0?"rgba(232,56,79,.5)":"rgba(0,184,107,.5)"),borderWidth:0},{type:"line",label:"MACD",data:data.map(d=>d.macd),borderColor:"#00d4ff",borderWidth:1.5,pointRadius:0,tension:.4},{type:"line",label:"Signal",data:data.map(d=>d.signal),borderColor:"#fbbf24",borderWidth:1,pointRadius:0,tension:.4}]},options:clone()});
+    ...(data[0]?.bb_upper?[{label:"BB上",data:data.map(d=>d.bb_upper),borderColor:"rgba(167,139,250,.4)",borderWidth:1,borderDash:[3,3],pointRadius:0,tension:.3},{label:"BB下",data:data.map(d=>d.bb_lower),borderColor:"rgba(167,139,250,.4)",borderWidth:1,borderDash:[3,3],pointRadius:0,tension:.3}]:[])
+  ]},options:cloneOpt()});
+  const chVol=$("chVol");if(chVol)charts.vol=new Chart(chVol,{type:"bar",data:{labels:lbl,datasets:[{label:"成交量",data:data.map(d=>d.volume),backgroundColor:data.map((d,i)=>i===0||d.close>=(data[i-1]?.close??d.close)?"rgba(232,56,79,.6)":"rgba(0,184,107,.6)"),borderWidth:0}]},options:cloneOpt()});
+  const chRsi=$("chRsi");if(chRsi)charts.rsi=new Chart(chRsi,{type:"line",data:{labels:lbl,datasets:[{label:"RSI(14)",data:data.map(d=>d.rsi),borderColor:"#a78bfa",borderWidth:1.5,pointRadius:0,tension:.4},{label:"超買(70)",data:data.map(()=>70),borderColor:"rgba(232,56,79,.4)",borderWidth:1,borderDash:[4,4],pointRadius:0},{label:"超賣(30)",data:data.map(()=>30),borderColor:"rgba(0,184,107,.4)",borderWidth:1,borderDash:[4,4],pointRadius:0}]},options:cloneOpt()});
+  const chMacd=$("chMacd");if(chMacd)charts.macd=new Chart(chMacd,{type:"bar",data:{labels:lbl,datasets:[{type:"bar",label:"Histogram",data:data.map(d=>d.hist),backgroundColor:data.map(d=>d.hist>=0?"rgba(232,56,79,.5)":"rgba(0,184,107,.5)"),borderWidth:0},{type:"line",label:"MACD",data:data.map(d=>d.macd),borderColor:"#00d4ff",borderWidth:1.5,pointRadius:0,tension:.4},{type:"line",label:"Signal",data:data.map(d=>d.signal),borderColor:"#fbbf24",borderWidth:1,pointRadius:0,tension:.4}]},options:cloneOpt()});
 }
 
 // ── AI Learning ───────────────────────────────────────────────────
@@ -1552,7 +1671,6 @@ async function loadWeights(){
   const recent=d.recent||[];const lm=$("learnMsg");if(lm)lm.textContent=recent.length?recent.map(x=>`${x.stock_name} (${x.stock_id}) ${x.signal} ${x.confidence}分 ${x.created_at?.slice(0,10)||""}`).join("\n"):"尚無訊號紀錄";
   }catch(e){const lm=$("learnMsg");if(lm)lm.textContent="學習中心載入失敗："+e.message;}
 }
-
 async function learnAction(type){
   const btnMap={eval:"btnEval",retrain:"btnRetrain",history:"btnHistory"};
   const btn=$(btnMap[type]);if(btn)btn.disabled=true;
@@ -1560,10 +1678,8 @@ async function learnAction(type){
     const url=type==="eval"?"/api/learning/evaluate":type==="retrain"?"/api/learning/retrain":"/api/learning/history";
     const opt=type==="retrain"?{method:"POST"}:{};
     const r=await apiFetch(API+url,opt,90000);const d=await r.json();
-    if(type==="history"){
-      const sigs=d.signals||[];const lm=$("learnMsg");
-      if(lm)lm.textContent=sigs.length?sigs.slice(0,20).map(x=>`[${x.evaluated?"✅":"⏳"}] ${x.stock_name} (${x.stock_id}) ${x.signal} ${x.confidence}分 ${x.created_at?.slice(0,10)||""}${x.result?` → ${x.result.success?"成功 +":"失敗 "}${x.result.final_return_pct}%`:""}`).join("\n"):"尚無訊號紀錄";
-    }else{const lm=$("learnMsg");if(lm)lm.textContent=JSON.stringify(d,null,2);await loadWeights();}
+    if(type==="history"){const sigs=d.signals||[];const lm=$("learnMsg");if(lm)lm.textContent=sigs.length?sigs.slice(0,20).map(x=>`[${x.evaluated?"✅":"⏳"}] ${x.stock_name} (${x.stock_id}) ${x.signal} ${x.confidence}分 ${x.created_at?.slice(0,10)||""}${x.result?` → ${x.result.success?"成功 +":"失敗 "}${x.result.final_return_pct}%`:""}`).join("\n"):"尚無訊號紀錄";}
+    else{const lm=$("learnMsg");if(lm)lm.textContent=JSON.stringify(d,null,2);await loadWeights();}
   }catch(e){const lm=$("learnMsg");if(lm)lm.textContent="操作失敗："+e.message;}
   finally{if(btn)btn.disabled=false;}
 }
@@ -1571,54 +1687,59 @@ async function learnAction(type){
 // ── Clock ─────────────────────────────────────────────────────────
 setInterval(()=>setTxt("clock",new Date().toLocaleString("zh-TW")),1000);
 
-// ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 // initApp - DOMContentLoaded 後統一初始化
-// ══════════════════════════════════════════════════════════════════════════════
-async function initApp() {
-  // 1. Firebase
+// ══════════════════════════════════════════════════════════════════
+async function initApp(){
   initFirebase();
 
-  // 2. Nav tabs
-  document.querySelectorAll(".nav-tab").forEach(btn => {
-    btn.addEventListener("click", () => { const pg = btn.dataset.page; if (pg) showPage(pg); });
+  // Nav tabs
+  document.querySelectorAll(".nav-tab").forEach(btn=>{
+    btn.addEventListener("click",()=>{const pg=btn.dataset.page;if(pg)showPage(pg);});
   });
 
-  // 3. Search
+  // Search
   safeBind("btnSearch","click",doSearch);
   safeBind("btnAdd","click",addWL);
   initSearchSuggest();
 
-  // 4. Watchlist
-  safeBind("btnRefresh","click",()=>{ isRefreshWL=false; wlLeft=30; const bar=$("wlBar");if(bar)bar.style.width="100%"; refreshWL(); });
+  // Watchlist
+  safeBind("btnRefresh","click",()=>{isRefreshWL=false;wlLeft=30;const bar=$("wlBar");if(bar)bar.style.width="100%";refreshWL();});
   safeBind("btnScan","click",()=>scanAlerts());
   safeBind("btnScan2","click",()=>scanAlerts());
   safeBind("btnAiScan","click",aiScan);
 
-  // 5. Auto monitor
+  // Auto LINE
   updateAutoUI();
   safeBind("btnAuto","click",toggleAuto);
-  if (autoOn) startAutoTimer();
+  if(autoOn)startAutoTimer();
 
-  // 6. 4D analysis
-  safeBind("btnLoad4dPage","click",load4dPage);
+  // 4D (main trade page)
+  safeBind("btnLoad4d","click",load4d);
 
-  // 7. LINE
+  // LINE
   safeBind("btnTestLine","click",testLine);
 
-  // 8. Backtest
+  // Backtest
   safeBind("btnBt","click",runBt);
 
-  // 9. AI Learning
+  // AI Learning
   safeBind("btnWeights","click",loadWeights);
   safeBind("btnEval","click",()=>learnAction("eval"));
   safeBind("btnRetrain","click",()=>learnAction("retrain"));
   safeBind("btnHistory","click",()=>learnAction("history"));
 
-  // 10. Macro / Sentiment buttons (they need to exist)
+  // Macro / Sentiment
   safeBind("btnLoadMacro","click",loadMacro);
   safeBind("btnLoadSentiment","click",loadSentiment);
 
-  // 11. Load data
+  // Account page
+  safeBind("btnGoogleLogin","click",googleLogin);
+  safeBind("btnLogout","click",googleLogout);
+  safeBind("btnManualSync","click",async()=>{if(CURRENT_USER){setSyncBadge("ing");await saveWLForUser(CURRENT_USER.uid,WL);setSyncBadge("ok");}});
+  safeBind("btnRestoreLegacy","click",async()=>{if(CURRENT_USER){await migrateWatchlistIfNeeded(CURRENT_USER.uid);WL=await loadWLForUser(CURRENT_USER.uid)||WL;renderWL();setSyncBadge("migrated");}});
+
+  // Load data
   await loadStockMaster();
   await loadWatchlist();
   renderWL();
@@ -1626,9 +1747,10 @@ async function initApp() {
   startWLTimer();
   checkLineStatus();
   loadWeights();
+  setSyncBadge(CURRENT_USER?"ok":"local");
 }
 
-document.addEventListener("DOMContentLoaded", initApp);
+document.addEventListener("DOMContentLoaded",initApp);
 </script>
 </body>
 </html>
