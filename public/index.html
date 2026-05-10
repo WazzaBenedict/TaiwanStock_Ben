@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>台股 V10.2 Personal</title>
+<title>台股 V10.3 TradingView Edition</title>
 <script src="config.js"></script>
 <style>
 :root{
@@ -350,10 +350,39 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="logo">
     <span class="live-dot"></span>
     台股<span style="color:var(--down)">MONITOR</span>
-    <span class="ver">V10.2 Personal</span>
+    <span class="ver">V10.3 TradingView</span>
   </div>
   <span class="clock" id="clock"></span>
 </header>
+
+<!-- ★ V10.3: 登入遮罩（未登入時全頁顯示）-->
+<div id="loginOverlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:100;overflow-y:auto;display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="max-width:460px;width:100%;text-align:center">
+    <div class="logo" style="justify-content:center;font-size:22px;margin-bottom:16px">
+      <span class="live-dot"></span>
+      台股<span style="color:var(--down)">MONITOR</span>
+    </div>
+    <div style="font-family:var(--mono);font-size:28px;font-weight:800;color:var(--cyan);margin-bottom:8px">V10.3</div>
+    <div style="font-size:16px;font-weight:600;margin-bottom:6px">TradingView Edition</div>
+    <div style="color:var(--muted);font-size:13px;margin-bottom:28px;line-height:1.8">請使用 Google 登入後開始使用個人化台股監測工具。</div>
+    <div style="background:#0d1728;border:1px solid var(--line);border-radius:14px;padding:20px 24px;margin-bottom:24px;text-align:left">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.1em">功能說明</div>
+      <div style="font-size:13px;color:var(--text);line-height:2">
+        📊 個人自選股（跨裝置同步）<br>
+        🤖 AI 選股（可進場 / 等回檔分區）<br>
+        🔍 四面向分析（按需載入）<br>
+        📈 Lightweight Charts K 線圖<br>
+        🌐 宏觀指標 &amp; 市場情緒<br>
+        📲 LINE 推播
+      </div>
+    </div>
+    <button class="google-btn" id="btnLoginOverlay" style="margin:0 auto">
+      <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      使用 Google 帳號登入
+    </button>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:16px">V10.3 TradingView Edition</div>
+  </div>
+</div>
 
 <div class="wrap">
 <!-- V10 Navigation -->
@@ -465,6 +494,17 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       <div class="score-sub">/ 5 分</div>
       <div class="score-dots" id="scoreDots"></div>
       <div class="reasons-list" id="scoreReasons"></div>
+    </div>
+  </div>
+
+  <!-- ★ V10.3 K線圖 (Lightweight Charts) -->
+  <div class="kline-wrap" id="klineWrap" style="display:none;margin-bottom:14px">
+    <div class="kline-header">
+      <span>📊 K 線圖（台股：漲紅跌綠）</span>
+      <span id="klineStatus" style="color:var(--muted);font-size:11px"></span>
+    </div>
+    <div class="kline-container" id="klineContainer">
+      <div class="kline-placeholder">K 線資料暫時無法取得</div>
     </div>
   </div>
 
@@ -581,24 +621,13 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
     </div>
   </div>
 
-  <!-- ★ V10.2 K線圖 (Lightweight Charts) -->
-  <div class="kline-wrap full" id="klineWrap" style="display:none;margin-bottom:14px">
-    <div class="kline-header">
-      <span>📊 K 線圖（台股：漲紅跌綠）</span>
-      <span id="klineStatus" style="color:var(--muted);font-size:11px"></span>
-    </div>
-    <div class="kline-container" id="klineContainer">
-      <div class="kline-placeholder" id="klinePlaceholder">K 線資料暫時無法取得</div>
-    </div>
-  </div>
-
   <!-- Charts -->
   <div class="section full" style="margin-bottom:14px">
     <div class="tabs">
-      <button class="tab on" onclick="swTab('price',this)">收盤＋均線</button>
-      <button class="tab" onclick="swTab('vol',this)">成交量</button>
-      <button class="tab" onclick="swTab('rsi',this)">RSI</button>
-      <button class="tab" onclick="swTab('macd',this)">MACD</button>
+      <button class="tab on" data-tab="price">收盤＋均線</button>
+      <button class="tab" data-tab="vol">成交量</button>
+      <button class="tab" data-tab="rsi">RSI</button>
+      <button class="tab" data-tab="macd">MACD</button>
     </div>
     <div class="tpane on" id="tp-price"><div class="ch-wrap" style="height:240px"><canvas id="chPrice"></canvas></div></div>
     <div class="tpane" id="tp-vol"><div class="ch-wrap" style="height:200px"><canvas id="chVol"></canvas></div></div>
@@ -758,11 +787,12 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 /* ══════════════════════════════════════════════════════════════════
-   V10.2 Personal Trading System - 完整前端 JS
-   - Firebase Auth Google Login
-   - 每人專屬 users/{uid}/watchlist/main
+   V10.3 TradingView Edition
+   - 必須登入才能使用（登入遮罩）
+   - 帳號完全隔離：users/{uid}/watchlist/main
+   - migration 只跑一次（migrated flag）
+   - 切換帳號 / 登出 → 清空所有狀態
    - Lightweight Charts K 線圖
-   - 四面向分析移回主交易頁（展開式）
    - safeBind + DOMContentLoaded
    ══════════════════════════════════════════════════════════════════ */
 
@@ -774,73 +804,124 @@ function safeBind(id, event, handler) {
 const API = window.API_BASE_URL || "https://taiwanstock-ben-1.onrender.com";
 const FB_CFG = window.FIREBASE_CONFIG || {};
 
+// ── 全域狀態 ──────────────────────────────────────────────────────
 let WL = [], WL_CACHE = {}, CURRENT_ID = null, STOCK_DICT = {};
 let wlLeft = 30, wlTimer = null, isRefreshWL = false;
-let autoOn = localStorage.getItem("tw_auto_v10") === "1";
-let autoLeft = 300, autoTimer = null;
-let charts = {}, lwChart = null, lwVolSeries = null;
-let CURRENT_USER = null;   // Firebase Auth user
+let autoOn = false, autoLeft = 300, autoTimer = null;
+let charts = {}, lwChart = null;
+let currentUser = null;       // Firebase Auth user（唯一信任來源）
 let db = null, auth = null;
 
-// ── Firebase Auth & Firestore init ────────────────────────────────
+// ── Firebase 初始化 ────────────────────────────────────────────────
 function initFirebase() {
   try {
-    if (typeof firebase === "undefined" || !FB_CFG.projectId) return;
+    if (typeof firebase === "undefined" || !FB_CFG.projectId) {
+      console.warn("Firebase not available"); return;
+    }
     if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
     db   = firebase.firestore();
     auth = firebase.auth();
 
     auth.onAuthStateChanged(async user => {
-      CURRENT_USER = user;
-      renderAccountUI(user);
+      const prev = currentUser;
+      currentUser = user;
+
       if (user) {
-        await migrateWatchlistIfNeeded(user.uid);
-        WL = await loadWLForUser(user.uid) || WL;
-        renderWL();
-        if (user.photoURL) {
-          const av = document.getElementById("userAvatar");
-          if (av) av.src = user.photoURL;
+        // 切換帳號：清空舊狀態
+        if (prev && prev.uid !== user.uid) {
+          clearAllState();
         }
+        hideLoginOverlay();
+        await onUserLogin(user);
+      } else {
+        clearAllState();
+        showLoginOverlay();
       }
     });
-  } catch(e) { console.warn("Firebase init:", e.message); }
+  } catch(e) { console.warn("Firebase init:", e.message); showLoginOverlay(); }
 }
 
-// ── Auth functions ────────────────────────────────────────────────
+// ── 登入 / 登出 ───────────────────────────────────────────────────
 async function googleLogin() {
-  if (!auth) { alert("Firebase 尚未初始化"); return; }
+  if (!auth) return;
   try {
     const provider = new firebase.auth.GoogleAuthProvider();
     await auth.signInWithPopup(provider);
-  } catch(e) { console.warn("Google login:", e.message); }
+  } catch(e) { console.warn("login:", e.message); }
 }
 
 async function googleLogout() {
   if (!auth) return;
-  try { await auth.signOut(); WL = lsGetWL(); renderWL(); setSyncBadge("local"); }
-  catch(e) { console.warn("Logout:", e.message); }
+  try {
+    stopAllTimers();
+    clearAllState();
+    await auth.signOut();
+    // onAuthStateChanged will fire with null → showLoginOverlay
+  } catch(e) { console.warn("logout:", e.message); }
 }
 
-function renderAccountUI(user) {
-  const guest = document.getElementById("accountGuest");
-  const logged = document.getElementById("accountUser");
-  if (!guest || !logged) return;
-  if (user) {
-    guest.style.display = "none";
-    logged.style.display = "block";
-    setTxt("userName", user.displayName || "—");
-    setTxt("userEmail", user.email || "—");
-    setTxt("userUid", (user.uid || "").slice(0, 8) + "…");
-    setTxt("userWlCount", WL.length + " 檔");
-    setSyncBadge("ok");
-  } else {
-    guest.style.display = "block";
-    logged.style.display = "none";
-    setSyncBadge("local");
-  }
+function clearAllState() {
+  stopAllTimers();
+  WL = []; WL_CACHE = {}; CURRENT_ID = null;
+  const g = document.getElementById("wlGrid");
+  if (g) g.innerHTML = '';
+  const wlC = document.getElementById("wlCount");
+  if (wlC) wlC.textContent = "0 檔";
+  destroyChart();
+  const dash = document.getElementById("dash");
+  if (dash) dash.style.display = "none";
 }
 
-// ── Firestore 路徑：users/{uid}/watchlist/main ────────────────────
+function stopAllTimers() {
+  clearInterval(wlTimer); wlTimer = null;
+  clearInterval(autoTimer); autoTimer = null;
+}
+
+// ── Login overlay ─────────────────────────────────────────────────
+function showLoginOverlay() {
+  const ov = document.getElementById("loginOverlay");
+  if (ov) ov.style.display = "flex";
+  // hide nav tabs too
+  const nav = document.querySelector(".nav-tabs");
+  if (nav) nav.style.display = "none";
+}
+
+function hideLoginOverlay() {
+  const ov = document.getElementById("loginOverlay");
+  if (ov) ov.style.display = "none";
+  const nav = document.querySelector(".nav-tabs");
+  if (nav) nav.style.display = "flex";
+  // Show default trade page
+  showPage("p-trade");
+}
+
+// ── 需要登入的安全守衛 ─────────────────────────────────────────────
+function requireAuth(fnName) {
+  if (!currentUser) { showLoginOverlay(); return false; }
+  return true;
+}
+
+// ── 登入後初始化 ───────────────────────────────────────────────────
+async function onUserLogin(user) {
+  setSyncBadge("ing");
+  // Update account UI
+  renderAccountUI(user);
+  // Save profile
+  saveUserProfile(user).catch(() => {});
+  // Load watchlist (with one-time migration)
+  await loadWatchlist();
+  renderWL();
+  refreshWL();
+  startWLTimer();
+  checkLineStatus();
+  loadWeights();
+  // Auto LINE
+  autoOn = localStorage.getItem(`tw_auto_${user.uid}`) === "1";
+  updateAutoUI();
+  if (autoOn) startAutoTimer();
+}
+
+// ── Firestore refs ────────────────────────────────────────────────
 function userWLRef(uid) {
   if (!db || !uid) return null;
   return db.collection("users").doc(uid).collection("watchlist").doc("main");
@@ -849,84 +930,95 @@ function userProfileRef(uid) {
   if (!db || !uid) return null;
   return db.collection("users").doc(uid).collection("profile").doc("main");
 }
-// 舊路徑（migration source only）
 function legacyDefaultRef() {
   if (!db) return null;
   return db.collection("watchlists").doc("default");
 }
 
-async function loadWLForUser(uid) {
+// ── 讀寫 users/{uid}/watchlist/main ──────────────────────────────
+async function loadWatchlist() {
+  if (!currentUser) return;
+  const uid = currentUser.uid;
   const ref = userWLRef(uid);
-  if (!ref) return null;
+  if (!ref) { WL = []; setSyncBadge("err"); return; }
   try {
     const snap = await ref.get();
-    if (!snap.exists) return null;
-    const raw = snap.data().watchlist || [];
-    return normalizeWatchlist(raw);
-  } catch(e) { console.warn("loadWLForUser:", e.message); return null; }
+    if (!snap.exists) {
+      // 第一次登入 → 執行 migration
+      await runMigration(uid);
+    } else {
+      const data = snap.data();
+      WL = normalizeWatchlist(data.watchlist || []);
+      if (!data.migrated) {
+        // migration 標記未設定 → 再跑一次 migration 合併
+        await runMigration(uid, WL);
+      } else {
+        // migrated = true → 只用 Firestore 資料，絕不讀舊來源
+      }
+      setSyncBadge("ok");
+    }
+  } catch(e) {
+    console.warn("loadWatchlist:", e.message);
+    WL = [];
+    setSyncBadge("err");
+  }
+  lsSaveWL(WL);
 }
 
-async function saveWLForUser(uid, items) {
+async function runMigration(uid, existingItems = []) {
+  // 只在 migrated !== true 時執行
+  let legacyItems = [];
+  // 1. localStorage
+  legacyItems.push(...loadLegacyWatchlist());
+  // 2. 舊 Firestore watchlists/default
+  try {
+    const ref = legacyDefaultRef();
+    if (ref) {
+      const snap = await ref.get();
+      if (snap.exists) legacyItems.push(...normalizeWatchlist(snap.data().watchlist || []));
+    }
+  } catch {}
+  // 3. 後端 /api/watchlist
+  if (!legacyItems.length && !existingItems.length) {
+    try {
+      const r = await apiFetch(`${API}/api/watchlist`, {}, 8000);
+      if (r.ok) { const d = await r.json(); legacyItems.push(...normalizeWatchlist(d.watchlist || [])); }
+    } catch {}
+  }
+  const merged = mergeWatchlists(existingItems, legacyItems);
+  WL = merged;
+  // 寫入 users/{uid}/watchlist/main 並設 migrated: true
   const ref = userWLRef(uid);
-  if (!ref) return false;
+  if (ref) {
+    await ref.set({ watchlist: merged, updated_at: new Date().toISOString(), migrated: true });
+    setSyncBadge(legacyItems.length ? "migrated" : "ok");
+  }
+}
+
+async function saveWatchlist() {
+  if (!currentUser) return;
+  lsSaveWL(WL);
+  const ref = userWLRef(currentUser.uid);
+  if (!ref) return;
   setSyncBadge("ing");
   try {
-    await ref.set({ watchlist: items, updated_at: new Date().toISOString() });
+    await ref.set({ watchlist: WL, updated_at: new Date().toISOString(), migrated: true });
     setTxt("userLastSync", new Date().toLocaleTimeString("zh-TW"));
-    setTxt("userWlCount", items.length + " 檔");
-    setSyncBadge("ok"); return true;
-  } catch(e) { setSyncBadge("err"); return false; }
+    setTxt("userWlCount", WL.length + " 檔");
+    setSyncBadge("ok");
+  } catch(e) { setSyncBadge("err"); }
 }
 
 async function saveUserProfile(user) {
   const ref = userProfileRef(user.uid);
   if (!ref) return;
-  try {
-    const now = new Date().toISOString();
-    const snap = await ref.get();
-    await ref.set({
-      uid: user.uid, email: user.email,
-      displayName: user.displayName, photoURL: user.photoURL,
-      last_login: now,
-      created_at: snap.exists ? snap.data().created_at : now
-    }, { merge: true });
-  } catch(e) {}
+  const now = new Date().toISOString();
+  await ref.set({ uid: user.uid, email: user.email,
+    displayName: user.displayName, photoURL: user.photoURL,
+    last_login: now }, { merge: true });
 }
 
-// ── Migration：登入後合併所有舊資料 ──────────────────────────────
-async function migrateWatchlistIfNeeded(uid) {
-  try {
-    const userItems = await loadWLForUser(uid) || [];
-    const legacyItems = loadLegacyWatchlist();
-    let backendItems = [];
-    if (!userItems.length && !legacyItems.length) {
-      try {
-        const r = await apiFetch(`${API}/api/watchlist`, {}, 8000);
-        if (r.ok) { const d = await r.json(); backendItems = normalizeWatchlist(d.watchlist || []); }
-      } catch {}
-    }
-    // Try old Firestore path
-    let oldFsItems = [];
-    try {
-      const ref = legacyDefaultRef();
-      if (ref) {
-        const snap = await ref.get();
-        if (snap.exists) oldFsItems = normalizeWatchlist(snap.data().watchlist || []);
-      }
-    } catch {}
-    const merged = mergeWatchlists(userItems, legacyItems, backendItems, oldFsItems);
-    if (merged.length > 0) {
-      if (merged.length > userItems.length) {
-        await saveWLForUser(uid, merged);
-        setSyncBadge("migrated");
-      }
-      lsSaveWL(merged);
-      await saveUserProfile(CURRENT_USER);
-    }
-    WL = merged.length ? merged : (userItems.length ? userItems : WL);
-  } catch(e) { console.warn("migrate:", e.message); }
-}
-
+// ── Normalise helpers ─────────────────────────────────────────────
 function normalizeWatchlist(raw) {
   if (!Array.isArray(raw)) return [];
   const result = [], seen = new Set();
@@ -943,88 +1035,77 @@ function normalizeWatchlist(raw) {
   }
   return result;
 }
-
 function mergeWatchlists(...lists) {
   const seen = new Set(), merged = [];
   for (const list of lists) {
     for (const item of (list || [])) {
-      if (item && item.stock_id && !seen.has(item.stock_id)) {
+      if (item?.stock_id && !seen.has(item.stock_id)) {
         seen.add(item.stock_id); merged.push(item);
       }
     }
   }
   return merged;
 }
-
 function loadLegacyWatchlist() {
   const keys = ["tw_wl_v10","tw_wl_v9","watchlist","WL_KEY","tw_watchlist"];
   const candidates = [];
   for (const key of keys) {
     try {
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
+      const raw = localStorage.getItem(key); if (!raw) continue;
       const parsed = JSON.parse(raw);
       const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.watchlist) ? parsed.watchlist : null;
-      if (arr && arr.length) candidates.push(...normalizeWatchlist(arr));
+      if (arr?.length) candidates.push(...normalizeWatchlist(arr));
     } catch {}
   }
   return normalizeWatchlist(candidates);
 }
+function lsSaveWL(items) { try { localStorage.setItem("tw_wl_v10", JSON.stringify(items)); } catch {} }
+function getWLIds() { return WL.map(x => x.stock_id); }
 
-// ── Sync badge ────────────────────────────────────────────────────
+// ── Sync badge ─────────────────────────────────────────────────────
 function setSyncBadge(state) {
   const el = document.getElementById("syncBadge"); if (!el) return;
   const map = {
-    ok:       ["☁️ 已同步",         "sync-badge sync-ok"],
-    migrated: ["🔄 已從舊資料恢復",  "sync-badge sync-ok"],
-    err:      ["⚠️ 同步失敗，使用本機備份","sync-badge sync-err"],
-    ing:      ["⏳ 同步中",          "sync-badge sync-ing"],
-    local:    ["👤 未登入，本機模式", "sync-badge sync-local"],
+    ok:       ["☁️ 已同步",           "sync-badge sync-ok"],
+    migrated: ["🔄 已從舊資料恢復並同步","sync-badge sync-ok"],
+    err:      ["⚠️ 同步失敗，本機備份", "sync-badge sync-err"],
+    ing:      ["⏳ 同步中",             "sync-badge sync-ing"],
+    local:    ["👤 未登入，本機模式",   "sync-badge sync-local"],
   };
   const [txt, cls] = map[state] || map.err;
   el.textContent = txt; el.className = cls;
 }
 
-// ── localStorage ─────────────────────────────────────────────────
-function lsGetWL() {
-  try { return JSON.parse(localStorage.getItem("tw_wl_v10") || "[]")
-    .map(x => typeof x === "string" ? { stock_id: x, stock_name: getLocalName(x) || x } : x);
-  } catch { return []; }
-}
-function lsSaveWL(items) { try { localStorage.setItem("tw_wl_v10", JSON.stringify(items)); } catch {} }
-function getWLIds() { return WL.map(x => x.stock_id); }
-
-async function loadWatchlist() {
-  setSyncBadge("ing");
-  if (CURRENT_USER) {
-    const items = await loadWLForUser(CURRENT_USER.uid);
-    WL = items && items.length ? items : lsGetWL();
-    setSyncBadge("ok");
+// ── Account UI ────────────────────────────────────────────────────
+function renderAccountUI(user) {
+  const guest  = document.getElementById("accountGuest");
+  const logged = document.getElementById("accountUser");
+  if (!guest || !logged) return;
+  if (user) {
+    guest.style.display  = "none";
+    logged.style.display = "block";
+    setTxt("userName",    user.displayName || "—");
+    setTxt("userEmail",   user.email || "—");
+    setTxt("userUid",     (user.uid || "").slice(0,8) + "…");
+    setTxt("userWlCount", WL.length + " 檔");
+    const av = document.getElementById("userAvatar");
+    if (av && user.photoURL) av.src = user.photoURL;
   } else {
-    WL = loadLegacyWatchlist();
-    if (!WL.length) WL = lsGetWL();
-    setSyncBadge("local");
+    guest.style.display  = "block";
+    logged.style.display = "none";
   }
 }
 
-async function saveWatchlist() {
-  lsSaveWL(WL);
-  if (CURRENT_USER) { await saveWLForUser(CURRENT_USER.uid, WL); }
-  else {
-    try { await apiFetch(`${API}/api/watchlist`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({watchlist:WL})},10000); } catch {}
-  }
-}
-
-// ── Stock master ──────────────────────────────────────────────────
+// ── Stock master ───────────────────────────────────────────────────
 async function loadStockMaster() {
   try {
     const r = await apiFetch(`${API}/api/stocks/master`, {}, 15000);
     if (r.ok) { const d = await r.json(); STOCK_DICT = d.stocks || {}; }
-  } catch(e) {}
+  } catch {}
 }
 function getLocalName(id) { return STOCK_DICT[id]?.name || null; }
 
-// ── Utils ─────────────────────────────────────────────────────────
+// ── Utils ──────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 const f  = (n,d=2) => n==null||Number.isNaN(Number(n)) ? "—" : Number(n).toFixed(d);
 const pct = n => n==null ? "—" : (Number(n)>0?"+":"") + Number(n).toFixed(2)+"%";
@@ -1049,17 +1130,17 @@ async function apiFetch(url,opt={},timeout=30000) {
   finally{clearTimeout(t);}
 }
 
-// ── Page navigation ───────────────────────────────────────────────
+// ── Page navigation ────────────────────────────────────────────────
 function showPage(pageId) {
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   document.querySelectorAll(".nav-tab").forEach(b => b.classList.remove("active"));
   const p = $(pageId); if(p) p.classList.add("active");
   document.querySelectorAll(".nav-tab").forEach(b => { if(b.dataset.page===pageId) b.classList.add("active"); });
-  if(pageId==="p-market"){loadMacro();loadSentiment();}
-  if(pageId==="p-account"){renderAccountUI(CURRENT_USER);}
+  if(pageId==="p-market" && currentUser){ loadMacro(); loadSentiment(); }
+  if(pageId==="p-account"){ renderAccountUI(currentUser); }
 }
 
-// ── Search suggest ────────────────────────────────────────────────
+// ── Search suggest ─────────────────────────────────────────────────
 let suggestTimer=null;
 function initSearchSuggest(){
   const inp=$("sid"),box=$("suggestBox");if(!inp||!box)return;
@@ -1085,58 +1166,30 @@ function showSuggest(results){
   });
 }
 
-// ── WL sort ───────────────────────────────────────────────────────
+// ── WL sort ────────────────────────────────────────────────────────
 function sortWL(ids){
-  function sortKey(c){
-    if(!c||c.noData)return 60;
-    const sig=c.signal||"WATCH",q=c.scoreQuality||"none";
-    if(sig==="BUY"   &&q==="full")return 10;
-    if(sig==="WATCH" &&q==="full")return 20;
-    if(sig==="WATCH" &&q==="partial")return 30;
-    if(sig==="AVOID" &&q==="full")return 40;
-    if(sig==="AVOID" &&q==="partial")return 45;
-    if(q==="none")return 50;return 55;
-  }
-  return [...ids].sort((a,b)=>{
-    const A=WL_CACHE[a]||{},B=WL_CACHE[b]||{};
-    if(A.error&&!B.error)return 1;if(!A.error&&B.error)return -1;
-    const kA=sortKey(A),kB=sortKey(B);if(kA!==kB)return kA-kB;
-    const cA=A.confidence??-1,cB=B.confidence??-1;if(cB!==cA)return cB-cA;
-    return(B.changePct??-999)-(A.changePct??-999);
-  });
+  function key(c){if(!c||c.noData)return 60;const s=c.signal||"WATCH",q=c.scoreQuality||"none";if(s==="BUY"&&q==="full")return 10;if(s==="WATCH"&&q==="full")return 20;if(s==="WATCH"&&q==="partial")return 30;if(s==="AVOID"&&q==="full")return 40;if(s==="AVOID"&&q==="partial")return 45;return 50;}
+  return [...ids].sort((a,b)=>{const A=WL_CACHE[a]||{},B=WL_CACHE[b]||{};const kA=key(A),kB=key(B);if(kA!==kB)return kA-kB;const cA=A.confidence??-1,cB=B.confidence??-1;if(cB!==cA)return cB-cA;return(B.changePct??-999)-(A.changePct??-999);});
 }
 
-// ── WL card ───────────────────────────────────────────────────────
 function cardHTML(id){
   const c=WL_CACHE[id],wlItem=WL.find(x=>x.stock_id===id)||{};
-  const nameFallback=wlItem.stock_name||getLocalName(id)||id;
-  if(!c)return`<div class="card" id="wc-${id}" data-load="${id}">
-    <div class="card-top"><div class="card-names"><div class="card-name">${getLocalName(id)||id}</div><div class="card-id">${id}</div></div>
-    <button class="card-del" data-del="${id}">×</button></div>
-    <div class="card-price-row"><span class="card-price tw-flat" style="font-size:13px;color:var(--muted)">讀取中…</span></div>
-    <div class="conf-bar"><div class="conf-bar-fill" style="width:0%"></div></div></div>`;
-  if(c.noData)return`<div class="card" id="wc-${id}" data-load="${id}">
-    <div class="card-top"><div class="card-names"><div class="card-name">${dsn(id,c.name||nameFallback)}</div><div class="card-id">${id}</div></div>
-    <button class="card-del" data-del="${id}">×</button></div>
-    <div class="card-price-row"><span class="card-price tw-flat" style="font-size:13px;color:var(--muted)">暫時無資料</span></div>
-    <div class="conf-bar"><div class="conf-bar-fill" style="width:0%"></div></div></div>`;
-  const clr=twcc(c.changePct),pT=c.price!=null?f(c.price):"—",cT=pct(c.changePct);
-  const sig=c.signal||"WATCH",cls=sigCls(sig);
+  const fb=wlItem.stock_name||getLocalName(id)||id;
+  if(!c)return`<div class="card" id="wc-${id}" data-load="${id}"><div class="card-top"><div class="card-names"><div class="card-name">${getLocalName(id)||id}</div><div class="card-id">${id}</div></div><button class="card-del" data-del="${id}">×</button></div><div class="card-price-row"><span class="card-price tw-flat" style="font-size:13px;color:var(--muted)">讀取中…</span></div><div class="conf-bar"><div class="conf-bar-fill" style="width:0%"></div></div></div>`;
+  if(c.noData)return`<div class="card" id="wc-${id}" data-load="${id}"><div class="card-top"><div class="card-names"><div class="card-name">${dsn(id,c.name||fb)}</div><div class="card-id">${id}</div></div><button class="card-del" data-del="${id}">×</button></div><div class="card-price-row"><span class="card-price tw-flat" style="font-size:13px;color:var(--muted)">暫時無資料</span></div><div class="conf-bar"><div class="conf-bar-fill" style="width:0%"></div></div></div>`;
+  const clr=twcc(c.changePct);const sig=c.signal||"WATCH",cls=sigCls(sig);
   const conf=c.confidence??null,confTxt=conf!=null?conf+"/100":"—",confW=conf!=null?conf:0;
-  const quality=c.scoreQuality||"none";
-  const barC=quality==="full"?(conf>=75?"var(--up)":conf>=55?"var(--yellow)":"var(--down)"):quality==="partial"?"var(--yellow)":"var(--flat)";
-  const qualityTag=quality==="full"?`<span class="sq-tag sq-full">正式分數</span>`:quality==="partial"?`<span class="sq-tag sq-partial">估算分</span><span class="sq-tag sq-nd">資料不足</span>`:`<span class="sq-tag sq-none">無資料</span>`;
+  const q=c.scoreQuality||"none";
+  const barC=q==="full"?(conf>=75?"var(--up)":conf>=55?"var(--yellow)":"var(--down)"):q==="partial"?"var(--yellow)":"var(--flat)";
+  const qTag=q==="full"?`<span class="sq-tag sq-full">正式分數</span>`:q==="partial"?`<span class="sq-tag sq-partial">估算分</span><span class="sq-tag sq-nd">資料不足</span>`:`<span class="sq-tag sq-none">無資料</span>`;
   const es=c.entryStatus||"",esText=c.entryStatusText||"";
   const esBadge=es?`<span class="es-badge es-${es}">${esText}</span>`:"";
-  const nm=dsn(id,c.name||nameFallback);
   const ep=c.entryPrice!=null?`<div class="card-ep">入場 ${f(c.entryPrice)} 目標 ${c.targetPrice?f(c.targetPrice):"—"} 止蝕 ${c.stopLoss?f(c.stopLoss):"—"}</div>`:"";
   return`<div class="card ${cls}${id===CURRENT_ID?" selected":""}" id="wc-${id}" data-load="${id}">
-    <div class="card-top"><div class="card-names"><div class="card-name">${nm}</div><div class="card-id">${id}</div></div>
-    <button class="card-del" data-del="${id}">×</button></div>
-    <div class="card-price-row"><span class="card-price ${clr}">${pT}</span><span class="card-chg ${clr}">${cT}</span></div>
-    ${ep}
-    <div class="card-sig-row"><span class="sig-badge">${sigIcon(sig)}</span><span class="card-conf">${confTxt}</span>${esBadge}</div>
-    <div class="card-quality-row">${qualityTag}</div>
+    <div class="card-top"><div class="card-names"><div class="card-name">${dsn(id,c.name||fb)}</div><div class="card-id">${id}</div></div><button class="card-del" data-del="${id}">×</button></div>
+    <div class="card-price-row"><span class="card-price ${clr}">${c.price!=null?f(c.price):"—"}</span><span class="card-chg ${clr}">${pct(c.changePct)}</span></div>
+    ${ep}<div class="card-sig-row"><span class="sig-badge">${sigIcon(sig)}</span><span class="card-conf">${confTxt}</span>${esBadge}</div>
+    <div class="card-quality-row">${qTag}</div>
     <div class="conf-bar"><div class="conf-bar-fill" style="width:${confW}%;background:${barC}"></div></div></div>`;
 }
 
@@ -1144,13 +1197,8 @@ function renderWL(){
   const wlC=$("wlCount");if(wlC)wlC.textContent=`${WL.length} 檔`;
   const g=$("wlGrid");if(!g)return;
   g.innerHTML=WL.length?sortWL(getWLIds()).map(cardHTML).join(""):'<div class="empty">尚無自選股<br><span class="mini">輸入股票代號後按「＋ 加入自選」即可監控</span></div>';
-  // Bind card events after render
-  g.querySelectorAll("[data-load]").forEach(el=>{
-    el.addEventListener("click",e=>{if(!e.target.closest("[data-del]"))loadStock(el.dataset.load);});
-  });
-  g.querySelectorAll("[data-del]").forEach(btn=>{
-    btn.addEventListener("click",e=>{e.stopPropagation();removeWL(btn.dataset.del);});
-  });
+  g.querySelectorAll("[data-load]").forEach(el=>{el.addEventListener("click",e=>{if(!e.target.closest("[data-del]"))loadStock(el.dataset.load);});});
+  g.querySelectorAll("[data-del]").forEach(btn=>{btn.addEventListener("click",e=>{e.stopPropagation();removeWL(btn.dataset.del);});});
 }
 
 async function fetchOneWL(id){
@@ -1162,14 +1210,13 @@ async function fetchOneWL(id){
     WL_CACHE[id]={name:d.stock_name||getLocalName(id)||id,price:d.price??null,changePct:d.change_pct??null,
       signal:ai.signal||null,confidence:ai.confidence??null,scoreQuality:ai.score_quality||"none",
       entryPrice:ai.entry_price??null,targetPrice:ai.target_price??null,stopLoss:ai.stop_loss??null,
-      entryStatus:ai.entry_status||"",entryStatusText:ai.entry_status_text||"",
-      canEnter:ai.can_enter||false,error:false,noData:false};
-    const item=WL.find(x=>x.stock_id===id);
-    if(item&&d.stock_name&&d.stock_name!==id)item.stock_name=d.stock_name;
-  }catch(e){if(!WL_CACHE[id])WL_CACHE[id]={name:wlItem.stock_name||getLocalName(id)||id,error:false,noData:true};}
+      entryStatus:ai.entry_status||"",entryStatusText:ai.entry_status_text||"",canEnter:ai.can_enter||false,error:false,noData:false};
+    const item=WL.find(x=>x.stock_id===id);if(item&&d.stock_name&&d.stock_name!==id)item.stock_name=d.stock_name;
+  }catch{if(!WL_CACHE[id])WL_CACHE[id]={name:wlItem.stock_name||getLocalName(id)||id,error:false,noData:true};}
 }
 
 async function refreshWL(){
+  if(!currentUser){return;}
   if(isRefreshWL)return;isRefreshWL=true;
   const ids=getWLIds();if(!ids.length){isRefreshWL=false;return;}
   try{for(let i=0;i<ids.length;i+=2){await Promise.allSettled(ids.slice(i,i+2).map(id=>fetchOneWL(id).catch(()=>{})));renderWL();if(i+2<ids.length)await sleep(500);}}
@@ -1179,14 +1226,14 @@ async function refreshWL(){
 function startWLTimer(){
   clearInterval(wlTimer);wlLeft=30;
   wlTimer=setInterval(()=>{
-    wlLeft--;
-    const bar=$("wlBar");if(bar)bar.style.width=Math.max(0,wlLeft/30*100)+"%";
+    wlLeft--;const bar=$("wlBar");if(bar)bar.style.width=Math.max(0,wlLeft/30*100)+"%";
     const tick=$("wlTick");if(tick)tick.textContent=`${Math.max(0,wlLeft)}s 後刷新`;
     if(wlLeft<=0){wlLeft=30;if(bar)bar.style.width="100%";refreshWL();}
   },1000);
 }
 
 async function addWL(){
+  if(!requireAuth("addWL"))return;
   const inp=$("sid");const id=inp?inp.value.trim():"";
   if(!/^\d{4,6}$/.test(id)){showErr("請輸入 4~6 位股票代號");return;}
   if(WL.find(x=>x.stock_id===id)){showErr(`${id} 已在自選股`);return;}
@@ -1195,49 +1242,46 @@ async function addWL(){
 }
 
 async function removeWL(id){
+  if(!currentUser)return;
   WL=WL.filter(x=>x.stock_id!==id);delete WL_CACHE[id];
   renderWL();await saveWatchlist();
 }
 
 function loadStock(id){const inp=$("sid");if(inp)inp.value=id;doSearch();}
 
-// ── Scan alerts ───────────────────────────────────────────────────
+// ── Scan alerts ────────────────────────────────────────────────────
 async function scanAlerts(silent=false){
+  if(!requireAuth("scanAlerts"))return null;
   const ids=getWLIds();
   if(!ids.length){if(!silent){const el=$("scanResult");if(el){el.className="scan-result warn";el.textContent="⚠️ 自選股清單是空的";el.style.display="block";}}return null;}
   const el=$("scanResult");let wakeT=null;
-  if(!silent&&el){el.className="scan-result";el.textContent=`⏳ 掃描中（${ids.length} 檔）…`;el.style.display="block";
-    wakeT=setTimeout(()=>{if(el)el.textContent+="\n後端喚醒中，請稍候…";},10000);}
+  if(!silent&&el){el.className="scan-result";el.textContent=`⏳ 掃描中（${ids.length} 檔）…`;el.style.display="block";wakeT=setTimeout(()=>{if(el)el.textContent+="\n後端喚醒中，請稍候…";},10000);}
   try{
     const r=await apiFetch(`${API}/api/alerts/check`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({watchlist:ids})},120000);
     if(wakeT)clearTimeout(wakeT);const d=await r.json();
     const alerts=d.alerts||[],sentLine=d.sent_line||[],checked=d.checked||ids.length,lineOk=d.line_enabled,errCnt=d.error_count||0,dur=d.duration_seconds||0;
     let txt;
     if(!alerts.length)txt=`✅ 掃描完成 ${checked} 檔（${dur}s）${errCnt>0?`，${errCnt} 檔讀取失敗`:""}\n目前自選股沒有符合條件的買點。`;
-    else{
-      const lines=alerts.map(a=>{const sent=sentLine.includes(a.stock_id)?"  📲 已推播":"";return`📈 ${dsn(a.stock_id,a.stock_name)}  信心：${a.confidence}/100${sent}\n   ${a.summary||""}`;});
-      txt=`📊 掃描 ${checked} 檔（${dur}s），發現 ${alerts.length} 個買點${errCnt>0?`，${errCnt} 檔讀取失敗`:""}\n\n`+lines.join("\n\n");
-      if(sentLine.length)txt+=`\n\n✅ LINE 已推播：${sentLine.join("、")}`;
-      else if(!lineOk)txt+="\n\n（LINE 未設定）";
-    }
+    else{const lines=alerts.map(a=>{const sent=sentLine.includes(a.stock_id)?"  📲 已推播":"";return`📈 ${dsn(a.stock_id,a.stock_name)}  信心：${a.confidence}/100${sent}\n   ${a.summary||""}`;});txt=`📊 掃描 ${checked} 檔（${dur}s），發現 ${alerts.length} 個買點${errCnt>0?`，${errCnt} 檔讀取失敗`:""}\n\n`+lines.join("\n\n");if(sentLine.length)txt+=`\n\n✅ LINE 已推播：${sentLine.join("、")}`;else if(!lineOk)txt+="\n\n（LINE 未設定）";}
     if(!silent&&el){el.className="scan-result ok";el.textContent=txt;el.style.display="block";}
     return{txt,alerts,sentLine,checked};
   }catch(e){if(wakeT)clearTimeout(wakeT);if(!silent&&el){el.className="scan-result fail";el.textContent=`❌ ${e.message||"掃描失敗"}`;el.style.display="block";}return null;}
 }
 
-// ── AI scan ───────────────────────────────────────────────────────
+// ── AI Scan ────────────────────────────────────────────────────────
 async function aiScan(){
+  if(!requireAuth("aiScan"))return;
   const box=$("aiScanBox"),ph=$("aiScanPlaceholder");
   if(box)box.style.display="block";if(ph)ph.style.display="none";
   const grid=$("aiScanGrid");if(grid)grid.innerHTML='<div class="empty">AI 選股掃描中（約 30~120 秒）…</div>';
-  const btnAi=$("btnAiScan");if(btnAi)btnAi.disabled=true;
+  const btn=$("btnAiScan");if(btn)btn.disabled=true;
   showPage("p-market");
   let wakeT=setTimeout(()=>{if(grid)grid.innerHTML+='<div class="empty" style="color:var(--yellow)">後端喚醒中，請稍候…</div>';},10000);
   try{
     const r=await apiFetch(`${API}/api/scan/ai?min_score=70&max_stocks=40`,{},120000);
     clearTimeout(wakeT);const d=await r.json();renderAIScan(d,grid);
   }catch(e){clearTimeout(wakeT);if(grid)grid.innerHTML=`<div class="empty">❌ ${e.message||"掃描失敗"}</div>`;}
-  finally{if(btnAi)btnAi.disabled=false;}
+  finally{if(btn)btn.disabled=false;}
 }
 
 function renderAIScan(data,container){
@@ -1246,179 +1290,77 @@ function renderAIScan(data,container){
   let html=`<div style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:6px 0 10px">掃描 ${scanned} 檔，耗時 ${duration_seconds}s</div>`;
   html+=`<div class="scan-section"><div class="scan-section-title"><span style="color:var(--down)">✅ 可進場候選</span><span class="sq-tag sq-full">${enterable_count} 檔</span></div>`;
   if(!enterable||!enterable.length)html+='<div class="empty-scan">目前沒有符合可進場條件的股票，避免追高是正確的。</div>';
-  else html+='<div class="grid-cards">'+enterable.map(r=>scanCard(r,true)).join("")+'</div>';
+  else html+='<div class="grid-cards">'+enterable.map(r=>scanCard(r)).join("")+'</div>';
   html+='</div>';
-  if(pullback&&pullback.length){
-    html+=`<div class="scan-section"><div class="scan-section-title"><span style="color:var(--yellow)">⏳ 等回檔觀察</span><span class="sq-tag sq-partial">${pullback_count} 檔</span></div><div class="grid-cards">${pullback.map(r=>scanCard(r,false)).join("")}</div></div>`;
-  }
+  if(pullback&&pullback.length){html+=`<div class="scan-section"><div class="scan-section-title"><span style="color:var(--yellow)">⏳ 等回檔觀察</span><span class="sq-tag sq-partial">${pullback_count} 檔</span></div><div class="grid-cards">${pullback.map(r=>scanCard(r)).join("")}</div></div>`;}
   container.innerHTML=html;
   container.querySelectorAll("[data-load]").forEach(el=>{el.addEventListener("click",()=>loadStock(el.dataset.load));});
 }
 
-function scanCard(r,enterable){
+function scanCard(r){
   const clr=twcc(r.change_pct);const es=r.entry_status||"WEAK_SETUP";const esText=r.entry_status_text||es;
-  const rr=r.risk_reward_ratio;const dist=r.distance_to_entry_pct;const up=r.upside_pct;
-  const reasons=r.too_extended_reasons||[];
+  const rr=r.risk_reward_ratio;const dist=r.distance_to_entry_pct;const up=r.upside_pct;const reasons=r.too_extended_reasons||[];
   return`<div class="scan-card" data-load="${r.stock_id}">
-    <div class="scan-card-top"><div><div class="scan-card-name">${dsn(r.stock_id,r.stock_name)}</div><div class="scan-card-id">${r.stock_id}</div></div>
-    <span class="es-badge es-${es}">${esText}</span></div>
+    <div class="scan-card-top"><div><div class="scan-card-name">${dsn(r.stock_id,r.stock_name)}</div><div class="scan-card-id">${r.stock_id}</div></div><span class="es-badge es-${es}">${esText}</span></div>
     <div class="card-price-row"><span class="scan-card-price ${clr}">${r.price!=null?f(r.price):"—"}</span><span class="card-chg ${clr}">${pct(r.change_pct)}</span></div>
-    <div class="scan-meta">
-      <div><span class="lbl">入場</span> <span class="val">${r.entry_price!=null?f(r.entry_price):"—"}</span></div>
-      <div><span class="lbl">距入場</span> <span class="val ${dist!=null&&dist>0?"up":dist!=null&&dist<0?"down":""}">${dist!=null?(dist>0?"+":"")+dist.toFixed(1)+"%":"—"}</span></div>
-      <div><span class="lbl">目標</span> <span class="val up">${r.target_price!=null?f(r.target_price):"—"}</span></div>
-      <div><span class="lbl">上漲空間</span> <span class="val down">${up!=null?"+"+up.toFixed(1)+"%":"—"}</span></div>
-      <div><span class="lbl">止蝕</span> <span class="val down">${r.stop_loss!=null?f(r.stop_loss):"—"}</span></div>
-      <div><span class="lbl">RR</span> <span class="val ${(rr||0)>=1.5?"down":"up"}">${rr!=null?rr+"x":"—"}</span></div>
-    </div>
+    <div class="scan-meta"><div><span class="lbl">入場</span> <span class="val">${r.entry_price!=null?f(r.entry_price):"—"}</span></div><div><span class="lbl">距入場</span> <span class="val ${dist!=null&&dist>0?"up":dist!=null&&dist<0?"down":""}">${dist!=null?(dist>0?"+":"")+dist.toFixed(1)+"%":"—"}</span></div><div><span class="lbl">目標</span> <span class="val up">${r.target_price!=null?f(r.target_price):"—"}</span></div><div><span class="lbl">上漲空間</span> <span class="val down">${up!=null?"+"+up.toFixed(1)+"%":"—"}</span></div><div><span class="lbl">止蝕</span> <span class="val down">${r.stop_loss!=null?f(r.stop_loss):"—"}</span></div><div><span class="lbl">RR</span> <span class="val ${(rr||0)>=1.5?"down":"up"}">${rr!=null?rr+"x":"—"}</span></div></div>
     ${reasons.length?`<div class="scan-reasons">⚠️ ${reasons.slice(0,2).join(" ／ ")}</div>`:""}
   </div>`;
 }
 
-// ── Auto LINE ─────────────────────────────────────────────────────
+// ── Auto LINE ──────────────────────────────────────────────────────
 function updateAutoUI(){
   const btn=$("btnAuto");
   if(autoOn){if(btn){btn.textContent="已開啟";btn.className="green-btn sm";}}
   else{if(btn){btn.textContent="已關閉";btn.className="ghost sm";}}
 }
 function toggleAuto(){
-  autoOn=!autoOn;localStorage.setItem("tw_auto_v10",autoOn?"1":"0");
+  if(!requireAuth("toggleAuto"))return;
+  autoOn=!autoOn;if(currentUser)localStorage.setItem(`tw_auto_${currentUser.uid}`,autoOn?"1":"0");
   updateAutoUI();
-  if(autoOn){startAutoTimer();const el=$("autoLastR");if(el){el.style.display="block";el.textContent="已開啟，5 分鐘後首次掃描…";}}
-  else{clearInterval(autoTimer);autoTimer=null;setTxt("autoCountdown","—");const el=$("autoLastR");if(el)el.style.display="none";}
+  if(autoOn){startAutoTimer();}else{clearInterval(autoTimer);autoTimer=null;setTxt("autoCountdown","—");}
 }
 function startAutoTimer(){
   clearInterval(autoTimer);autoLeft=300;
   autoTimer=setInterval(async()=>{
-    autoLeft--;const m=Math.floor(autoLeft/60),s=autoLeft%60;
-    setTxt("autoCountdown",`${m}:${s.toString().padStart(2,"0")}`);
+    autoLeft--;const m=Math.floor(autoLeft/60),s=autoLeft%60;setTxt("autoCountdown",`${m}:${s.toString().padStart(2,"0")}`);
     if(autoLeft<=0){autoLeft=300;setTxt("autoLastT",new Date().toLocaleTimeString("zh-TW"));
       const r=await scanAlerts(true);
-      if(r){setTxt("autoScanned",r.checked+"檔");setTxt("autoPushed",r.sentLine.length+"檔");
-        const el=$("autoLastR");if(el){el.style.display="block";el.textContent=r.txt;el.style.color=r.alerts.length>0?"var(--up)":"var(--muted)";}}}
+      if(r){setTxt("autoScanned",r.checked+"檔");setTxt("autoPushed",r.sentLine.length+"檔");const el=$("autoLastR");if(el){el.style.display="block";el.textContent=r.txt;el.style.color=r.alerts.length>0?"var(--up)":"var(--muted)";}}}
   },1000);
 }
 
-// ── ★ V10.2 K 線圖（Lightweight Charts）─────────────────────────
-function destroyChart(){
-  if(lwChart){try{lwChart.remove();}catch{}lwChart=null;lwVolSeries=null;}
-}
-
-function renderCandlestickChart(chartData,aiSignal){
-  const container=$("klineContainer");const wrap=$("klineWrap");const ph=$("klinePlaceholder");
-  if(!wrap||!container){return;}
-  if(!chartData||!chartData.length){
-    if(wrap)wrap.style.display="none";return;
-  }
-  wrap.style.display="block";
-  destroyChart();
-  if(ph)ph.style.display="none";
-  try{
-    const h=window.innerWidth<=768?320:420;
-    container.style.height=h+"px";
-    lwChart=LightweightCharts.createChart(container,{
-      width:container.offsetWidth,height:h,
-      layout:{background:{color:"#0d1728"},textColor:"#6f86a8"},
-      grid:{vertLines:{color:"rgba(29,49,80,.5)"},horzLines:{color:"rgba(29,49,80,.5)"}},
-      crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
-      rightPriceScale:{borderColor:"#1d3150"},
-      timeScale:{borderColor:"#1d3150",timeVisible:true},
-    });
-    // K線（台股：漲紅跌綠）
-    const candleSeries=lwChart.addCandlestickSeries({
-      upColor:"#e8384f",downColor:"#00b86b",
-      borderUpColor:"#e8384f",borderDownColor:"#00b86b",
-      wickUpColor:"#e8384f",wickDownColor:"#00b86b",
-    });
-    const candleData=chartData.filter(d=>d.open&&d.high&&d.low&&d.close).map(d=>({
-      time:d.date,open:d.open,high:d.high,low:d.low,close:d.close
-    }));
-    if(candleData.length)candleSeries.setData(candleData);
-    // MA5
-    const ma5=lwChart.addLineSeries({color:"#fbbf24",lineWidth:1,priceLineVisible:false});
-    ma5.setData(chartData.filter(d=>d.ma5!=null).map(d=>({time:d.date,value:d.ma5})));
-    // MA20
-    const ma20=lwChart.addLineSeries({color:"#f97316",lineWidth:1,priceLineVisible:false});
-    ma20.setData(chartData.filter(d=>d.ma20!=null).map(d=>({time:d.date,value:d.ma20})));
-    // MA60
-    const ma60=lwChart.addLineSeries({color:"#e8384f",lineWidth:1,lineStyle:2,priceLineVisible:false});
-    ma60.setData(chartData.filter(d=>d.ma60!=null).map(d=>({time:d.date,value:d.ma60})));
-    // 水平線：入場/目標/止蝕
-    const ai=aiSignal||{};
-    if(ai.entry_price&&candleData.length){
-      candleSeries.createPriceLine({price:ai.entry_price,color:"#fbbf24",lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:"入場"});
-    }
-    if(ai.target_price&&candleData.length){
-      candleSeries.createPriceLine({price:ai.target_price,color:"#e8384f",lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:"目標"});
-    }
-    if(ai.stop_loss&&candleData.length){
-      candleSeries.createPriceLine({price:ai.stop_loss,color:"#00b86b",lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:"止蝕"});
-    }
-    // 成交量（小chart）
-    const volPanel=lwChart.addHistogramSeries({
-      color:"rgba(0,212,255,.3)",priceFormat:{type:"volume"},priceScaleId:"vol",
-      scaleMargins:{top:0.8,bottom:0},
-    });
-    const volData=chartData.filter(d=>d.volume!=null&&d.close!=null).map(d=>({
-      time:d.date,value:d.volume,
-      color:d.close>=(d.open||d.close)?"rgba(232,56,79,.4)":"rgba(0,184,107,.4)"
-    }));
-    if(volData.length)volPanel.setData(volData);
-    lwChart.timeScale().fitContent();
-    const statusEl=$("klineStatus");if(statusEl)statusEl.textContent=`${candleData.length} 根`;
-    // Responsive resize
-    const ro=new ResizeObserver(()=>{if(lwChart&&container)lwChart.applyOptions({width:container.offsetWidth});});
-    ro.observe(container);
-  }catch(e){console.warn("kline error:",e.message);if(wrap)wrap.style.display="none";}
-}
-
-// ── Main search ───────────────────────────────────────────────────
+// ── Main search ────────────────────────────────────────────────────
 async function doSearch(){
+  if(!requireAuth("doSearch"))return;
   const inp=$("sid");const id=inp?inp.value.trim():"";
   if(!/^\d{4,6}$/.test(id)){showErr("請輸入 4~6 位股票代號");return;}
   const box=$("suggestBox");if(box)box.style.display="none";
   hideErr();CURRENT_ID=id;const btId=$("btId");if(btId)btId.value=id;
-
-  // Reset 4D
-  const d4C=$("d4Container");if(d4C){d4C.classList.remove("open");d4C.innerHTML='<div class="d4-status info" style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:12px;text-align:center;background:#0d1728;border-radius:9px">按「載入四面向分析」查看基本面、技術面、籌碼面、消息面。</div>';}
-  const d4NS=$("d4NewsSection");if(d4NS)d4NS.style.display="none";
+  // Reset
   const d4ES=$("d4ExpandSection");if(d4ES)d4ES.style.display="none";
+  const d4C=$("d4Container");if(d4C){d4C.classList.remove("open");d4C.innerHTML='<div style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:12px;text-align:center;background:#0d1728;border-radius:9px">按「載入四面向分析」查看基本面、技術面、籌碼面、消息面。</div>';}
+  const d4NS=$("d4NewsSection");if(d4NS)d4NS.style.display="none";
   const dash=$("dash");if(dash)dash.style.display="none";
   destroyChart();
 
-  // Step 1: stock-lite
+  // Step 1 stock-lite
   try{
     const r1=await apiFetch(`${API}/api/stock-lite/${id}`,{},20000);
-    if(r1.ok){
-      const d1=await r1.json();renderStockLite(d1);
-      const ai1=d1.ai_signal||{};
-      WL_CACHE[id]={name:d1.stock_name||id,price:d1.price??null,changePct:d1.change_pct??null,
-        signal:ai1.signal||null,confidence:ai1.confidence??null,scoreQuality:ai1.score_quality||"none",
-        entryPrice:ai1.entry_price??null,targetPrice:ai1.target_price??null,stopLoss:ai1.stop_loss??null,
-        entryStatus:ai1.entry_status||"",entryStatusText:ai1.entry_status_text||"",
-        canEnter:ai1.can_enter||false,error:false,noData:false};
-      renderWL();
-    }
-  }catch(e){console.warn("stock-lite:",e.message);}
+    if(r1.ok){const d1=await r1.json();renderStockLite(d1);const ai1=d1.ai_signal||{};WL_CACHE[id]={name:d1.stock_name||id,price:d1.price??null,changePct:d1.change_pct??null,signal:ai1.signal||null,confidence:ai1.confidence??null,scoreQuality:ai1.score_quality||"none",entryPrice:ai1.entry_price??null,targetPrice:ai1.target_price??null,stopLoss:ai1.stop_loss??null,entryStatus:ai1.entry_status||"",entryStatusText:ai1.entry_status_text||"",canEnter:ai1.can_enter||false,error:false,noData:false};renderWL();}
+  }catch{}
 
-  // Step 2: full stock
+  // Step 2 full stock
   let wakeT=null;
   try{
-    wakeT=setTimeout(()=>showErr("⏳ Render 免費方案可能正在喚醒（約 30 秒），請耐心等待…"),10000);
+    wakeT=setTimeout(()=>showErr("⏳ Render 免費方案可能正在喚醒，請耐心等待…"),10000);
     const r2=await apiFetch(`${API}/api/stock/${id}`,{},45000);
     clearTimeout(wakeT);hideErr();
     if(!r2.ok){const e=await r2.json().catch(()=>({}));throw new Error(e.detail||`HTTP ${r2.status}`);}
     const d2=await r2.json();renderStock(d2);
-    const ai2=d2.ai_signal||{};
-    WL_CACHE[id]={name:d2.stock_name||id,price:d2.price?.close??null,changePct:d2.price?.change_pct??null,
-      signal:ai2.signal||null,confidence:ai2.confidence??null,scoreQuality:ai2.score_quality||"none",
-      entryPrice:ai2.entry_price??null,targetPrice:ai2.target_price??null,stopLoss:ai2.stop_loss??null,
-      entryStatus:ai2.entry_status||"",entryStatusText:ai2.entry_status_text||"",
-      canEnter:ai2.can_enter||false,error:false,noData:false};
+    const ai2=d2.ai_signal||{};WL_CACHE[id]={name:d2.stock_name||id,price:d2.price?.close??null,changePct:d2.price?.change_pct??null,signal:ai2.signal||null,confidence:ai2.confidence??null,scoreQuality:ai2.score_quality||"none",entryPrice:ai2.entry_price??null,targetPrice:ai2.target_price??null,stopLoss:ai2.stop_loss??null,entryStatus:ai2.entry_status||"",entryStatusText:ai2.entry_status_text||"",canEnter:ai2.can_enter||false,error:false,noData:false};
     renderWL();checkLineStatus();
-    // Render K-line
     renderCandlestickChart(d2.chart_data||[],d2.ai_signal||{});
-    // Show 4D section
     if(d4ES)d4ES.style.display="block";
   }catch(e){
     if(wakeT)clearTimeout(wakeT);
@@ -1427,26 +1369,22 @@ async function doSearch(){
   }
 }
 
-// ── renderStockLite ───────────────────────────────────────────────
+// ── render functions ───────────────────────────────────────────────
 function renderStockLite(d){
   const dash=$("dash");if(dash)dash.style.display="block";
   const ai=d.ai_signal||{},rt=d.realtime_quote||{};
-  setTxt("dId",d.stock_id);setTxt("dName",dsn(d.stock_id,d.stock_name));
-  setTxt("dSource","股票資料載入中…");
-  const price=d.price,chg=d.change,chgP=d.change_pct;
-  setTxt("dClose",price!=null?f(price):"—");addCls("dClose",cc(chg||0));
-  setTxt("dChg",chg!=null?`${chg>0?"+":""}${f(chg)} (${pct(chgP)})`:"—");addCls("dChg",cc(chg||0));
+  setTxt("dId",d.stock_id);setTxt("dName",dsn(d.stock_id,d.stock_name));setTxt("dSource","股票資料載入中…");
+  const chg=d.change;setTxt("dClose",d.price!=null?f(d.price):"—");addCls("dClose",cc(chg||0));
+  setTxt("dChg",chg!=null?`${chg>0?"+":""}${f(chg)} (${pct(d.change_pct)})`:"—");addCls("dChg",cc(chg||0));
   setTxt("dConc","載入中…");const ce=$("dConc");if(ce)ce.className="conclusion neu";
   const rtEl=$("rtInfo");if(rtEl)rtEl.innerHTML=rt?.price!=null?`<span class="pill pill-ok">⚡ ${rt.source||"TWSE MIS"}</span>`:`<span class="pill pill-warn">休市或無成交</span>`;
   renderAI(ai);
 }
 
-// ── renderStock ───────────────────────────────────────────────────
 function renderStock(d){
   const p=d.price||{},ind=d.indicators||{},bt=d.backtest||{},sc=d.score||{},vol=d.volume||{},rt=d.realtime_quote||null,ai=d.ai_signal||{};
   if(d.data_warning)showErr(d.data_warning);
-  setTxt("dId",d.stock_id);setTxt("dName",dsn(d.stock_id,d.stock_name));setTxt("dDate","資料日期："+d.last_date);
-  setTxt("dSource",d.data_source?`來源: ${d.data_source}`:"");
+  setTxt("dId",d.stock_id);setTxt("dName",dsn(d.stock_id,d.stock_name));setTxt("dDate","資料日期："+d.last_date);setTxt("dSource",d.data_source?`來源: ${d.data_source}`:"");
   const mEl=$("dMode");if(mEl){mEl.textContent=p.mode==="realtime"?"⚡ 即時":"📅 日線";mEl.className=p.mode==="realtime"?"mode-rt":"mode-daily";}
   const cE=$("dConc");if(cE){cE.textContent=d.conclusion||"";cE.className="conclusion "+(d.conclusion?.includes("偏多")?"bull":d.conclusion?.includes("偏弱")?"bear":"neu");}
   const chg=p.change||0;setTxt("dClose",f(p.close));addCls("dClose",cc(chg));
@@ -1458,11 +1396,10 @@ function renderStock(d){
   const ra=$("rsiAlert");if(ra)ra.innerHTML=d.rsi_alert?`<span class="pill ${d.rsi_alert.includes("過熱")?"pill-hot":"pill-warn"}">${d.rsi_alert}</span>`:"";
   setTxt("dMa5",f(ind.ma5));setTxt("dMa20",f(ind.ma20));setTxt("dMa60",f(ind.ma60));
   setTxt("dRsi",f(ind.rsi));addCls("dRsi",ind.rsi>50?"up":"down");
-  setTxt("dMacd",f(ind.macd,4));setTxt("dSig",f(ind.signal,4));setTxt("dHist",f(ind.hist,4));
-  addCls("dHist",ind.hist>0?"up":"down");addCls("dMacd",ind.macd>ind.signal?"up":"down");
+  setTxt("dMacd",f(ind.macd,4));setTxt("dSig",f(ind.signal,4));setTxt("dHist",f(ind.hist,4));addCls("dHist",ind.hist>0?"up":"down");addCls("dMacd",ind.macd>ind.signal?"up":"down");
   setTxt("dBbU",f(ind.bb_upper));setTxt("dBbL",f(ind.bb_lower));
   setTxt("dScore",sc.score||0);addCls("dScore",sc.score>=4?"up":sc.score<=2?"down":"flat");
-  const dots=$("scoreDots");if(dots){dots.innerHTML="";for(let i=0;i<5;i++){const dot=document.createElement("div");dot.className="dot"+(i<(sc.score||0)?" on":"");dots.appendChild(dot);}}
+  const dots=$("scoreDots");if(dots){dots.innerHTML="";for(let i=0;i<5;i++){const d2=document.createElement("div");d2.className="dot"+(i<(sc.score||0)?" on":"");dots.appendChild(d2);}}
   const srEl=$("scoreReasons");if(srEl)srEl.innerHTML=(sc.reasons||[]).map(r=>`<div class="reason">${r}</div>`).join("");
   setTxt("dWr",(bt.winrate||0)+"%");addCls("dWr",bt.winrate>=60?"up":bt.winrate<45?"down":"flat");
   setTxt("dWrSub",bt.trials?"近一年回測結果":"樣本不足");setTxt("dTrials",bt.trials||0);setTxt("dWins",bt.wins||0);
@@ -1471,25 +1408,21 @@ function renderStock(d){
   const dash=$("dash");if(dash)dash.style.display="block";
 }
 
-// ── renderAI ──────────────────────────────────────────────────────
 function renderAI(ai){
   const badge=$("aiBadge");if(badge)badge.className="ai-signal-block "+(ai.signal==="BUY"?"ai-buy":ai.signal==="AVOID"?"ai-avoid":"ai-watch");
   setTxt("aiLabel",sigIcon(ai.signal||"WATCH"));setTxt("aiConf",`信心 ${ai.confidence??0} / 100`);
   const barEl=$("confBar");if(barEl){barEl.style.width=(ai.confidence||0)+"%";barEl.style.background=(ai.confidence||0)>=75?"var(--up)":(ai.confidence||0)>=55?"var(--yellow)":"var(--down)";}
-  setTxt("aiEp",ai.entry_price!=null?f(ai.entry_price):"—");
-  setTxt("aiTp",ai.target_price!=null?f(ai.target_price):"—");
-  setTxt("aiSl",ai.stop_loss!=null?f(ai.stop_loss):"—");
+  setTxt("aiEp",ai.entry_price!=null?f(ai.entry_price):"—");setTxt("aiTp",ai.target_price!=null?f(ai.target_price):"—");setTxt("aiSl",ai.stop_loss!=null?f(ai.stop_loss):"—");
   const rrEl=$("aiRr");if(rrEl){if(ai.risk_reward_ratio!=null){rrEl.textContent=ai.risk_reward_ratio+"x";rrEl.className="aiq-val "+(ai.risk_reward_ratio>=1.5?"down":"up");}else{rrEl.textContent="—";rrEl.className="aiq-val";}}
   setTxt("aiSummary",ai.summary||"—");
   const tsEl=$("tradeStatusBadge");if(tsEl){const ts=ai.trade_status||"WATCH";const tsLbl={"BUY_NOW":"✅ BUY_NOW 可布局","BUY_PULLBACK":"⏳ BUY_PULLBACK 等回檔","WATCH":"👀 WATCH 觀望","AVOID":"🚫 AVOID 不建議"};tsEl.textContent=tsLbl[ts]||ts;tsEl.className="ts-badge ts-"+ts;}
   const esEl=$("entryStatusBadge");if(esEl){const es=ai.entry_status||"";if(es){esEl.textContent=ai.entry_status_text||es;esEl.className="es-badge es-"+es;esEl.style.display="inline-block";}else esEl.style.display="none";}
-  const aiEntryEl=$("aiEntry");if(aiEntryEl)aiEntryEl.innerHTML=(ai.entry_reason||[]).length?(ai.entry_reason.map(r=>`<div class="ai-reason">✅ ${r}</div>`).join("")):"<div class=\"ai-reason\" style=\"color:var(--muted)\">無</div>";
-  const aiRiskEl=$("aiRisk");if(aiRiskEl)aiRiskEl.innerHTML=(ai.risk_reason||[]).length?(ai.risk_reason.map(r=>`<div class="ai-reason">⚠️ ${r}</div>`).join("")):"<div class=\"ai-reason\" style=\"color:var(--down)\">暫無明顯風險</div>";
+  const aeEl=$("aiEntry");if(aeEl)aeEl.innerHTML=(ai.entry_reason||[]).length?(ai.entry_reason.map(r=>`<div class="ai-reason">✅ ${r}</div>`).join("")):"<div class=\"ai-reason\" style=\"color:var(--muted)\">無</div>";
+  const arEl=$("aiRisk");if(arEl)arEl.innerHTML=(ai.risk_reason||[]).length?(ai.risk_reason.map(r=>`<div class="ai-reason">⚠️ ${r}</div>`).join("")):"<div class=\"ai-reason\" style=\"color:var(--down)\">暫無明顯風險</div>";
   setTxt("aiDisc",ai.disclaimer||"");
   const terEl=$("tooExtendedReasons");if(terEl){const reasons=ai.too_extended_reasons||[];terEl.innerHTML=reasons.length?reasons.map(r=>`<div class="ai-reason">🚫 ${r}</div>`).join(""):"";terEl.style.display=reasons.length?"block":"none";}
 }
 
-// ── renderMTF ─────────────────────────────────────────────────────
 function renderMTF(mtf){
   const panel=$("mtfPanel");if(!mtf){if(panel)panel.style.display="none";return;}
   if(panel)panel.style.display="block";
@@ -1499,11 +1432,60 @@ function renderMTF(mtf){
   const el3=$("mtfOverall");if(el3){el3.textContent=mtf.overall||"—";el3.className="mtf-val "+(clr(mtf.overall||""));}
 }
 
-// ── 4D analysis（主交易頁展開式）────────────────────────────────
+// ── ★ Lightweight Charts K線圖 ───────────────────────────────────
+function destroyChart(){
+  if(lwChart){try{lwChart.remove();}catch{}lwChart=null;}
+}
+
+function renderCandlestickChart(chartData,aiSignal){
+  const wrap=$("klineWrap"),container=$("klineContainer");
+  if(!wrap||!container)return;
+  if(!chartData||!chartData.length){wrap.style.display="none";return;}
+  wrap.style.display="block";destroyChart();
+  try{
+    if(typeof LightweightCharts==="undefined"){wrap.style.display="none";return;}
+    const h=window.innerWidth<=768?320:420;container.style.height=h+"px";
+    lwChart=LightweightCharts.createChart(container,{
+      width:container.offsetWidth,height:h,
+      layout:{background:{color:"#0d1728"},textColor:"#6f86a8"},
+      grid:{vertLines:{color:"rgba(29,49,80,.5)"},horzLines:{color:"rgba(29,49,80,.5)"}},
+      crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+      rightPriceScale:{borderColor:"#1d3150"},
+      timeScale:{borderColor:"#1d3150",timeVisible:true},
+    });
+    // K線（台股漲紅跌綠）
+    const cs=lwChart.addCandlestickSeries({upColor:"#e8384f",downColor:"#00b86b",borderUpColor:"#e8384f",borderDownColor:"#00b86b",wickUpColor:"#e8384f",wickDownColor:"#00b86b"});
+    const cd=chartData.filter(d=>d.open&&d.high&&d.low&&d.close).map(d=>({time:d.date,open:d.open,high:d.high,low:d.low,close:d.close}));
+    if(cd.length)cs.setData(cd);
+    // MA5/MA20/MA60
+    const ma5s=lwChart.addLineSeries({color:"#fbbf24",lineWidth:1,priceLineVisible:false});
+    ma5s.setData(chartData.filter(d=>d.ma5!=null).map(d=>({time:d.date,value:d.ma5})));
+    const ma20s=lwChart.addLineSeries({color:"#f97316",lineWidth:1,priceLineVisible:false});
+    ma20s.setData(chartData.filter(d=>d.ma20!=null).map(d=>({time:d.date,value:d.ma20})));
+    const ma60s=lwChart.addLineSeries({color:"#e8384f",lineWidth:1,lineStyle:2,priceLineVisible:false});
+    ma60s.setData(chartData.filter(d=>d.ma60!=null).map(d=>({time:d.date,value:d.ma60})));
+    // 水平線
+    const ai=aiSignal||{};
+    if(ai.entry_price&&cd.length)cs.createPriceLine({price:ai.entry_price,color:"#fbbf24",lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:"入場"});
+    if(ai.target_price&&cd.length)cs.createPriceLine({price:ai.target_price,color:"#e8384f",lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:"目標"});
+    if(ai.stop_loss&&cd.length)cs.createPriceLine({price:ai.stop_loss,color:"#00b86b",lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:"止蝕"});
+    // 成交量
+    const vs=lwChart.addHistogramSeries({color:"rgba(0,212,255,.3)",priceFormat:{type:"volume"},priceScaleId:"vol",scaleMargins:{top:0.8,bottom:0}});
+    const vd=chartData.filter(d=>d.volume!=null&&d.close!=null).map(d=>({time:d.date,value:d.volume,color:d.close>=(d.open||d.close)?"rgba(232,56,79,.4)":"rgba(0,184,107,.4)"}));
+    if(vd.length)vs.setData(vd);
+    lwChart.timeScale().fitContent();
+    const st=$("klineStatus");if(st)st.textContent=`${cd.length} 根`;
+    // Responsive
+    try{const ro=new ResizeObserver(()=>{if(lwChart&&container)lwChart.applyOptions({width:container.offsetWidth});});ro.observe(container);}catch{}
+  }catch(e){console.warn("kline:",e.message);if(wrap)wrap.style.display="none";}
+}
+
+// ── 4D analysis ───────────────────────────────────────────────────
 async function load4d(){
+  if(!requireAuth("load4d"))return;
   if(!CURRENT_ID){alert("請先查詢股票");return;}
   const container=$("d4Container");if(container)container.classList.add("open");
-  if(container)container.innerHTML='<div class="d4-status info" style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:12px;text-align:center;background:#0d1728;border-radius:9px">四面向分析載入中（含基本面/籌碼/消息）…</div>';
+  if(container)container.innerHTML='<div style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:12px;text-align:center;background:#0d1728;border-radius:9px">四面向分析載入中…</div>';
   const btn=$("btnLoad4d");if(btn)btn.textContent="🔄 重新載入";
   try{
     const r=await apiFetch(`${API}/api/analysis-4d/${CURRENT_ID}`,{},90000);
@@ -1512,27 +1494,22 @@ async function load4d(){
     if(container)render4D(d.analysis_4d,d.news||[],container,d.ai_signal||{});
     const ns=$("d4NewsSection");if(ns)ns.style.display="block";
     const nd=$("d4News");if(nd)nd.innerHTML=renderNews(d.news||[]);
-  }catch(e){if(container)container.innerHTML=`<div class="d4-status info warn" style="font-family:var(--mono);font-size:12px;padding:12px;background:#0d1728;border-radius:9px;color:var(--up)">⚠️ 四面向分析暫時無法取得：${e.message}</div>`;}
+  }catch(e){if(container)container.innerHTML=`<div style="font-family:var(--mono);font-size:12px;padding:12px;background:#0d1728;border-radius:9px;color:var(--up)">⚠️ 四面向分析暫時無法取得：${e.message}</div>`;}
 }
 
-// ── render4D ──────────────────────────────────────────────────────
 function render4D(a4,news,container,aiSig){
   if(!a4){if(container)container.innerHTML='<div style="color:var(--muted);font-family:var(--mono);font-size:12px;padding:12px">四面向資料不可用</div>';return;}
   const{fundamental:fu,technical:te,chip:ch,news:nw,overall:ov}=a4;const ai=aiSig||{};
   let html='';
   const sigLabel=ai.signal==="BUY"?"📈 BUY":ai.signal==="AVOID"?"🚫 AVOID":"👀 WATCH";
-  const sigCss=ai.signal==="BUY"?"ai-buy":ai.signal==="AVOID"?"ai-avoid":"ai-watch";
+  const sigCss2=ai.signal==="BUY"?"ai-buy":ai.signal==="AVOID"?"ai-avoid":"ai-watch";
   const dqLabel=ai.data_quality==="official"?"正式資料":ai.data_quality==="estimated"?"部分估算":"資料不足";
   const dqCss=ai.data_quality==="official"?"sq-full":ai.data_quality==="estimated"?"sq-partial":"sq-none";
   const conf=ai.confidence??0;const barC=conf>=75?"var(--up)":conf>=55?"var(--yellow)":"var(--down)";
   html+=`<div style="background:#0d1728;border:2px solid ${ai.signal==="BUY"?"rgba(0,184,107,.4)":ai.signal==="AVOID"?"rgba(232,56,79,.4)":"rgba(251,191,36,.4)"};border-radius:12px;padding:16px;margin-bottom:14px">
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em">🤖 四面向綜合交易建議</div>
     <div style="display:flex;align-items:stretch;gap:14px;flex-wrap:wrap">
-      <div class="ai-signal-block ${sigCss}" style="flex:0 0 140px;padding:12px 8px">
-        <div class="ai-label" style="font-size:20px">${sigLabel}</div>
-        <div class="ai-conf-txt">${conf>0?conf+' / 100':'—'}</div>
-        <span class="sq-tag ${dqCss}" style="margin-top:5px">${dqLabel}</span>
-      </div>
+      <div class="ai-signal-block ${sigCss2}" style="flex:0 0 140px;padding:12px 8px"><div class="ai-label" style="font-size:20px">${sigLabel}</div><div class="ai-conf-txt">${conf>0?conf+' / 100':'—'}</div><span class="sq-tag ${dqCss}" style="margin-top:5px">${dqLabel}</span></div>
       <div style="flex:1;min-width:200px">
         <div style="height:6px;background:#172946;border-radius:3px;overflow:hidden;margin-bottom:10px"><div style="width:${conf}%;height:100%;background:${barC};border-radius:3px;transition:width .6s"></div></div>
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px">
@@ -1549,14 +1526,9 @@ function render4D(a4,news,container,aiSig){
     ${ai.risk_reason?.length?`<div style="margin-top:4px;font-size:12px;color:var(--up)">${ai.risk_reason.map(r=>"⚠️ "+r).join("<br>")}</div>`:""}
   </div>`;
   const ovScore=ov?.overall_score;
-  html+=`<div class="d4-overall">
-    <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:10px">
-      <div class="d4-ov-score ${ovScore!=null?(ovScore>=65?"up":ovScore>=50?"flat":"down"):""}">${ovScore!=null?Math.round(ovScore):"—"}</div>
-      <div><div style="font-family:var(--mono);font-size:14px;font-weight:700">${ov?.rating||"—"}</div><div style="font-family:var(--mono);font-size:11px;color:var(--muted)">四面向加權總分</div></div>
-    </div>
+  html+=`<div class="d4-overall"><div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:10px"><div class="d4-ov-score ${ovScore!=null?(ovScore>=65?"up":ovScore>=50?"flat":"down"):""}">${ovScore!=null?Math.round(ovScore):"—"}</div><div><div style="font-family:var(--mono);font-size:14px;font-weight:700">${ov?.rating||"—"}</div><div style="font-family:var(--mono);font-size:11px;color:var(--muted)">四面向加權總分</div></div></div>
     <div class="d4-bars">${[["基本面",fu,"#3b82f6"],["技術面",te,"var(--cyan)"],["籌碼面",ch,"var(--purple)"],["消息面",nw,"var(--yellow)"]].map(([label,v,color])=>{const s=v?.score;const p2=s!=null?Math.min(100,Math.round(s)):0;return`<div class="d4-bar-item"><span class="d4-bar-label">${label}</span><div class="d4-bar-track"><div class="d4-bar-seg" style="width:${p2}%;background:${color}"></div></div><span class="d4-bar-val">${s!=null?Math.round(s):"—"}</span></div>`;}).join("")}</div>
-    <div class="d4-ov-summary">${ov?.summary||"—"}</div>
-  </div>`;
+    <div class="d4-ov-summary">${ov?.summary||"—"}</div></div>`;
   html+='<div class="d4-grid">';
   const cards=[
     {label:"💰 基本面",icon:"#3b82f6",data:fu,extras:()=>{const d=fu||{};const tags=[];if(d.per!=null)tags.push(`PE:${d.per}`);if(d.roe!=null)tags.push(`ROE:${d.roe}%`);if(d.eps!=null)tags.push(`EPS:${d.eps}`);if(d.revenue_yoy!=null)tags.push(`YoY:${d.revenue_yoy>0?"+":""}${d.revenue_yoy}%`);return tags.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${tags.map(t=>`<span style="font-family:var(--mono);font-size:10px;padding:2px 7px;background:#172946;border:1px solid var(--line);border-radius:5px;color:var(--muted)">${t}</span>`).join("")}</div>`:"";}},
@@ -1565,8 +1537,7 @@ function render4D(a4,news,container,aiSig){
     {label:"📰 消息面",icon:"var(--yellow)",data:nw,extras:()=>{const d=nw||{};const tags=[`<span style="font-family:var(--mono);font-size:10px;padding:2px 7px;background:rgba(232,56,79,.12);border:1px solid rgba(232,56,79,.25);border-radius:5px;color:var(--up)">利多 ${d.bullish_count||0}</span>`,`<span style="font-family:var(--mono);font-size:10px;padding:2px 7px;background:rgba(0,184,107,.1);border:1px solid rgba(0,184,107,.25);border-radius:5px;color:var(--down)">利空 ${d.bearish_count||0}</span>`,`<span style="font-family:var(--mono);font-size:10px;padding:2px 7px;background:#172946;border:1px solid var(--line);border-radius:5px;color:var(--muted)">中性 ${d.neutral_count||0}</span>`].join("");return`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${tags}</div>${d.risk_keywords?.length?`<div style="font-family:var(--mono);font-size:11px;color:var(--up);margin-top:5px">⚠️ 風險字詞：${d.risk_keywords.join("、")}</div>`:""}`;}},
   ];
   cards.forEach(({label,icon,data,extras})=>{const s=data?.score;const rat=data?.rating||"資料不足";const p2=s!=null?Math.min(100,s):0;html+=`<div class="d4-card"><div class="d4-card-title">${label}</div><div style="display:flex;align-items:center"><span class="d4-score ${s!=null?(s>=70?"up":s>=50?"flat":"down"):""}">${s!=null?Math.round(s):"—"}</span><span class="d4-rating ${rat}">${rat}</span></div><div class="d4-bar"><div class="d4-bar-fill" style="width:${p2}%;background:${icon}"></div></div><div class="d4-reasons">${(data?.reasons||[]).slice(0,3).map(r=>`✅ ${r}<br>`).join("")}${(data?.risks||[]).slice(0,2).map(r=>`⚠️ <span style="color:var(--up)">${r}</span><br>`).join("")}</div>${extras()}</div>`;});
-  html+='</div>';
-  if(container)container.innerHTML=html;
+  html+='</div>';if(container)container.innerHTML=html;
 }
 
 function renderNews(news){
@@ -1574,24 +1545,24 @@ function renderNews(news){
   return news.map(n=>{const cls=n.sentiment==="利多"?"s-bull":n.sentiment==="利空"?"s-bear":"s-neu";return`<div class="news-item"><a href="${n.link}" target="_blank" rel="noopener">${n.title}</a><div class="news-meta"><span class="stag ${cls}">${n.sentiment}</span><span>${fmtD(n.pub_date)}</span></div></div>`;}).join("");
 }
 
-// ── Macro ─────────────────────────────────────────────────────────
+// ── Macro / Sentiment ─────────────────────────────────────────────
 async function loadMacro(){
+  if(!requireAuth("loadMacro"))return;
   const grid=$("macroGrid");if(!grid)return;
   grid.innerHTML='<div class="macro-item"><div class="macro-label">載入中</div><div class="macro-val" style="font-size:14px;color:var(--muted)">…</div></div>';
-  try{
-    const r=await apiFetch(`${API}/api/macro`,{},12000);const d=await r.json();
-    const items=[{label:"USD/TWD",key:"usd_twd",dd:3},{label:"DXY 美元",key:"dxy",dd:2},{label:"NASDAQ Fut",key:"nasdaq_futures",dd:0},{label:"SOX",key:"sox",dd:0},{label:"美債10Y%",key:"us10y",dd:2}];
-    grid.innerHTML=items.map(it=>{const v=d[it.key];const vt=v!=null?Number(v).toFixed(it.dd):"—";return`<div class="macro-item"><div class="macro-label">${it.label}</div><div class="macro-val">${vt}</div></div>`;}).join("");
-    const noteEl=$("macroNote");if(noteEl){const adj=d.macro_adj||0;noteEl.textContent=d.risk_note+(adj?`  宏觀調整：${adj>0?"+":""}${adj}`:"");noteEl.style.color=adj>=0?"var(--down)":"var(--up)";}
+  try{const r=await apiFetch(`${API}/api/macro`,{},12000);const d=await r.json();
+  const items=[{label:"USD/TWD",key:"usd_twd",dd:3},{label:"DXY 美元",key:"dxy",dd:2},{label:"NASDAQ Fut",key:"nasdaq_futures",dd:0},{label:"SOX",key:"sox",dd:0},{label:"美債10Y%",key:"us10y",dd:2}];
+  grid.innerHTML=items.map(it=>{const v=d[it.key];const vt=v!=null?Number(v).toFixed(it.dd):"—";return`<div class="macro-item"><div class="macro-label">${it.label}</div><div class="macro-val">${vt}</div></div>`;}).join("");
+  const noteEl=$("macroNote");if(noteEl){const adj=d.macro_adj||0;noteEl.textContent=d.risk_note+(adj?`  宏觀調整：${adj>0?"+":""}${adj}`:"");noteEl.style.color=adj>=0?"var(--down)":"var(--up)";}
   }catch{if(grid)grid.innerHTML='<div class="macro-item"><div class="macro-label" style="color:var(--muted)">宏觀資料暫時無法取得</div></div>';}
 }
 
 async function loadSentiment(){
-  try{
-    const r=await apiFetch(`${API}/api/market-sentiment`,{},30000);const d=await r.json();
-    const lbl=$("sentLabel");if(lbl)lbl.textContent=d.sentiment||"—";
-    const bar=$("sentBar");if(bar){bar.style.width=(d.buy_pct||0)+"%";bar.style.background=d.buy_pct>=50?"var(--down)":"var(--up)";}
-    const det=$("sentDetail");if(det)det.textContent=`BUY ${d.buy_count} / WATCH ${d.watch_count} / AVOID ${d.avoid_count}（共掃描 ${d.total} 檔）`;
+  if(!requireAuth("loadSentiment"))return;
+  try{const r=await apiFetch(`${API}/api/market-sentiment`,{},30000);const d=await r.json();
+  const lbl=$("sentLabel");if(lbl)lbl.textContent=d.sentiment||"—";
+  const bar=$("sentBar");if(bar){bar.style.width=(d.buy_pct||0)+"%";bar.style.background=d.buy_pct>=50?"var(--down)":"var(--up)";}
+  const det=$("sentDetail");if(det)det.textContent=`BUY ${d.buy_count} / WATCH ${d.watch_count} / AVOID ${d.avoid_count}（共掃描 ${d.total} 檔）`;
   }catch{}
 }
 
@@ -1611,52 +1582,40 @@ async function testLine(){
 
 // ── Backtest ──────────────────────────────────────────────────────
 async function runBt(){
+  if(!requireAuth("runBt"))return;
   const idEl=$("btId"),dEl=$("btDays"),sEl=$("btScore");
   const id=(idEl?idEl.value.trim():"")||CURRENT_ID;const days=dEl?dEl.value:5;const score=sEl?sEl.value:75;
   if(!id||!/^\d{4,6}$/.test(id)){alert("請輸入正確股票代號");return;}
   const loading=$("btLoading"),result=$("btResult");
   if(loading)loading.style.display="block";if(result)result.style.display="none";
-  try{
-    const r=await apiFetch(`${API}/api/backtest/${id}?holding_days=${days}&min_score=${score}&lookback_days=400`,{},90000);
-    const d=await r.json();if(!r.ok)throw new Error(d.detail||"回測失敗");const res=d.result;
-    setTxt("btWr",res.winrate+"%");setTxt("btAvg",(res.avg_return>=0?"+":"")+res.avg_return+"%");
-    setTxt("btDd","-"+res.max_drawdown+"%");setTxt("btPf",res.profit_factor+"x");
-    setTxt("btTotal",res.total_trades+"筆");setTxt("btWl",res.wins+" / "+res.losses);
-    setTxt("btBest","+"+res.best_return+"%");setTxt("btWorst",res.worst_return+"%");
-    addCls("btWr",res.winrate>=60?"up":res.winrate<45?"down":"flat");
-    addCls("btAvg",res.avg_return>0?"up":"down");addCls("btPf",res.profit_factor>=1?"up":"down");
-    const tbEl=$("btTrades");if(tbEl)tbEl.innerHTML=(d.trades||[]).map(t=>`<tr class="${t.win?"win":"loss"}"><td>${t.date}</td><td>${f(t.entry_price)}</td><td>${f(t.exit_price)}</td><td class="${t.return_pct>=0?"up":"down"}">${(t.return_pct>=0?"+":"")+t.return_pct}%</td><td>${t.confidence}</td><td>${t.signal}</td></tr>`).join("");
-    if(result)result.style.display="block";
-  }catch(e){alert("回測失敗："+e.message);}
+  try{const r=await apiFetch(`${API}/api/backtest/${id}?holding_days=${days}&min_score=${score}&lookback_days=400`,{},90000);
+  const d=await r.json();if(!r.ok)throw new Error(d.detail||"回測失敗");const res=d.result;
+  setTxt("btWr",res.winrate+"%");setTxt("btAvg",(res.avg_return>=0?"+":"")+res.avg_return+"%");setTxt("btDd","-"+res.max_drawdown+"%");setTxt("btPf",res.profit_factor+"x");
+  setTxt("btTotal",res.total_trades+"筆");setTxt("btWl",res.wins+" / "+res.losses);setTxt("btBest","+"+res.best_return+"%");setTxt("btWorst",res.worst_return+"%");
+  addCls("btWr",res.winrate>=60?"up":res.winrate<45?"down":"flat");addCls("btAvg",res.avg_return>0?"up":"down");addCls("btPf",res.profit_factor>=1?"up":"down");
+  const tbEl=$("btTrades");if(tbEl)tbEl.innerHTML=(d.trades||[]).map(t=>`<tr class="${t.win?"win":"loss"}"><td>${t.date}</td><td>${f(t.entry_price)}</td><td>${f(t.exit_price)}</td><td class="${t.return_pct>=0?"up":"down"}">${(t.return_pct>=0?"+":"")+t.return_pct}%</td><td>${t.confidence}</td><td>${t.signal}</td></tr>`).join("");
+  if(result)result.style.display="block";}catch(e){alert("回測失敗："+e.message);}
   finally{if(loading)loading.style.display="none";}
 }
 
-// ── Chart tabs ────────────────────────────────────────────────────
+// ── Chart.js tabs + charts ────────────────────────────────────────
 function swTab(name,btn){
   document.querySelectorAll(".tab").forEach(b=>b.classList.remove("on"));
   document.querySelectorAll(".tpane").forEach(p=>p.classList.remove("on"));
   if(btn)btn.classList.add("on");const tp=$("tp-"+name);if(tp)tp.classList.add("on");
 }
 
-// ── Chart.js charts ───────────────────────────────────────────────
 function killCharts(){Object.values(charts).forEach(c=>{try{c.destroy()}catch{}});charts={};}
 const CX={responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
   plugins:{legend:{labels:{color:"#6f86a8",font:{family:"Consolas",size:11},boxWidth:14}},
     tooltip:{backgroundColor:"#0d1728",borderColor:"#1d3150",borderWidth:1,titleColor:"#e5eefc",bodyColor:"#6f86a8",titleFont:{family:"Consolas"},bodyFont:{family:"Consolas",size:11}}},
-  scales:{x:{grid:{color:"rgba(29,49,80,.5)"},ticks:{color:"#6f86a8",font:{family:"Consolas",size:10},maxTicksLimit:10}},
-    y:{grid:{color:"rgba(29,49,80,.5)"},ticks:{color:"#6f86a8",font:{family:"Consolas",size:10}}}}};
+  scales:{x:{grid:{color:"rgba(29,49,80,.5)"},ticks:{color:"#6f86a8",font:{family:"Consolas",size:10},maxTicksLimit:10}},y:{grid:{color:"rgba(29,49,80,.5)"},ticks:{color:"#6f86a8",font:{family:"Consolas",size:10}}}}};
 const cloneOpt=()=>JSON.parse(JSON.stringify(CX));
 
 function mkCharts(data){
   if(!data||!data.length)return;const lbl=data.map(d=>d.date);
   const chPrice=$("chPrice");if(!chPrice)return;
-  charts.price=new Chart(chPrice,{type:"line",data:{labels:lbl,datasets:[
-    {label:"收盤",data:data.map(d=>d.close),borderColor:"#00d4ff",backgroundColor:"rgba(0,212,255,.04)",borderWidth:1.5,pointRadius:0,fill:true,tension:.3},
-    {label:"MA5",data:data.map(d=>d.ma5),borderColor:"#fbbf24",borderWidth:1,pointRadius:0,tension:.3},
-    {label:"MA20",data:data.map(d=>d.ma20),borderColor:"#f97316",borderWidth:1,pointRadius:0,tension:.3},
-    {label:"MA60",data:data.map(d=>d.ma60),borderColor:"#e8384f",borderWidth:1,pointRadius:0,tension:.3},
-    ...(data[0]?.bb_upper?[{label:"BB上",data:data.map(d=>d.bb_upper),borderColor:"rgba(167,139,250,.4)",borderWidth:1,borderDash:[3,3],pointRadius:0,tension:.3},{label:"BB下",data:data.map(d=>d.bb_lower),borderColor:"rgba(167,139,250,.4)",borderWidth:1,borderDash:[3,3],pointRadius:0,tension:.3}]:[])
-  ]},options:cloneOpt()});
+  charts.price=new Chart(chPrice,{type:"line",data:{labels:lbl,datasets:[{label:"收盤",data:data.map(d=>d.close),borderColor:"#00d4ff",backgroundColor:"rgba(0,212,255,.04)",borderWidth:1.5,pointRadius:0,fill:true,tension:.3},{label:"MA5",data:data.map(d=>d.ma5),borderColor:"#fbbf24",borderWidth:1,pointRadius:0,tension:.3},{label:"MA20",data:data.map(d=>d.ma20),borderColor:"#f97316",borderWidth:1,pointRadius:0,tension:.3},{label:"MA60",data:data.map(d=>d.ma60),borderColor:"#e8384f",borderWidth:1,pointRadius:0,tension:.3}]},options:cloneOpt()});
   const chVol=$("chVol");if(chVol)charts.vol=new Chart(chVol,{type:"bar",data:{labels:lbl,datasets:[{label:"成交量",data:data.map(d=>d.volume),backgroundColor:data.map((d,i)=>i===0||d.close>=(data[i-1]?.close??d.close)?"rgba(232,56,79,.6)":"rgba(0,184,107,.6)"),borderWidth:0}]},options:cloneOpt()});
   const chRsi=$("chRsi");if(chRsi)charts.rsi=new Chart(chRsi,{type:"line",data:{labels:lbl,datasets:[{label:"RSI(14)",data:data.map(d=>d.rsi),borderColor:"#a78bfa",borderWidth:1.5,pointRadius:0,tension:.4},{label:"超買(70)",data:data.map(()=>70),borderColor:"rgba(232,56,79,.4)",borderWidth:1,borderDash:[4,4],pointRadius:0},{label:"超賣(30)",data:data.map(()=>30),borderColor:"rgba(0,184,107,.4)",borderWidth:1,borderDash:[4,4],pointRadius:0}]},options:cloneOpt()});
   const chMacd=$("chMacd");if(chMacd)charts.macd=new Chart(chMacd,{type:"bar",data:{labels:lbl,datasets:[{type:"bar",label:"Histogram",data:data.map(d=>d.hist),backgroundColor:data.map(d=>d.hist>=0?"rgba(232,56,79,.5)":"rgba(0,184,107,.5)"),borderWidth:0},{type:"line",label:"MACD",data:data.map(d=>d.macd),borderColor:"#00d4ff",borderWidth:1.5,pointRadius:0,tension:.4},{type:"line",label:"Signal",data:data.map(d=>d.signal),borderColor:"#fbbf24",borderWidth:1,pointRadius:0,tension:.4}]},options:cloneOpt()});
@@ -1672,15 +1631,12 @@ async function loadWeights(){
   }catch(e){const lm=$("learnMsg");if(lm)lm.textContent="學習中心載入失敗："+e.message;}
 }
 async function learnAction(type){
-  const btnMap={eval:"btnEval",retrain:"btnRetrain",history:"btnHistory"};
-  const btn=$(btnMap[type]);if(btn)btn.disabled=true;
-  try{
-    const url=type==="eval"?"/api/learning/evaluate":type==="retrain"?"/api/learning/retrain":"/api/learning/history";
-    const opt=type==="retrain"?{method:"POST"}:{};
-    const r=await apiFetch(API+url,opt,90000);const d=await r.json();
-    if(type==="history"){const sigs=d.signals||[];const lm=$("learnMsg");if(lm)lm.textContent=sigs.length?sigs.slice(0,20).map(x=>`[${x.evaluated?"✅":"⏳"}] ${x.stock_name} (${x.stock_id}) ${x.signal} ${x.confidence}分 ${x.created_at?.slice(0,10)||""}${x.result?` → ${x.result.success?"成功 +":"失敗 "}${x.result.final_return_pct}%`:""}`).join("\n"):"尚無訊號紀錄";}
-    else{const lm=$("learnMsg");if(lm)lm.textContent=JSON.stringify(d,null,2);await loadWeights();}
-  }catch(e){const lm=$("learnMsg");if(lm)lm.textContent="操作失敗："+e.message;}
+  const btnMap={eval:"btnEval",retrain:"btnRetrain",history:"btnHistory"};const btn=$(btnMap[type]);if(btn)btn.disabled=true;
+  try{const url=type==="eval"?"/api/learning/evaluate":type==="retrain"?"/api/learning/retrain":"/api/learning/history";const opt=type==="retrain"?{method:"POST"}:{};
+  const r=await apiFetch(API+url,opt,90000);const d=await r.json();
+  if(type==="history"){const sigs=d.signals||[];const lm=$("learnMsg");if(lm)lm.textContent=sigs.length?sigs.slice(0,20).map(x=>`[${x.evaluated?"✅":"⏳"}] ${x.stock_name} (${x.stock_id}) ${x.signal} ${x.confidence}分 ${x.created_at?.slice(0,10)||""}${x.result?` → ${x.result.success?"成功 +":"失敗 "}${x.result.final_return_pct}%`:""}`).join("\n"):"尚無訊號紀錄";}
+  else{const lm=$("learnMsg");if(lm)lm.textContent=JSON.stringify(d,null,2);await loadWeights();}}
+  catch(e){const lm=$("learnMsg");if(lm)lm.textContent="操作失敗："+e.message;}
   finally{if(btn)btn.disabled=false;}
 }
 
@@ -1688,9 +1644,12 @@ async function learnAction(type){
 setInterval(()=>setTxt("clock",new Date().toLocaleString("zh-TW")),1000);
 
 // ══════════════════════════════════════════════════════════════════
-// initApp - DOMContentLoaded 後統一初始化
+// initApp
 // ══════════════════════════════════════════════════════════════════
 async function initApp(){
+  // 先顯示登入遮罩，等 Firebase Auth 確認
+  showLoginOverlay();
+
   initFirebase();
 
   // Nav tabs
@@ -1698,24 +1657,29 @@ async function initApp(){
     btn.addEventListener("click",()=>{const pg=btn.dataset.page;if(pg)showPage(pg);});
   });
 
+  // Chart tabs
+  document.querySelectorAll(".tab[data-tab]").forEach(btn=>{
+    btn.addEventListener("click",()=>swTab(btn.dataset.tab,btn));
+  });
+
   // Search
   safeBind("btnSearch","click",doSearch);
   safeBind("btnAdd","click",addWL);
   initSearchSuggest();
 
-  // Watchlist
-  safeBind("btnRefresh","click",()=>{isRefreshWL=false;wlLeft=30;const bar=$("wlBar");if(bar)bar.style.width="100%";refreshWL();});
+  // WL
+  safeBind("btnRefresh","click",()=>{if(!requireAuth("refresh"))return;isRefreshWL=false;wlLeft=30;const bar=$("wlBar");if(bar)bar.style.width="100%";refreshWL();});
   safeBind("btnScan","click",()=>scanAlerts());
   safeBind("btnScan2","click",()=>scanAlerts());
   safeBind("btnAiScan","click",aiScan);
 
   // Auto LINE
-  updateAutoUI();
   safeBind("btnAuto","click",toggleAuto);
-  if(autoOn)startAutoTimer();
 
-  // 4D (main trade page)
+  // 4D
   safeBind("btnLoad4d","click",load4d);
+  // Old 4D container button (if exists)
+  safeBind("btnLoad4dPage","click",load4d);
 
   // LINE
   safeBind("btnTestLine","click",testLine);
@@ -1733,21 +1697,15 @@ async function initApp(){
   safeBind("btnLoadMacro","click",loadMacro);
   safeBind("btnLoadSentiment","click",loadSentiment);
 
-  // Account page
+  // Account
   safeBind("btnGoogleLogin","click",googleLogin);
+  safeBind("btnLoginOverlay","click",googleLogin);
   safeBind("btnLogout","click",googleLogout);
-  safeBind("btnManualSync","click",async()=>{if(CURRENT_USER){setSyncBadge("ing");await saveWLForUser(CURRENT_USER.uid,WL);setSyncBadge("ok");}});
-  safeBind("btnRestoreLegacy","click",async()=>{if(CURRENT_USER){await migrateWatchlistIfNeeded(CURRENT_USER.uid);WL=await loadWLForUser(CURRENT_USER.uid)||WL;renderWL();setSyncBadge("migrated");}});
+  safeBind("btnManualSync","click",async()=>{if(!currentUser)return;setSyncBadge("ing");await saveWatchlist();});
+  safeBind("btnRestoreLegacy","click",async()=>{if(!currentUser)return;await runMigration(currentUser.uid,WL);WL=await (async()=>{const ref=userWLRef(currentUser.uid);if(!ref)return WL;const snap=await ref.get();return snap.exists?normalizeWatchlist(snap.data().watchlist||[]):WL;})();renderWL();setSyncBadge("migrated");});
 
-  // Load data
+  // Stock master (doesn't need auth)
   await loadStockMaster();
-  await loadWatchlist();
-  renderWL();
-  refreshWL();
-  startWLTimer();
-  checkLineStatus();
-  loadWeights();
-  setSyncBadge(CURRENT_USER?"ok":"local");
 }
 
 document.addEventListener("DOMContentLoaded",initApp);
