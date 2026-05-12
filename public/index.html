@@ -361,12 +361,13 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .cc-del{position:absolute;top:6px;right:6px;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;min-height:0;padding:0;border-radius:4px}
 .cc-del:hover{color:var(--up)}
 /* ══ V10.4 ticker ════════════════════════════════════════════════ */
-.wl-ticker-wrap{overflow:hidden;background:#0d1728;border:1px solid var(--line);border-radius:8px;padding:0;margin-bottom:10px;position:relative}
-.wl-ticker-inner{display:flex;animation:ticker-scroll 40s linear infinite;white-space:nowrap;width:max-content}
-.wl-ticker-wrap:hover .wl-ticker-inner{animation-play-state:paused}
-@media(prefers-reduced-motion:reduce){.wl-ticker-inner{animation:none;overflow-x:auto;-webkit-overflow-scrolling:touch}}
-@keyframes ticker-scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-.ticker-item{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-right:1px solid var(--line);cursor:pointer;font-size:12px;flex-shrink:0}
+.wl-ticker-wrap{overflow:hidden;background:#0d1728;border:1px solid var(--line);border-radius:8px;padding:0;margin-bottom:10px;position:relative;cursor:default}
+.wl-ticker-inner{display:flex;white-space:nowrap;width:max-content;will-change:transform}
+/* Animation set dynamically via JS for correct speed per item count */
+.wl-ticker-wrap:hover .wl-ticker-inner{animation-play-state:paused!important}
+@media(prefers-reduced-motion:reduce){.wl-ticker-inner{animation:none!important;overflow-x:auto;-webkit-overflow-scrolling:touch}}
+@keyframes ticker-scroll{0%{transform:translateX(0)}100%{transform:translateX(var(--ticker-half,-50%))}}
+.ticker-item{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-right:1px solid var(--line);cursor:pointer;font-size:12px;flex-shrink:0;user-select:none}
 .ticker-item:hover{background:rgba(0,212,255,.08)}
 .ticker-name{font-weight:600;color:var(--text)}
 .ticker-price{font-family:var(--mono)}
@@ -1545,6 +1546,8 @@ function renderAI(ai){
   const arEl=$("aiRisk");if(arEl)arEl.innerHTML=(ai.risk_reason||[]).length?(ai.risk_reason.map(r=>`<div class="ai-reason">⚠️ ${r}</div>`).join("")):"<div class=\"ai-reason\" style=\"color:var(--down)\">暫無明顯風險</div>";
   setTxt("aiDisc",ai.disclaimer||"");
   const terEl=$("tooExtendedReasons");if(terEl){const reasons=ai.too_extended_reasons||[];terEl.innerHTML=reasons.length?reasons.map(r=>`<div class="ai-reason">🚫 ${r}</div>`).join(""):"";terEl.style.display=reasons.length?"block":"none";}
+  // V10.4: trade plan box (no recursion — direct call)
+  if(typeof renderTradePlanV4 === "function") renderTradePlanV4(ai);
 }
 
 function renderMTF(mtf){
@@ -1599,6 +1602,20 @@ function renderCandlestickChart(chartData,aiSignal){
     if(vd.length)vs.setData(vd);
     lwChart.timeScale().fitContent();
     const st=$("klineStatus");if(st)st.textContent=`${cd.length} 根`;
+    // V10.4: support / resistance lines (drawn here, not in override)
+    const aiSig = aiSignal || {};
+    if(aiSig.trade_valid !== false && cd.length) {
+      try {
+        if(aiSig.recent_support) {
+          const supLine = lwChart.addLineSeries({color:"rgba(59,130,246,.55)",lineWidth:1,lineStyle:3,priceLineVisible:false});
+          supLine.setData([{time:cd[0].time,value:aiSig.recent_support},{time:cd[cd.length-1].time,value:aiSig.recent_support}]);
+        }
+        if(aiSig.recent_resistance) {
+          const resLine = lwChart.addLineSeries({color:"rgba(100,116,139,.5)",lineWidth:1,lineStyle:3,priceLineVisible:false});
+          resLine.setData([{time:cd[0].time,value:aiSig.recent_resistance},{time:cd[cd.length-1].time,value:aiSig.recent_resistance}]);
+        }
+      } catch {}
+    }
     // Responsive
     try{const ro=new ResizeObserver(()=>{if(lwChart&&container)lwChart.applyOptions({width:container.offsetWidth});});ro.observe(container);}catch{}
   }catch(e){console.warn("kline:",e.message);if(wrap)wrap.style.display="none";}
@@ -1926,6 +1943,15 @@ function renderWL() {
           inner.querySelectorAll("[data-load]").forEach(el=>{
             el.addEventListener("click",()=>loadStock(el.dataset.load));
           });
+          // Set animation duration based on item count (8s per item, min 20s, max 120s)
+          // and use CSS variable for exact half-translate
+          requestAnimationFrame(() => {
+            const totalW = inner.scrollWidth;
+            const halfW  = Math.round(totalW / 2);
+            const dur    = Math.min(120, Math.max(20, tickerIds.length * 8));
+            tw.style.setProperty("--ticker-half", `-${halfW}px`);
+            inner.style.animation = `ticker-scroll ${dur}s linear infinite`;
+          });
         }
       } else {
         tw.style.display="none";
@@ -2020,59 +2046,36 @@ function scanCardV4(r) {
   </div>`;
 }
 
-// ── Override renderAI to show V10.4 trade plan info ──────────────
-const _origRenderAI = renderAI;
-function renderAI(ai) {
-  _origRenderAI(ai);
-  // V10.4 trade plan box
+// ── V10.4 trade plan box helper (called FROM renderAI directly) ───
+function renderTradePlanV4(ai) {
   const tpBox = $("tradePlanBox");
+  if(!tpBox) return;
   const tv = ai.trade_valid;
-  if(tpBox) {
-    const ez_lo = ai.entry_zone_low, ez_hi = ai.entry_zone_high;
-    const sup = ai.recent_support, res = ai.recent_resistance;
-    const strat = ai.strategy_type || "—";
-    if(ez_lo || sup || res || strat !== "—") {
-      tpBox.style.display = "block";
-      setTxt("tpEntryZone", (ez_lo&&ez_hi)?`${f(ez_lo)} ~ ${f(ez_hi)}`:"—");
-      setTxt("tpSupport", sup?f(sup):"—");
-      setTxt("tpResistance", res?f(res):"—");
-      setTxt("tpStrategy", strat);
-    } else {
-      tpBox.style.display = "none";
-    }
-    // If trade_valid = false, show warning
-    const sumEl = $("aiSummary");
-    if(sumEl && tv === false && ai.signal==="BUY") {
-      sumEl.textContent = "⚠️ 交易點位暫不合理，建議觀察。" + (ai.summary||"");
-    }
+  const ez_lo = ai.entry_zone_low, ez_hi = ai.entry_zone_high;
+  const sup = ai.recent_support, res = ai.recent_resistance;
+  const strat = ai.strategy_type || "";
+  if(ez_lo || sup || res || strat) {
+    tpBox.style.display = "block";
+    setTxt("tpEntryZone", (ez_lo&&ez_hi)?`${f(ez_lo)} ~ ${f(ez_hi)}`:"—");
+    setTxt("tpSupport", sup?f(sup):"—");
+    setTxt("tpResistance", res?f(res):"—");
+    setTxt("tpStrategy", strat||"—");
+  } else {
+    tpBox.style.display = "none";
   }
-  // trade_valid badge near aiRr
+  // trade_valid = false → warn + hide RR
+  const sumEl = $("aiSummary");
+  if(sumEl && tv === false && ai.signal==="BUY") {
+    sumEl.textContent = "⚠️ 交易點位暫不合理，建議觀察。" + (ai.summary||"");
+  }
   const rrEl = $("aiRr");
   if(rrEl && tv === false) {
-    rrEl.textContent = "—";
-    rrEl.className = "aiq-val up";
+    rrEl.textContent = "—"; rrEl.className = "aiq-val up";
   }
 }
 
-// ── Override renderCandlestickChart to draw support/resistance ────
-const _origKline = renderCandlestickChart;
-function renderCandlestickChart(chartData, aiSignal) {
-  _origKline(chartData, aiSignal);
-  // Add support/resistance lines if available and trade_valid
-  if(!lwChart || !chartData || !chartData.length) return;
-  const ai = aiSignal || {};
-  if(ai.trade_valid === false) return; // 點位不合理，不畫
-  try {
-    const cs = lwChart.addLineSeries({color:"rgba(59,130,246,.6)",lineWidth:1,lineStyle:3,priceLineVisible:false,title:""});
-    if(ai.recent_support) {
-      cs.setData([{time:chartData[0].date,value:ai.recent_support},{time:chartData[chartData.length-1].date,value:ai.recent_support}]);
-    }
-    const rs = lwChart.addLineSeries({color:"rgba(100,116,139,.5)",lineWidth:1,lineStyle:3,priceLineVisible:false,title:""});
-    if(ai.recent_resistance) {
-      rs.setData([{time:chartData[0].date,value:ai.recent_resistance},{time:chartData[chartData.length-1].date,value:ai.recent_resistance}]);
-    }
-  } catch {}
-}
+// ── V10.4 support/resistance lines drawn inside renderCandlestickChart ──
+// (Moved into renderCandlestickChart body; see below - no override needed)
 
 // ── Quick nav scroll ──────────────────────────────────────────────
 function scrollToAnchor(id) {
