@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>台股 V10.4 Technical Trade Plan</title>
+<title>台股 V10.4.1 Technical Trade Plan</title>
 <script src="config.js"></script>
 <style>
 :root{
@@ -399,7 +399,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="logo">
     <span class="live-dot"></span>
     台股<span style="color:var(--down)">MONITOR</span>
-    <span class="ver">V10.4 Technical</span>
+    <span class="ver">V10.4.1 Technical</span>
   </div>
   <span class="clock" id="clock"></span>
 </header>
@@ -429,7 +429,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
       使用 Google 帳號登入
     </button>
-    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:16px">V10.4 Technical Trade Plan</div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:16px">V10.4.1 Technical Trade Plan</div>
   </div>
 </div>
 
@@ -1420,6 +1420,8 @@ async function doSearch(){
   // Reset
   const d4ES=$("d4ExpandSection");if(d4ES)d4ES.style.display="none";
   const d4C=$("d4Container");if(d4C){d4C.classList.remove("open");d4C.innerHTML='<div style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:12px;text-align:center;background:#0d1728;border-radius:9px">按「載入四面向分析」查看基本面、技術面、籌碼面、消息面。</div>';}
+  const a4C=$("a4Container");if(a4C){a4C.innerHTML='<div class="d4-status info" id="a4Status">為保持查詢速度，四面向分析不會自動載入。<br>按「載入四面向分析」即可查看基本面、技術面（詳細）、籌碼面、消息面。</div>';}
+  document.querySelectorAll('[id="btnLoad4d"]').forEach(btn=>btn.textContent="載入四面向分析");
   const d4NS=$("d4NewsSection");if(d4NS)d4NS.style.display="none";
   const dash=$("dash");if(dash)dash.style.display="none";
   destroyChart();
@@ -1437,7 +1439,11 @@ async function doSearch(){
     const r2=await apiFetch(`${API}/api/stock/${id}`,{},45000);
     clearTimeout(wakeT);hideErr();
     if(!r2.ok){const e=await r2.json().catch(()=>({}));throw new Error(e.detail||`HTTP ${r2.status}`);}
-    const d2=await r2.json();renderStock(d2);
+    const d2=await r2.json();
+    if(d2.error || !d2.ai_signal || d2.ai_signal.confidence==null){
+      throw new Error(d2.error || "完整技術資料暫時無法取得，已保留即時報價資料");
+    }
+    renderStock(d2);
     const ai2=d2.ai_signal||{};WL_CACHE[id]={name:d2.stock_name||id,price:d2.price?.close??null,changePct:d2.price?.change_pct??null,signal:ai2.signal||null,confidence:ai2.confidence??null,scoreQuality:ai2.score_quality||"none",entryPrice:ai2.entry_price??null,targetPrice:ai2.target_price??null,stopLoss:ai2.stop_loss??null,entryStatus:ai2.entry_status||"",entryStatusText:ai2.entry_status_text||"",canEnter:ai2.can_enter||false,error:false,noData:false};
     renderWL();checkLineStatus();
     renderCandlestickChart(d2.chart_data||[],d2.ai_signal||{});
@@ -1564,9 +1570,12 @@ function renderCandlestickChart(chartData,aiSignal){
 async function load4d(){
   if(!requireAuth("load4d"))return;
   if(!CURRENT_ID){alert("請先查詢股票");return;}
-  const container=$("d4Container");if(container)container.classList.add("open");
+  // V10.4.1：優先使用交易頁可見的 a4Container；避免寫入隱藏的 d4Container 導致看起來無法載入
+  const container=$("a4Container") || $("d4Container");
+  const hiddenContainer=$("d4Container");
+  if(hiddenContainer)hiddenContainer.classList.add("open");
   if(container)container.innerHTML='<div style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:12px;text-align:center;background:#0d1728;border-radius:9px">四面向分析載入中…</div>';
-  const btn=$("btnLoad4d");if(btn)btn.textContent="🔄 重新載入";
+  document.querySelectorAll('[id="btnLoad4d"]').forEach(btn=>btn.textContent="🔄 重新載入");
   try{
     const r=await apiFetch(`${API}/api/analysis-4d/${CURRENT_ID}`,{},90000);
     if(!r.ok)throw new Error("四面向分析失敗");
@@ -1757,8 +1766,7 @@ async function initApp(){
   safeBind("btnAuto","click",toggleAuto);
 
   // 4D
-  safeBind("btnLoad4d","click",load4d);
-  // Old 4D container button (if exists)
+  document.querySelectorAll('[id="btnLoad4d"]').forEach(btn=>btn.addEventListener("click",load4d));
   safeBind("btnLoad4dPage","click",load4d);
 
   // LINE
