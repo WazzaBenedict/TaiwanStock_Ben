@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>台股 V10.3 TradingView Edition</title>
+<title>台股 V10.4 Technical Trade Plan</title>
 <script src="config.js"></script>
 <style>
 :root{
@@ -343,6 +343,55 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .d4-expand{display:none}
 .d4-expand.open{display:block}
 
+
+/* ══ V10.4 compact watchlist ════════════════════════════════════ */
+.wl-compact-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+@media(max-width:768px){.wl-compact-grid{grid-template-columns:repeat(2,1fr)}}
+.card-compact{background:#0d1728;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;transition:all .15s;min-height:0}
+.card-compact:hover{border-color:var(--cyan);transform:translateY(-1px)}
+.card-compact.selected{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(0,212,255,.2)}
+.card-compact.buy{border-left:3px solid var(--up)}
+.card-compact.watch-sig{border-left:3px solid var(--yellow)}
+.card-compact.avoid{border-left:3px solid var(--down)}
+.cc-name{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc-id{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.cc-price{font-family:var(--mono);font-size:16px;font-weight:600}
+.cc-chg{font-family:var(--mono);font-size:11px}
+.cc-sig{font-family:var(--mono);font-size:10px;margin-top:3px;display:flex;gap:5px;align-items:center}
+.cc-del{position:absolute;top:6px;right:6px;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;min-height:0;padding:0;border-radius:4px}
+.cc-del:hover{color:var(--up)}
+/* ══ V10.4 ticker ════════════════════════════════════════════════ */
+.wl-ticker-wrap{overflow:hidden;background:#0d1728;border:1px solid var(--line);border-radius:8px;padding:0;margin-bottom:10px;position:relative}
+.wl-ticker-inner{display:flex;animation:ticker-scroll 40s linear infinite;white-space:nowrap;width:max-content}
+.wl-ticker-wrap:hover .wl-ticker-inner{animation-play-state:paused}
+@media(prefers-reduced-motion:reduce){.wl-ticker-inner{animation:none;overflow-x:auto;-webkit-overflow-scrolling:touch}}
+@keyframes ticker-scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.ticker-item{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-right:1px solid var(--line);cursor:pointer;font-size:12px;flex-shrink:0}
+.ticker-item:hover{background:rgba(0,212,255,.08)}
+.ticker-name{font-weight:600;color:var(--text)}
+.ticker-price{font-family:var(--mono)}
+.ticker-chg{font-family:var(--mono);font-size:11px}
+.ticker-sig{font-family:var(--mono);font-size:10px;padding:1px 5px;border-radius:4px}
+/* ══ V10.4 quick nav buttons ════════════════════════════════════ */
+.quick-nav{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.quick-nav-btn{font-family:var(--mono);font-size:11px;padding:5px 10px;background:#172946;border:1px solid var(--line);color:var(--muted);border-radius:6px;cursor:pointer;min-height:0}
+.quick-nav-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+/* ══ V10.4 AI scan in trade page ════════════════════════════════ */
+#aiScanTradeBox{margin-bottom:14px}
+.scan-zone-title{font-family:var(--mono);font-size:12px;font-weight:700;padding:8px 12px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:8px}
+.sz-enterable{background:rgba(0,184,107,.12);color:var(--down);border:1px solid rgba(0,184,107,.3)}
+.sz-pullback{background:rgba(251,191,36,.1);color:var(--yellow);border:1px solid rgba(251,191,36,.25)}
+.sz-riskwatch{background:rgba(232,56,79,.08);color:var(--up);border:1px solid rgba(232,56,79,.2)}
+/* ══ V10.4 trade_valid indicator ════════════════════════════════ */
+.tv-badge{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:5px;margin-left:6px}
+.tv-valid{background:rgba(0,184,107,.15);color:var(--down);border:1px solid rgba(0,184,107,.3)}
+.tv-invalid{background:rgba(232,56,79,.1);color:var(--up);border:1px solid rgba(232,56,79,.25)}
+/* ══ zone / support resistance info ════════════════════════════ */
+.trade-plan-box{background:#172946;border-radius:8px;padding:10px 12px;margin-top:8px;font-family:var(--mono);font-size:11px;line-height:1.8}
+.tp-row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(30,45,69,.4);padding:2px 0}
+.tp-row:last-child{border-bottom:none}
+.tp-lbl{color:var(--muted)}
+
 </style>
 </head>
 <body>
@@ -350,7 +399,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="logo">
     <span class="live-dot"></span>
     台股<span style="color:var(--down)">MONITOR</span>
-    <span class="ver">V10.3 TradingView</span>
+    <span class="ver">V10.4 Technical</span>
   </div>
   <span class="clock" id="clock"></span>
 </header>
@@ -380,7 +429,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
       使用 Google 帳號登入
     </button>
-    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:16px">V10.3 TradingView Edition</div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:16px">V10.4 Technical Trade Plan</div>
   </div>
 </div>
 
@@ -407,22 +456,38 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 </div>
 <div id="err"></div>
 
-<!-- Watchlist -->
+<!-- V10.4 Compact Watchlist -->
 <div class="section">
   <div class="section-title">
     <div class="section-title-left">
-      ⭐ 自選股監控
+      ⭐ 自選股
       <span class="d-badge" id="wlCount">0 檔</span>
       <span class="sync-badge sync-ing" id="syncBadge">⏳ 初始化</span>
     </div>
-    <div class="row" style="gap:7px">
-      <span class="bar-tick" id="wlTick">30s 後刷新</span>
-      <button class="ghost sm" id="btnRefresh">↻ 刷新</button>
-      <button class="green-btn sm" id="btnScan">📡 掃描買點</button>
+    <div class="row" style="gap:6px">
+      <span class="bar-tick" id="wlTick" style="font-size:10px">30s 後刷新</span>
+      <button class="ghost sm" id="btnRefresh" style="font-size:11px">↻</button>
+      <button class="ghost sm" id="btnScan" style="font-size:11px">📡 掃描</button>
+      <button class="ghost sm" id="btnToggleWl" style="font-size:11px">展開全部</button>
     </div>
   </div>
+  <!-- Quick Nav -->
+  <div class="quick-nav">
+    <button class="quick-nav-btn" id="qnAiScan">🤖 AI 選股</button>
+    <button class="quick-nav-btn" id="qnKline">📊 K 線圖</button>
+    <button class="quick-nav-btn" id="qnA4d">🔍 四面向</button>
+  </div>
   <div class="bar"><span id="wlBar" style="width:100%"></span></div>
-  <div class="grid-cards" id="wlGrid"></div>
+  <!-- Compact cards (前4) -->
+  <div class="wl-compact-grid" id="wlGridCompact"></div>
+  <!-- Ticker (第5以後) -->
+  <div class="wl-ticker-wrap" id="wlTickerWrap" style="display:none">
+    <div class="wl-ticker-inner" id="wlTickerInner"></div>
+  </div>
+  <!-- Full grid (展開後) -->
+  <div style="display:none" id="wlGridFull">
+    <div class="grid-cards" id="wlGrid"></div>
+  </div>
   <div class="scan-result" id="scanResult"></div>
 </div>
 
@@ -445,10 +510,16 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="auto-note">⚠️ 需保持網頁開啟。每 5 分鐘自動掃描，BUY 達條件即推播 LINE（同股 30 分鐘冷卻）。</div>
 </div>
 
-<!-- AI Scan Panel -->
-<div id="aiScanBox" style="display:none" class="section">
-  <div class="section-title">🤖 AI 選股掃描結果</div>
-  <div class="grid-cards" id="aiScanGrid"></div>
+<!-- V10.4: AI Scan result in trade page (三區) -->
+<div id="aiScanTradeBox" style="display:none;margin-bottom:14px">
+  <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--cyan);margin-bottom:10px;display:flex;align-items:center;gap:8px">
+    🤖 AI 選股結果
+    <span id="aiScanSummary" style="font-size:11px;color:var(--muted);font-weight:400"></span>
+    <button class="ghost sm" id="btnAiScanAgain" style="font-size:11px;margin-left:auto">重新掃描</button>
+  </div>
+  <div id="aiZoneEnterable"></div>
+  <div id="aiZonePullback"></div>
+  <div id="aiZoneRiskWatch"></div>
 </div>
 
 <!-- Dashboard -->
@@ -498,6 +569,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   </div>
 
   <!-- ★ V10.3 K線圖 (Lightweight Charts) -->
+  <div id="anchorKline"></div>
   <div class="kline-wrap" id="klineWrap" style="display:none;margin-bottom:14px">
     <div class="kline-header">
       <span>📊 K 線圖（台股：漲紅跌綠）</span>
@@ -556,6 +628,13 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
     <div class="g2" style="margin-bottom:8px">
       <div><div class="ai-section-lbl">📈 進場理由</div><div class="ai-reasons-list" id="aiEntry"></div></div>
       <div><div class="ai-section-lbl">⚠️ 風險提示</div><div class="ai-reasons-list" id="aiRisk"></div></div>
+    </div>
+    <!-- V10.4 trade plan info -->
+    <div id="tradePlanBox" class="trade-plan-box" style="display:none">
+      <div class="tp-row"><span class="tp-lbl">入場區間</span><span id="tpEntryZone">—</span></div>
+      <div class="tp-row"><span class="tp-lbl">近期支撐</span><span id="tpSupport">—</span></div>
+      <div class="tp-row"><span class="tp-lbl">近期壓力</span><span id="tpResistance">—</span></div>
+      <div class="tp-row"><span class="tp-lbl">策略型態</span><span id="tpStrategy">—</span></div>
     </div>
     <div id="tooExtendedReasons" style="display:none;margin-bottom:6px"></div>
     <div class="ai-disc" id="aiDisc">⚠️ 本工具僅供參考，非投資建議</div>
@@ -644,6 +723,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 
 
 <!-- 四面向分析（主交易頁展開式） -->
+  <div id="anchorA4d"></div>
   <div id="d4ExpandSection" style="display:none;margin-bottom:14px">
     <button class="d4-toggle-btn" id="btnLoad4d">🔍 載入四面向分析</button>
     <div class="d4-expand" id="d4Container">
@@ -1706,6 +1786,265 @@ async function initApp(){
 
   // Stock master (doesn't need auth)
   await loadStockMaster();
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   V10.4 ADDITIONS
+   ══════════════════════════════════════════════════════════════════ */
+
+// ── Compact Watchlist ──────────────────────────────────────────────
+let watchlistExpanded = false;
+
+function compactCard(id) {
+  const c = WL_CACHE[id] || {}, wlItem = WL.find(x=>x.stock_id===id)||{};
+  const name = c.name || wlItem.stock_name || getLocalName(id) || id;
+  const clr  = twcc(c.changePct);
+  const sig  = c.signal || "WATCH", cls = sigCls(sig);
+  const es   = c.entryStatus || "", esText = c.entryStatusText || "";
+  const conf = c.confidence != null ? c.confidence + "/100" : "—";
+  const sel  = id === CURRENT_ID ? " selected" : "";
+  return `<div class="card-compact ${cls}${sel}" style="position:relative" data-load="${id}">
+    <button class="cc-del" data-del="${id}">×</button>
+    <div class="cc-name" title="${name}">${name}</div>
+    <div class="cc-id">${id}</div>
+    <div class="cc-price ${clr}">${c.price!=null?f(c.price):"—"}</div>
+    <div class="cc-chg ${clr}">${pct(c.changePct)}</div>
+    <div class="cc-sig">
+      <span class="sig-badge" style="font-size:10px;padding:1px 6px">${sigIcon(sig)}</span>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${conf}</span>
+      ${es?`<span class="es-badge es-${es}" style="font-size:9px;padding:1px 5px">${esText}</span>`:""}
+    </div>
+  </div>`;
+}
+
+function tickerItem(id) {
+  const c = WL_CACHE[id] || {}, wlItem = WL.find(x=>x.stock_id===id)||{};
+  const name = c.name || wlItem.stock_name || getLocalName(id) || id;
+  const clr  = twcc(c.changePct);
+  const sig  = c.signal || "WATCH";
+  const es   = c.entryStatus || ""; const esText = c.entryStatusText || "";
+  const sigColor = sig==="BUY"?"var(--up)":sig==="AVOID"?"var(--down)":"var(--yellow)";
+  return `<div class="ticker-item" data-load="${id}">
+    <span class="ticker-name">${name} ${id}</span>
+    <span class="ticker-price ${clr}">${c.price!=null?f(c.price):"—"}</span>
+    <span class="ticker-chg ${clr}">${pct(c.changePct)}</span>
+    <span class="ticker-sig" style="background:${sigColor}20;color:${sigColor};border:1px solid ${sigColor}50">${es?esText:sigIcon(sig)}</span>
+  </div>`;
+}
+
+function renderWL() {
+  const wlC = $("wlCount"); if(wlC) wlC.textContent = `${WL.length} 檔`;
+  const ids = sortWL(getWLIds());
+
+  if (watchlistExpanded) {
+    // Full grid
+    const fg = $("wlGridFull"), g = $("wlGrid");
+    const cg = $("wlGridCompact"), tw = $("wlTickerWrap");
+    if(fg) fg.style.display = "block";
+    if(cg) cg.style.display = "none";
+    if(tw) tw.style.display = "none";
+    if(g) {
+      g.innerHTML = ids.length ? ids.map(cardHTMLCompat).join("") : '<div class="empty">尚無自選股</div>';
+      g.querySelectorAll("[data-load]").forEach(el=>{el.addEventListener("click",e=>{if(!e.target.closest("[data-del]"))loadStock(el.dataset.load);});});
+      g.querySelectorAll("[data-del]").forEach(btn=>{btn.addEventListener("click",e=>{e.stopPropagation();removeWL(btn.dataset.del);});});
+    }
+    const btn=$("btnToggleWl");if(btn)btn.textContent="收合";
+  } else {
+    // Compact view
+    const fg=$("wlGridFull"),cg=$("wlGridCompact"),tw=$("wlTickerWrap");
+    if(fg) fg.style.display="none";
+    const COMPACT_COUNT = window.innerWidth <= 768 ? 2 : 4;
+    const compactIds = ids.slice(0, COMPACT_COUNT);
+    const tickerIds  = ids.slice(COMPACT_COUNT);
+    if(cg) {
+      cg.innerHTML = compactIds.length ? compactIds.map(compactCard).join("") : '<div class="empty" style="grid-column:1/-1">尚無自選股，輸入代號加入</div>';
+      cg.querySelectorAll("[data-load]").forEach(el=>{el.addEventListener("click",e=>{if(!e.target.closest("[data-del]"))loadStock(el.dataset.load);});});
+      cg.querySelectorAll("[data-del]").forEach(btn=>{btn.addEventListener("click",e=>{e.stopPropagation();removeWL(btn.dataset.del);});});
+    }
+    if(tw) {
+      if(tickerIds.length) {
+        tw.style.display="block";
+        const inner=$("wlTickerInner");
+        if(inner) {
+          // Double the items for seamless loop
+          const items = tickerIds.map(tickerItem).join("");
+          inner.innerHTML = items + items;
+          inner.querySelectorAll("[data-load]").forEach(el=>{
+            el.addEventListener("click",()=>loadStock(el.dataset.load));
+          });
+        }
+      } else {
+        tw.style.display="none";
+      }
+    }
+    const btn=$("btnToggleWl");if(btn)btn.textContent="展開全部";
+  }
+}
+
+function cardHTMLCompat(id) {
+  // Use existing cardHTML from V10.3 logic
+  return cardHTML(id);
+}
+
+function toggleWatchlistExpanded() {
+  watchlistExpanded = !watchlistExpanded;
+  renderWL();
+}
+
+// ── AI Scan in Trade Page (三區) ──────────────────────────────────
+async function aiScan() {
+  if(!requireAuth("aiScan"))return;
+  const box=$("aiScanTradeBox");
+  if(box){box.style.display="block";}
+  const sumEl=$("aiScanSummary");if(sumEl)sumEl.textContent="掃描中…";
+  const ze=$("aiZoneEnterable"),zp=$("aiZonePullback"),zr=$("aiZoneRiskWatch");
+  if(ze)ze.innerHTML='';if(zp)zp.innerHTML='';if(zr)zr.innerHTML='';
+  const btn=$("btnAiScan");if(btn)btn.disabled=true;
+  const btn2=$("btnAiScanAgain");if(btn2)btn2.disabled=true;
+  // Scroll to AI scan result
+  if(box)setTimeout(()=>box.scrollIntoView({behavior:"smooth",block:"start"}),200);
+  try{
+    const r=await apiFetch(`${API}/api/scan/ai?min_score=65&max_stocks=40`,{},120000);
+    const d=await r.json();
+    if(sumEl)sumEl.textContent=`掃描 ${d.scanned} 檔，耗時 ${d.duration_seconds}s`;
+    renderAIScanV4(d,$("aiZoneEnterable"),$("aiZonePullback"),$("aiZoneRiskWatch"));
+  }catch(e){if(sumEl)sumEl.textContent="掃描失敗："+e.message;}
+  finally{if(btn)btn.disabled=false;if(btn2)btn2.disabled=false;}
+}
+
+function renderAIScanV4(data, zeEl, zpEl, zrEl) {
+  const {enterable,pullback,risk_watch,enterable_count,pullback_count,risk_watch_count}=data;
+
+  function zoneHTML(title,titleCss,items,emptyMsg) {
+    if(!items||!items.length) return `<div class="scan-zone-title ${titleCss}">${title} <span>0 檔</span></div><div class="empty-scan">${emptyMsg}</div>`;
+    return `<div class="scan-zone-title ${titleCss}">${title} <span class="sq-tag">${items.length} 檔</span></div>
+      <div class="grid-cards" style="margin-bottom:10px">${items.map(r=>scanCardV4(r)).join("")}</div>`;
+  }
+
+  if(zeEl) {
+    zeEl.innerHTML = zoneHTML("✅ 可進場候選","sz-enterable",enterable,"目前沒有符合可進場條件的股票，避免追高是正確的。");
+    zeEl.querySelectorAll("[data-load]").forEach(el=>el.addEventListener("click",()=>loadStock(el.dataset.load)));
+  }
+  if(zpEl) {
+    zpEl.innerHTML = zoneHTML("⏳ 等回檔觀察","sz-pullback",pullback,"—");
+    zpEl.querySelectorAll("[data-load]").forEach(el=>el.addEventListener("click",()=>loadStock(el.dataset.load)));
+  }
+  if(zrEl && risk_watch && risk_watch.length) {
+    zrEl.innerHTML = zoneHTML("⚠️ 風險觀察 / 疑似假突破","sz-riskwatch",risk_watch,"—");
+    zrEl.querySelectorAll("[data-load]").forEach(el=>el.addEventListener("click",()=>loadStock(el.dataset.load)));
+  }
+}
+
+function scanCardV4(r) {
+  const clr=twcc(r.change_pct);const es=r.entry_status||"WEAK_SETUP";const esText=r.entry_status_text||es;
+  const rr=r.risk_reward_ratio;const dist=r.distance_to_entry_pct;const up=r.upside_pct;
+  const reasons=(r.too_extended_reasons||[]).concat(r.false_breakout_flags||[]);
+  const tv=r.trade_valid;
+  const tvBadge=tv===true?`<span class="tv-badge tv-valid">點位合理</span>`:(tv===false?`<span class="tv-badge tv-invalid">點位不合理</span>`:"");
+  const strat=r.strategy_type||"";const ts=r.technical_score||0;
+  return `<div class="scan-card" data-load="${r.stock_id}">
+    <div class="scan-card-top">
+      <div><div class="scan-card-name">${dsn(r.stock_id,r.stock_name)}</div>
+      <div class="scan-card-id">${r.stock_id} ${strat?`<span style="font-size:9px;color:var(--muted)">${strat}</span>`:""}</div></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+        <span class="es-badge es-${es}">${esText}</span>
+        ${tvBadge}
+      </div>
+    </div>
+    <div class="card-price-row"><span class="scan-card-price ${clr}">${r.price!=null?f(r.price):"—"}</span><span class="card-chg ${clr}">${pct(r.change_pct)}</span></div>
+    <div class="scan-meta">
+      <div><span class="lbl">入場</span> <span class="val">${r.entry_price!=null?f(r.entry_price):"—"}</span></div>
+      <div><span class="lbl">距入場</span> <span class="val ${dist!=null&&dist>0?"up":dist!=null&&dist<0?"down":""}">${dist!=null?(dist>0?"+":"")+dist.toFixed(1)+"%":"—"}</span></div>
+      <div><span class="lbl">目標</span> <span class="val up">${r.target_price!=null?f(r.target_price):"—"}</span></div>
+      <div><span class="lbl">上漲空間</span> <span class="val down">${up!=null?"+"+up.toFixed(1)+"%":"—"}</span></div>
+      <div><span class="lbl">止蝕</span> <span class="val down">${r.stop_loss!=null?f(r.stop_loss):"—"}</span></div>
+      <div><span class="lbl">RR</span> <span class="val ${(rr||0)>=1.5?"down":"up"}">${rr!=null?rr+"x":"—"}</span></div>
+      ${ts?`<div><span class="lbl">技術分</span> <span class="val">${ts}</span></div>`:""}
+      ${r.recent_support?`<div><span class="lbl">支撐</span> <span class="val">${f(r.recent_support)}</span></div>`:""}
+    </div>
+    ${reasons.length?`<div class="scan-reasons">⚠️ ${reasons.slice(0,2).join(" ／ ")}</div>`:""}
+  </div>`;
+}
+
+// ── Override renderAI to show V10.4 trade plan info ──────────────
+const _origRenderAI = renderAI;
+function renderAI(ai) {
+  _origRenderAI(ai);
+  // V10.4 trade plan box
+  const tpBox = $("tradePlanBox");
+  const tv = ai.trade_valid;
+  if(tpBox) {
+    const ez_lo = ai.entry_zone_low, ez_hi = ai.entry_zone_high;
+    const sup = ai.recent_support, res = ai.recent_resistance;
+    const strat = ai.strategy_type || "—";
+    if(ez_lo || sup || res || strat !== "—") {
+      tpBox.style.display = "block";
+      setTxt("tpEntryZone", (ez_lo&&ez_hi)?`${f(ez_lo)} ~ ${f(ez_hi)}`:"—");
+      setTxt("tpSupport", sup?f(sup):"—");
+      setTxt("tpResistance", res?f(res):"—");
+      setTxt("tpStrategy", strat);
+    } else {
+      tpBox.style.display = "none";
+    }
+    // If trade_valid = false, show warning
+    const sumEl = $("aiSummary");
+    if(sumEl && tv === false && ai.signal==="BUY") {
+      sumEl.textContent = "⚠️ 交易點位暫不合理，建議觀察。" + (ai.summary||"");
+    }
+  }
+  // trade_valid badge near aiRr
+  const rrEl = $("aiRr");
+  if(rrEl && tv === false) {
+    rrEl.textContent = "—";
+    rrEl.className = "aiq-val up";
+  }
+}
+
+// ── Override renderCandlestickChart to draw support/resistance ────
+const _origKline = renderCandlestickChart;
+function renderCandlestickChart(chartData, aiSignal) {
+  _origKline(chartData, aiSignal);
+  // Add support/resistance lines if available and trade_valid
+  if(!lwChart || !chartData || !chartData.length) return;
+  const ai = aiSignal || {};
+  if(ai.trade_valid === false) return; // 點位不合理，不畫
+  try {
+    const cs = lwChart.addLineSeries({color:"rgba(59,130,246,.6)",lineWidth:1,lineStyle:3,priceLineVisible:false,title:""});
+    if(ai.recent_support) {
+      cs.setData([{time:chartData[0].date,value:ai.recent_support},{time:chartData[chartData.length-1].date,value:ai.recent_support}]);
+    }
+    const rs = lwChart.addLineSeries({color:"rgba(100,116,139,.5)",lineWidth:1,lineStyle:3,priceLineVisible:false,title:""});
+    if(ai.recent_resistance) {
+      rs.setData([{time:chartData[0].date,value:ai.recent_resistance},{time:chartData[chartData.length-1].date,value:ai.recent_resistance}]);
+    }
+  } catch {}
+}
+
+// ── Quick nav scroll ──────────────────────────────────────────────
+function scrollToAnchor(id) {
+  const el = document.getElementById(id);
+  if(el) el.scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+// ── Override initApp additions ────────────────────────────────────
+const _origInitApp = initApp;
+async function initApp() {
+  await _origInitApp();
+  // V10.4 extra bindings
+  safeBind("btnToggleWl","click",toggleWatchlistExpanded);
+  safeBind("btnAiScanAgain","click",aiScan);
+  safeBind("qnAiScan","click",()=>{aiScan();});
+  safeBind("qnKline","click",()=>scrollToAnchor("anchorKline"));
+  safeBind("qnA4d","click",()=>scrollToAnchor("anchorA4d"));
+  // Re-bind btnAiScan to not redirect to market page
+  const btnAiScan = document.getElementById("btnAiScan");
+  if(btnAiScan) {
+    // Remove old listeners by cloning
+    const newBtn = btnAiScan.cloneNode(true);
+    btnAiScan.parentNode.replaceChild(newBtn, btnAiScan);
+    newBtn.addEventListener("click", aiScan);
+  }
 }
 
 document.addEventListener("DOMContentLoaded",initApp);

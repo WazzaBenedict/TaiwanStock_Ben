@@ -12,7 +12,7 @@ from fastapi import FastAPI,HTTPException,Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app=FastAPI(title="台股監測 API V10.3 TradingView Edition",version="10.3.0")
+app=FastAPI(title="台股監測 API V10.4 Technical Trade Plan",version="10.4.0")
 _raw=os.getenv("ALLOWED_ORIGINS","http://localhost:5500,http://127.0.0.1:5500,https://taiwanstock-ben.web.app,https://taiwanstock-ben.firebaseapp.com")
 ALLOWED_ORIGINS=[o.strip() for o in _raw.split(",") if o.strip()]
 DEV_MODE=os.getenv("DEV_MODE","false").lower()=="true"
@@ -78,7 +78,7 @@ STOCK_NAME_MAP:dict[str,str]={
 # AI 學習系統
 # ══════════════════════════════════════════════════════════════════════════════
 DEFAULT_WEIGHTS={"technical":0.35,"fundamental":0.25,"chip":0.25,"news":0.15,
-    "risk":0.10,"macro":0.05,"updated_at":"","version":"10.3.0","last_reason":"預設權重"}
+    "risk":0.10,"macro":0.05,"updated_at":"","version":"10.4.0","last_reason":"預設權重"}
 WEIGHT_LIMITS={"technical":(0.20,0.45),"fundamental":(0.10,0.35),"chip":(0.10,0.40),"news":(0.05,0.25)}
 
 def _rjf(path,default):
@@ -825,6 +825,321 @@ def compute_4d_ai_signal(ov,fu,te,ch,nw,latest_row,cp,macro=None)->dict:
            "summary":summary,"entry_reason":er[:4],"risk_reason":rr2[:4],"disclaimer":"⚠️ 本工具僅供參考，非投資建議"}
 
 # ══════════════════════════════════════════════════════════════════════════════
+# ★ V10.4: ADX 計算
+# ══════════════════════════════════════════════════════════════════════════════
+def calc_adx(df: pd.DataFrame, period: int = 14) -> pd.Series:
+    """計算 ADX 趨勢強度"""
+    try:
+        hi = df.get("最高價", df["收盤價"]); lo = df.get("最低價", df["收盤價"])
+        c = df["收盤價"]; pc = c.shift(1)
+        tr = pd.concat([hi - lo, (hi - pc).abs(), (lo - pc).abs()], axis=1).max(axis=1)
+        dm_plus  = pd.Series(0.0, index=df.index)
+        dm_minus = pd.Series(0.0, index=df.index)
+        for i in range(1, len(df)):
+            h_diff = float(hi.iloc[i]) - float(hi.iloc[i-1])
+            l_diff = float(lo.iloc[i-1]) - float(lo.iloc[i])
+            dm_plus.iloc[i]  = max(h_diff, 0) if h_diff > l_diff else 0
+            dm_minus.iloc[i] = max(l_diff, 0) if l_diff > h_diff else 0
+        atr14  = tr.ewm(alpha=1/period, min_periods=period).mean()
+        dip14  = dm_plus.ewm(alpha=1/period, min_periods=period).mean()
+        dim14  = dm_minus.ewm(alpha=1/period, min_periods=period).mean()
+        di_plus  = 100 * dip14 / atr14.replace(0, np.nan)
+        di_minus = 100 * dim14 / atr14.replace(0, np.nan)
+        dx = 100 * (di_plus - di_minus).abs() / (di_plus + di_minus).replace(0, np.nan)
+        return dx.ewm(alpha=1/period, min_periods=period).mean()
+    except:
+        return pd.Series(np.nan, index=df.index)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ★ V10.4: compute_indicators_v4 (含 ADX)
+# ══════════════════════════════════════════════════════════════════════════════
+def compute_indicators_v4(df: pd.DataFrame) -> pd.DataFrame:
+    """V10.3 指標 + ADX"""
+    if df.empty: return df
+    c = df["收盤價"]
+    df["MA5"]  = c.rolling(5).mean()
+    df["MA20"] = c.rolling(20).mean()
+    df["MA60"] = c.rolling(60).mean()
+    df["RSI"]  = calc_rsi(c, 14)
+    df["MACD"], df["Signal"], df["Hist"] = calc_macd(c)
+    df["BB_mid"]   = c.rolling(20).mean()
+    bbs = c.rolling(20).std()
+    df["BB_upper"] = df["BB_mid"] + 2 * bbs
+    df["BB_lower"] = df["BB_mid"] - 2 * bbs
+    hi = df.get("最高價", c); lo = df.get("最低價", c)
+    if hi is not None and lo is not None:
+        pc  = c.shift(1)
+        tr  = pd.concat([hi-lo, (hi-pc).abs(), (lo-pc).abs()], axis=1).max(axis=1)
+        df["ATR"] = tr.rolling(14).mean()
+    df["ADX"] = calc_adx(df, 14)
+    return df
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ★ V10.4: build_trade_plan — 統一交易點位（保證 sl < ep < tp）
+# ══════════════════════════════════════════════════════════════════════════════
+def build_trade_plan(row: pd.Series, current_price: float, signal: str,
+                     strategy_type: str = "", price_df: pd.DataFrame | None = None) -> dict:
+    """
+    唯一交易點位計算函式。
+    永遠保證：stop_loss < entry_price < target_price
+    如果無法保證，trade_valid = False。
+    """
+    def _g(col):
+        return float(row[col]) if col in row.index and pd.notna(row.get(col)) else None
+
+    ma5  = _g("MA5");  ma20 = _g("MA20"); ma60 = _g("MA60")
+    atr  = _g("ATR");  rsi  = _g("RSI")
+    cp   = current_price
+
+    # 支撐 / 壓力
+    recent_support    = None
+    recent_resistance = None
+    swing_low         = None
+    if price_df is not None and not price_df.empty:
+        tail20 = price_df.tail(20)
+        if "最低價" in tail20.columns:
+            recent_support = round(float(tail20["最低價"].min()), 2)
+            swing_low      = recent_support
+        elif not tail20.empty:
+            recent_support = round(float(tail20["收盤價"].min()), 2)
+        if "最高價" in tail20.columns:
+            recent_resistance = round(float(tail20["最高價"].max()), 2)
+        elif not tail20.empty:
+            recent_resistance = round(float(tail20["收盤價"].max()), 2)
+
+    # ── Entry Price ──────────────────────────────────────────────────────────
+    if signal == "BUY":
+        if ma5 and cp > ma5 * 0.98:   ep = round(ma5, 2)
+        elif ma20 and cp > ma20 * 0.98: ep = round(ma20, 2)
+        else:                            ep = round(cp, 2)
+    elif signal == "WATCH":
+        ep = round(ma20, 2) if ma20 and cp > ma20 else round(cp, 2)
+    else:
+        return {
+            "entry_price": None, "entry_zone_low": None, "entry_zone_high": None,
+            "target_price": None, "stop_loss": None, "risk_reward_ratio": None,
+            "entry_status": "NO_DATA", "trade_valid": False,
+            "trade_note": "AVOID，無交易建議",
+            "risk_reason": [], "recent_support": recent_support,
+            "recent_resistance": recent_resistance,
+            "support_zone": [round(recent_support*0.99,2), round(recent_support*1.01,2)] if recent_support else None,
+            "resistance_zone": [round(recent_resistance*0.99,2), round(recent_resistance*1.01,2)] if recent_resistance else None,
+        }
+
+    # Clamp ep: don't let ep be lower than 95% of cp
+    if ep < cp * 0.80: ep = round(cp, 2)
+
+    # ── Stop Loss ────────────────────────────────────────────────────────────
+    sl_candidates = [ep * 0.97]
+    if ma20: sl_candidates.append(ma20 * 0.985)
+    if swing_low: sl_candidates.append(swing_low * 0.99)
+    if atr and atr > 0: sl_candidates.append(ep - atr * 1.5)
+    sl = round(min(sl_candidates), 2) if sl_candidates else round(ep * 0.96, 2)
+    # 保證 sl < ep
+    if sl >= ep: sl = round(ep * 0.96, 2)
+    if sl <= 0:  sl = round(ep * 0.96, 2)
+
+    # ── Target Price ─────────────────────────────────────────────────────────
+    tp_candidates = [ep * 1.05]
+    if recent_resistance and recent_resistance > ep * 1.01:
+        tp_candidates.append(recent_resistance)
+    if atr and atr > 0: tp_candidates.append(ep + atr * 2.5)
+    tp = round(max(tp_candidates), 2) if tp_candidates else round(ep * 1.06, 2)
+    # 保證 tp > ep
+    if tp <= ep: tp = round(ep * 1.06, 2)
+
+    # ── 最終驗證 ─────────────────────────────────────────────────────────────
+    risk_reason = []
+    if not (sl < ep < tp):
+        risk_reason.append("交易點位不合理：止蝕價高於或等於建議入場價")
+        return {
+            "entry_price": None, "entry_zone_low": None, "entry_zone_high": None,
+            "target_price": None, "stop_loss": None, "risk_reward_ratio": None,
+            "entry_status": "BAD_SETUP", "trade_valid": False,
+            "trade_note": "交易點位暫不合理，建議觀察",
+            "risk_reason": risk_reason, "recent_support": recent_support,
+            "recent_resistance": recent_resistance,
+            "support_zone": None, "resistance_zone": None,
+        }
+
+    # ── RR 計算（用 entry_price，非 current_price）────────────────────────────
+    rr = round((tp - ep) / (ep - sl), 2) if ep > sl else None
+    if rr is not None and rr < 0: rr = None
+
+    # ── Entry Zone ───────────────────────────────────────────────────────────
+    ts = compute_trade_status_v4(signal, rr, ep, cp)
+    if ts in ("BUY_NOW",):
+        ez_lo = round(ep * 0.995, 2); ez_hi = round(ep * 1.005, 2)
+    else:
+        ez_lo = round(ep * 0.99, 2);  ez_hi = round(ep * 1.01, 2)
+
+    trade_valid = (rr is not None and rr >= 1.5)
+    if not trade_valid: risk_reason.append(f"RR比 {rr}x 不足（需≥1.5）")
+
+    trade_note = "交易點位合理，可參考使用。" if trade_valid else "交易點位暫不合理，建議觀察"
+
+    return {
+        "entry_price": ep, "entry_zone_low": ez_lo, "entry_zone_high": ez_hi,
+        "target_price": tp, "stop_loss": sl, "risk_reward_ratio": rr,
+        "entry_status": "ENTERABLE" if trade_valid else "BAD_SETUP",
+        "trade_valid": trade_valid, "trade_note": trade_note,
+        "risk_reason": risk_reason, "recent_support": recent_support,
+        "recent_resistance": recent_resistance,
+        "support_zone": [round(recent_support*0.99,2), round(recent_support*1.01,2)] if recent_support else None,
+        "resistance_zone": [round(recent_resistance*0.99,2), round(recent_resistance*1.01,2)] if recent_resistance else None,
+    }
+
+def compute_trade_status_v4(signal: str, rr, entry_price, current_price) -> str:
+    if signal == "AVOID": return "AVOID"
+    dev = (current_price - entry_price) / entry_price * 100 if (entry_price and entry_price > 0 and current_price > 0) else 0
+    if signal == "BUY":
+        if dev > 4: return "BUY_PULLBACK"
+        if rr and rr >= 1.5: return "BUY_NOW"
+    return "WATCH"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ★ V10.4: 技術面 100 分制 + ADX + strategy_type + overheat + false breakout
+# ══════════════════════════════════════════════════════════════════════════════
+def compute_technical_v4(row: pd.Series, cp: float, vol_info: dict,
+                          chg_pct: float | None = None,
+                          price_df: pd.DataFrame | None = None) -> dict:
+    """V10.4 增強技術評分（100分制）+ strategy_type + overheat + false_breakout"""
+    def _g(col): return float(row[col]) if col in row.index and pd.notna(row.get(col)) else None
+
+    ma5 = _g("MA5"); ma20 = _g("MA20"); ma60 = _g("MA60")
+    rsi = _g("RSI"); macd = _g("MACD"); sig_v = _g("Signal"); hist = _g("Hist")
+    atr = _g("ATR"); adx  = _g("ADX"); bbm = _g("BB_mid")
+    vol_ratio = vol_info.get("ratio", 1.0) if vol_info else 1.0
+
+    score = 0
+    bd = {"trend_score": 0, "momentum_score": 0, "volume_score": 0,
+          "volatility_score": 0, "support_resistance_score": 0, "adx_score": 0}
+
+    # ── 1. 趨勢結構 30分 ─────────────────────────────────────────────────────
+    if ma5 and ma20 and ma5 > ma20:  score += 10; bd["trend_score"] += 10
+    if ma20 and ma60 and ma20 > ma60: score += 10; bd["trend_score"] += 10
+    if ma20 and cp > ma20:            score += 10; bd["trend_score"] += 10
+
+    # ── 2. 動能 20分 ─────────────────────────────────────────────────────────
+    if macd and sig_v:
+        if macd > sig_v: score += 8; bd["momentum_score"] += 8
+    if hist and hist > 0: score += 5; bd["momentum_score"] += 5
+    if rsi:
+        if 45 <= rsi <= 65:  score += 7; bd["momentum_score"] += 7
+        elif 65 < rsi <= 72: score += 3; bd["momentum_score"] += 3
+        elif rsi > 72:        score -= 8; bd["momentum_score"] -= 8
+        elif rsi < 40:        score -= 6; bd["momentum_score"] -= 6
+
+    # ── 3. 量能 15分 ─────────────────────────────────────────────────────────
+    if vol_ratio >= 2.0 and (chg_pct or 0) > 0:
+        score += 15; bd["volume_score"] += 15  # 大量突破
+    elif vol_ratio >= 1.2 and (chg_pct or 0) > 0:
+        score += 8; bd["volume_score"] += 8   # 量增上漲
+    elif vol_ratio < 0.8 and (chg_pct or 0) > 0:
+        score -= 5; bd["volume_score"] -= 5   # 量縮上漲（不健康）
+    elif (chg_pct or 0) < 0 and vol_ratio >= 1.5:
+        score -= 8; bd["volume_score"] -= 8   # 下跌爆量
+
+    # ── 4. 波動風險 15分 ─────────────────────────────────────────────────────
+    if atr and atr > 0 and cp > 0:
+        atr_pct = atr / cp * 100
+        if atr_pct <= 3: score += 8; bd["volatility_score"] += 8
+    if ma20 and ma20 > 0 and cp > 0:
+        dev_pct = (cp - ma20) / ma20 * 100
+        if dev_pct <= 5:  score += 7; bd["volatility_score"] += 7
+        elif dev_pct > 8: score -= 10; bd["volatility_score"] -= 10
+
+    # ── 5. 支撐壓力 10分 ─────────────────────────────────────────────────────
+    if price_df is not None and not price_df.empty:
+        tail20 = price_df.tail(20)
+        sup = float(tail20["最低價"].min()) if "最低價" in tail20 else (float(tail20["收盤價"].min()) if not tail20.empty else None)
+        res = float(tail20["最高價"].max()) if "最高價" in tail20 else (float(tail20["收盤價"].max()) if not tail20.empty else None)
+        if sup and cp > 0:
+            if abs(cp - sup) / cp < 0.03: score += 5; bd["support_resistance_score"] += 5
+        if res and cp > 0:
+            upside_to_res = (res - cp) / cp * 100
+            if upside_to_res >= 5: score += 5; bd["support_resistance_score"] += 5
+            elif upside_to_res < 1: score -= 5; bd["support_resistance_score"] -= 5
+
+    # ── 6. 趨勢強度 ADX 10分 ────────────────────────────────────────────────
+    if adx:
+        if adx >= 25:   score += 10; bd["adx_score"] += 10
+        elif adx >= 15: score += 5;  bd["adx_score"] += 5
+        else:           score -= 5;  bd["adx_score"] -= 5
+
+    final_score = max(0, min(100, score))
+
+    # ── 過熱偵測 ─────────────────────────────────────────────────────────────
+    overheat_flags = []
+    if rsi and rsi > 72:     overheat_flags.append(f"RSI {rsi:.1f} 過熱（需≤72）")
+    if chg_pct and chg_pct > 5: overheat_flags.append(f"今日漲幅 {chg_pct:.1f}% 過熱")
+    if ma20 and ma20 > 0 and cp > 0:
+        dev20 = (cp - ma20) / ma20 * 100
+        if dev20 > 8: overheat_flags.append(f"現價高於 MA20 {dev20:.1f}%（需≤8%）")
+    if price_df is not None and not price_df.empty:
+        closes = price_df["收盤價"].dropna()
+        if len(closes) >= 5:
+            g5 = (cp - float(closes.iloc[-5])) / float(closes.iloc[-5]) * 100
+            if g5 > 10: overheat_flags.append(f"近5日漲幅 {g5:.1f}%（需≤10%）")
+        if len(closes) >= 10:
+            g10 = (cp - float(closes.iloc[-10])) / float(closes.iloc[-10]) * 100
+            if g10 > 18: overheat_flags.append(f"近10日漲幅 {g10:.1f}%（需≤18%）")
+
+    # ── 假突破偵測 ───────────────────────────────────────────────────────────
+    false_breakout_flags = []
+    if price_df is not None and not price_df.empty:
+        tail20 = price_df.tail(20)
+        res20 = float(tail20["最高價"].max()) if "最高價" in tail20.columns else None
+        # 突破前高但量能不足
+        if res20 and cp >= res20 * 0.99 and vol_ratio < 1.2:
+            false_breakout_flags.append("突破前高但成交量不足（需>1.2倍均量）")
+        # 長上影線：(最高-收盤)/(最高-最低) > 0.6 且今日爆量
+        if not tail20.empty and "最高價" in tail20.columns and "最低價" in tail20.columns:
+            last = tail20.iloc[-1]
+            hi_ = float(last.get("最高價", cp)); lo_ = float(last.get("最低價", cp))
+            if hi_ > lo_ and vol_ratio >= 2.0:
+                upper_shadow = (hi_ - float(last.get("收盤價", cp))) / (hi_ - lo_)
+                if upper_shadow > 0.6:
+                    false_breakout_flags.append("長上影線且爆量（疑似出貨）")
+
+    # ── strategy_type 判斷 ───────────────────────────────────────────────────
+    is_full_bull = (ma5 and ma20 and ma60 and ma5 > ma20 > ma60 and cp > ma20)
+    is_adx_trend = adx and adx > 25
+    if overheat_flags:
+        strategy_type = "Overheated"
+    elif false_breakout_flags:
+        strategy_type = "Avoid"
+    elif final_score < 40:
+        strategy_type = "Avoid"
+    elif adx and adx < 15:
+        strategy_type = "Range Bound"
+    elif is_full_bull and is_adx_trend and rsi and 45 <= rsi <= 70:
+        strategy_type = "Trend Following"
+    elif ma20 and cp > 0 and (cp - ma20) / ma20 * 100 < 3 and is_full_bull:
+        strategy_type = "Pullback Entry"
+    elif price_df is not None and not price_df.empty:
+        tail20 = price_df.tail(20)
+        res20 = float(tail20["最高價"].max()) if "最高價" in tail20.columns else None
+        if res20 and cp >= res20 * 0.99 and vol_ratio >= 1.5:
+            strategy_type = "Breakout"
+        elif rsi and rsi < 40:
+            strategy_type = "Reversal Bounce"
+        else:
+            strategy_type = "Range Bound" if (adx and adx < 20) else "Trend Following"
+    else:
+        strategy_type = "Trend Following" if final_score >= 60 else "Range Bound"
+
+    return {
+        "technical_score": final_score,
+        "technical_breakdown": bd,
+        "strategy_type": strategy_type,
+        "overheat_flags": overheat_flags,
+        "false_breakout_flags": false_breakout_flags,
+        "adx": round(adx, 1) if adx else None,
+        "atr": round(atr, 2) if atr else None,
+    }
+
+# ══════════════════════════════════════════════════════════════════════════════
 # ★ V10: trade_status 系統
 # ══════════════════════════════════════════════════════════════════════════════
 def compute_trade_status(ai:dict,cp:float,vol_info:dict|None=None)->str:
@@ -1027,20 +1342,16 @@ def compute_ai_signal_lite(row:pd.Series,winrate_info:dict,cp:float,macro:dict|N
     rsi=_g("RSI");macd=_g("MACD");sig=_g("Signal");hist=_g("Hist")
     wr=winrate_info.get("winrate",0)
 
-    def _cp(signal):
-        if signal=="BUY":tp=round(cp*1.06,2)
-        elif signal=="WATCH":tp=round(cp*1.03,2)
-        else:tp=None
-        sl=round(ma20*0.98,2) if ma20 else round(cp*0.95,2)
-        ep=None
-        if signal!="AVOID":
-            if ma5 and cp>ma5:ep=round(ma5,2)
-            elif ma20 and cp>ma20:ep=round(ma20,2)
-            else:ep=round(cp,2)
-        if tp and sl and cp>sl:
-            rr=round((tp-cp)/(cp-sl),2);rr=rr if rr>0 else None
-        else:rr=None
-        if signal=="BUY" and(rr is None or rr<1.5):signal="WATCH";tp=round(cp*1.03,2)
+    def _cp(signal, strat=""):
+        plan=build_trade_plan(row,cp,signal,strat,price_df)
+        ep=plan["entry_price"];tp=plan["target_price"];sl=plan["stop_loss"];rr=plan["risk_reward_ratio"]
+        if not plan.get("trade_valid") and signal=="BUY":signal="WATCH"
+        # Recalc WATCH plan if needed
+        if signal=="WATCH" and ep is None:
+            ep=round(ma20,2) if ma20 and cp>ma20 else round(cp,2)
+            sl=round(ep*0.96,2);tp=round(ep*1.04,2)
+            if ep>sl>0 and tp>ep: rr=round((tp-ep)/(ep-sl),2)
+            else: rr=None
         return signal,ep,tp,sl,rr
 
     # ★ V10.1 Momentum Breakout + 風控
@@ -1189,7 +1500,7 @@ async def _analyze_stock_core(stock_id:str)->dict:
                    "conclusion":"資料不足 ⚠️","rsi_alert":None,
                    "ai_signal":compute_ai_signal_lite(pd.Series(),{"winrate":0,"trials":0,"wins":0},rtp or 0),
                    "multi_timeframe":None,"realtime_quote":rt,"news":[],"chart_data":[],"analysis_4d":None}
-        df=compute_indicators(df);latest=df.iloc[-1];prev=df.iloc[-2] if len(df)>1 else latest
+        df=compute_indicators_v4(df);latest=df.iloc[-1];prev=df.iloc[-2] if len(df)>1 else latest
         chg=float(latest["收盤價"]-prev["收盤價"])
         chgp=round(chg/float(prev["收盤價"])*100,2) if float(prev["收盤價"]) else 0
         cp=float(rt["price"]) if rt and rt.get("price") is not None else float(latest["收盤價"])
@@ -1257,13 +1568,37 @@ async def _analyze_stock_lite(stock_id:str,macro:dict|None=None)->dict:
             ai=compute_ai_signal_lite(latest,wri,cp,macro=macro,price_df_len=len(df),realtime_quote=rt,vol_info=vi,price_df=df)
         elif cp>0:
             ai=compute_ai_signal_lite(pd.Series(),{"winrate":0,"trials":0,"wins":0},cp,macro=macro,price_df_len=0,realtime_quote=rt)
-        # V10.1: enrich with entry_status
+        # V10.4: enrich with entry_status + technical_v4
         rsi_v=None;ma20_v=None
         if not df.empty and len(df)>0:
             try:
                 latest2=df.iloc[-1]
                 rsi_v=float(latest2["RSI"]) if "RSI" in latest2.index and pd.notna(latest2.get("RSI")) else None
                 ma20_v=float(latest2["MA20"]) if "MA20" in latest2.index and pd.notna(latest2.get("MA20")) else None
+                # V10.4 technical analysis
+                tech_v4=compute_technical_v4(latest2,cp,vi if "vi" in dir() else {},chgp,df)
+                ai["technical_score_v4"]=tech_v4["technical_score"]
+                ai["technical_breakdown"]=tech_v4["technical_breakdown"]
+                ai["strategy_type"]=tech_v4["strategy_type"] or ai.get("strategy_type","")
+                ai["overheat_flags"]=tech_v4["overheat_flags"]
+                ai["false_breakout_flags"]=tech_v4["false_breakout_flags"]
+                # Enrich with V10.4 trade plan (validate points)
+                if ai.get("entry_price") and ai.get("stop_loss") and ai.get("target_price"):
+                    ep_=ai["entry_price"];sl_=ai["stop_loss"];tp_=ai["target_price"]
+                    if not (sl_<ep_<tp_):
+                        ai["trade_valid"]=False
+                        ai["entry_status"]="BAD_SETUP"
+                        ai["entry_status_text"]="點位不合理"
+                        ai["risk_reward_ratio"]=None
+                        if "risk_reason" not in ai: ai["risk_reason"]=[]
+                        ai["risk_reason"].append("交易點位不合理：止蝕價高於或等於建議入場價")
+                    else:
+                        rr_=round((tp_-ep_)/(ep_-sl_),2) if ep_>sl_ else None
+                        ai["risk_reward_ratio"]=rr_
+                        ai["trade_valid"]=(rr_ is not None and rr_>=1.5)
+                    # entry zone
+                    ai["entry_zone_low"]=round(ep_*0.995,2) if ep_ else None
+                    ai["entry_zone_high"]=round(ep_*1.005,2) if ep_ else None
             except:pass
         ai=_enrich_ai_with_entry(ai,cp,chgp,rsi_v,ma20_v,df if not df.empty else None)
         record_ai_signal(stock_id,sname,ai,None,source="stock-lite")
@@ -1364,7 +1699,7 @@ async def get_analysis_4d(stock_id:str):
         rt=await fetch_realtime_quote(stock_id)
         if df.empty:cp=float(rt["price"]) if rt and rt.get("price") else 0.0
         else:
-            df=compute_indicators(df);lr=df.iloc[-1]
+            df=compute_indicators_v4(df);lr=df.iloc[-1]
             cp=float(rt["price"]) if rt and rt.get("price") else float(lr["收盤價"])
         news,fu,chip,margin=await asyncio.gather(
             fetch_news(stock_id,sname),fetch_fundamental_data(stock_id),fetch_chip_data(stock_id),fetch_margin_data(stock_id))
@@ -1395,53 +1730,64 @@ async def api_market_sentiment():
     except Exception as e:return{"error":str(e),"buy_count":0,"watch_count":0,"avoid_count":0,"sentiment":"中性⚠️"}
 
 @app.get("/api/scan/ai")
-async def ai_scan(min_score:int=Query(70,ge=0,le=100),max_stocks:int=Query(40,ge=5,le=80)):
-    """V10.1: AI 選股 + entry_filter，分 ENTERABLE / WAIT_PULLBACK 兩區。"""
+async def ai_scan(min_score:int=Query(65,ge=0,le=100),max_stocks:int=Query(40,ge=5,le=80)):
+    """V10.4: AI 選股 + trade_valid + technical_v4，分三區。"""
     t0=time.time();pool=list(dict.fromkeys(AI_SCAN_POOL))[:max_stocks]
     try:macro=await asyncio.wait_for(fetch_macro_context(),timeout=6)
     except:macro={}
-    enterable=[];pullback=[];errors=[]
+    enterable=[];pullback=[];risk_watch=[];errors=[]
     for sid in pool:
         try:
             r=await _analyze_stock_lite(sid,macro);ai=r.get("ai_signal",{})
             conf=ai.get("confidence") or 0
             if conf<min_score:continue
             es=ai.get("entry_status","NO_DATA")
+            trade_valid=ai.get("trade_valid",False)
+            strategy=ai.get("strategy_type","")
+            overheat=ai.get("overheat_flags",[])
+            fb=ai.get("false_breakout_flags",[])
+            ts=ai.get("technical_score_v4") or 0
             item={"stock_id":sid,"stock_name":r["stock_name"],
                 "signal":ai.get("signal","WATCH"),"confidence":conf,
                 "trade_status":ai.get("trade_status","WATCH"),
                 "entry_status":es,"entry_status_text":ai.get("entry_status_text",ENTRY_STATUS_TEXT.get(es,"—")),
                 "can_enter":ai.get("can_enter",False),
-                "strategy_type":ai.get("strategy_type",""),
+                "trade_valid":trade_valid,
+                "strategy_type":strategy,
+                "technical_score":ts,
+                "overheat_flags":overheat,"false_breakout_flags":fb,
                 "risk_level":ai.get("risk_model",{}).get("risk_level","—"),
                 "price":r.get("price"),"change_pct":r.get("change_pct"),
                 "entry_price":ai.get("entry_price"),"target_price":ai.get("target_price"),
+                "entry_zone_low":ai.get("entry_zone_low"),"entry_zone_high":ai.get("entry_zone_high"),
                 "stop_loss":ai.get("stop_loss"),"risk_reward_ratio":ai.get("risk_reward_ratio"),
                 "distance_to_entry_pct":ai.get("distance_to_entry_pct"),
                 "upside_pct":ai.get("upside_pct"),
+                "recent_support":ai.get("recent_support"),"recent_resistance":ai.get("recent_resistance"),
                 "score_quality":ai.get("score_quality","none"),
                 "too_extended_reasons":ai.get("too_extended_reasons",[]),
                 "summary":ai.get("summary","")}
-            if es=="ENTERABLE":enterable.append(item)
-            elif es in("WAIT_PULLBACK","TOO_EXTENDED"):pullback.append(item)
+            # 分區
+            if fb:
+                risk_watch.append(item)
+            elif trade_valid and es=="ENTERABLE" and ts>=70 and not overheat:
+                enterable.append(item)
+            elif strategy in("Overheated","Avoid") or overheat or es in("TOO_EXTENDED","WAIT_PULLBACK","BAD_SETUP"):
+                pullback.append(item)
         except Exception as e:errors.append({"stock_id":sid,"error":str(e)})
-    # 排序
-    def sort_enter(x):
-        rr=x.get("risk_reward_ratio") or 0
-        dist=abs(x.get("distance_to_entry_pct") or 99)
-        conf=x.get("confidence") or 0
-        return (-rr,-dist,conf)  # RR高、距離近、信心高
-    def sort_pullback(x):return (-(x.get("confidence") or 0))
-    enterable.sort(key=sort_enter);pullback.sort(key=sort_pullback)
+    def sort_enter(x): return (-(x.get("risk_reward_ratio") or 0), abs(x.get("distance_to_entry_pct") or 99), -(x.get("confidence") or 0))
+    def sort_pb(x):    return (-(x.get("confidence") or 0))
+    enterable.sort(key=sort_enter);pullback.sort(key=sort_pb);risk_watch.sort(key=sort_pb)
     return{"scanned":len(pool),"enterable_count":len(enterable),"pullback_count":len(pullback),
-           "min_score":min_score,"enterable":enterable,"pullback":pullback,
+           "risk_watch_count":len(risk_watch),"min_score":min_score,
+           "enterable":enterable,"pullback":pullback,"risk_watch":risk_watch,
            "errors":errors,"error_count":len(errors),
            "duration_seconds":round(time.time()-t0,1),"timestamp":datetime.now().isoformat()}
 
 @app.post("/api/alerts/test")
 async def test_line():
     _cc()
-    result=await send_line_message("✅ 台股監測 V10.3 TradingView Edition - LINE 通知測試成功！")
+    result=await send_line_message("✅ 台股監測 V10.4 Technical Trade Plan - LINE 通知測試成功！")
     if not result["success"]:raise HTTPException(500,detail=result["message"])
     return result
 
@@ -1463,8 +1809,10 @@ async def check_alerts(body:WatchlistBody):
             rr2=ai.get("risk_reward_ratio") or 0;conf=ai.get("confidence") or 0
             dq=ai.get("score_quality","none");ts=ai.get("trade_status","WATCH")
             es2=ai.get("entry_status","NO_DATA");up2=ai.get("upside_pct") or 0
+            tv=ai.get("trade_valid",False);ts2=ai.get("technical_score_v4") or 0
+            ovh=bool(ai.get("overheat_flags")); fb2=bool(ai.get("false_breakout_flags"))
             lok=(conf>=75 and rr2>=1.5 and dq=="full" and ai.get("signal")=="BUY"
-                 and es2=="ENTERABLE" and up2>=5)
+                 and es2=="ENTERABLE" and up2>=5 and tv and ts2>=70 and not ovh and not fb2)
             if lo and lok:
                 ls=LAST_ALERTS.get(sid)
                 if ls is None or(now-ls).total_seconds()>=ALERT_COOLDOWN_MINUTES*60:
@@ -1504,12 +1852,12 @@ def api_learning_retrain():return retrain_ai_weights()
 
 @app.get("/health")
 def health():
-    return{"status":"ok","version":"10.3.0","time":datetime.now().isoformat(),
+    return{"status":"ok","version":"10.4.0","time":datetime.now().isoformat(),
            "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
            "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
            "price_sources":"Yahoo Finance → TWSE Official → FinMind",
            "stock_master_count":len(STOCK_MASTER),"stock_master_updated":_mua,
            "http_timeout":HTTP_TIMEOUT,
-           "features":["V10.3 TradingView Edition","trade_status BUY_NOW/BUY_PULLBACK/WATCH/AVOID",
+           "features":["V10.4 Technical Trade Plan","trade_status BUY_NOW/BUY_PULLBACK/WATCH/AVOID",
                        "Momentum Breakout","multi_timeframe","macro_api","market_sentiment",
                        "Firestore watchlist","4D on-demand","AI learning","stock-lite","sharpe_ratio"]}
