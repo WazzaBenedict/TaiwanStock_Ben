@@ -411,8 +411,8 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       <span class="live-dot"></span>
       台股<span style="color:var(--down)">MONITOR</span>
     </div>
-    <div style="font-family:var(--mono);font-size:28px;font-weight:800;color:var(--cyan);margin-bottom:8px">V10.3</div>
-    <div style="font-size:16px;font-weight:600;margin-bottom:6px">TradingView Edition</div>
+    <div style="font-family:var(--mono);font-size:28px;font-weight:800;color:var(--cyan);margin-bottom:8px">V10.4</div>
+    <div style="font-size:16px;font-weight:600;margin-bottom:6px">Technical Trade Plan</div>
     <div style="color:var(--muted);font-size:13px;margin-bottom:28px;line-height:1.8">請使用 Google 登入後開始使用個人化台股監測工具。</div>
     <div style="background:#0d1728;border:1px solid var(--line);border-radius:14px;padding:20px 24px;margin-bottom:24px;text-align:left">
       <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.1em">功能說明</div>
@@ -1784,6 +1784,13 @@ async function initApp(){
   safeBind("btnManualSync","click",async()=>{if(!currentUser)return;setSyncBadge("ing");await saveWatchlist();});
   safeBind("btnRestoreLegacy","click",async()=>{if(!currentUser)return;await runMigration(currentUser.uid,WL);WL=await (async()=>{const ref=userWLRef(currentUser.uid);if(!ref)return WL;const snap=await ref.get();return snap.exists?normalizeWatchlist(snap.data().watchlist||[]):WL;})();renderWL();setSyncBadge("migrated");});
 
+  // V10.4 compact watchlist + quick navigation
+  safeBind("btnToggleWl","click",toggleWatchlistExpanded);
+  safeBind("btnAiScanAgain","click",aiScan);
+  safeBind("qnAiScan","click",()=>{aiScan();});
+  safeBind("qnKline","click",()=>scrollToAnchor("anchorKline"));
+  safeBind("qnA4d","click",()=>scrollToAnchor("anchorA4d"));
+
   // Stock master (doesn't need auth)
   await loadStockMaster();
 }
@@ -2027,149 +2034,7 @@ function scrollToAnchor(id) {
   if(el) el.scrollIntoView({behavior:"smooth", block:"start"});
 }
 
-// ── Override initApp additions ────────────────────────────────────
-const _origInitApp = initApp;
-async function initApp() {
-  await _origInitApp();
-  // V10.4 extra bindings
-  safeBind("btnToggleWl","click",toggleWatchlistExpanded);
-  safeBind("btnAiScanAgain","click",aiScan);
-  safeBind("qnAiScan","click",()=>{aiScan();});
-  safeBind("qnKline","click",()=>scrollToAnchor("anchorKline"));
-  safeBind("qnA4d","click",()=>scrollToAnchor("anchorA4d"));
-  // Re-bind btnAiScan to not redirect to market page
-  const btnAiScan = document.getElementById("btnAiScan");
-  if(btnAiScan) {
-    // Remove old listeners by cloning
-    const newBtn = btnAiScan.cloneNode(true);
-    btnAiScan.parentNode.replaceChild(newBtn, btnAiScan);
-    newBtn.addEventListener("click", aiScan);
-  }
-}
-
-
-
-/* V10.4.1 Login + Data Loading Safe Patch
-   基於原始 V10.4 檔案，只修登入與進入工具流程，不覆寫 renderStock/doSearch，避免資料載入中斷。 */
-(function(){
-  function byId(id){ return document.getElementById(id); }
-
-  window.showLoginError = function(msg){
-    var el = byId('loginError');
-    var text = String(msg || '登入失敗，請重新整理後再試。');
-    if(el){ el.textContent = text; el.style.display = 'block'; }
-    else { console.error(text); alert(text); }
-  };
-
-  window.clearLoginError = function(){
-    var el = byId('loginError');
-    if(el){ el.textContent = ''; el.style.display = 'none'; }
-  };
-
-  window.ensureFirebaseReady = function(){
-    try{
-      if(typeof firebase === 'undefined'){
-        showLoginError('Firebase SDK 尚未載入，請按 Ctrl+F5 重新整理。');
-        return false;
-      }
-      if(!window.FIREBASE_CONFIG || !window.FIREBASE_CONFIG.projectId){
-        showLoginError('Firebase 設定遺失，請確認 public/config.js 已正確部署。');
-        return false;
-      }
-      if(!firebase.apps.length){ firebase.initializeApp(window.FIREBASE_CONFIG); }
-      auth = firebase.auth();
-      db = firebase.firestore();
-      try{ auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); }catch(e){ console.warn('setPersistence:', e); }
-      return true;
-    }catch(e){
-      console.error('Firebase init failed:', e);
-      showLoginError('Firebase 初始化失敗：' + (e.message || e.code || '未知錯誤'));
-      return false;
-    }
-  };
-
-  window.forceOpenApp = async function(user){
-    if(!user) return;
-    try{
-      clearLoginError();
-      currentUser = user;
-      if(typeof hideLoginOverlay === 'function') hideLoginOverlay();
-      var nav = document.querySelector('.nav-tabs');
-      if(nav) nav.style.display = 'flex';
-      if(typeof showPage === 'function') showPage('p-trade');
-      if(typeof onUserLogin === 'function'){
-        try{ await onUserLogin(user); }
-        catch(e){
-          console.error('onUserLogin failed:', e);
-          if(typeof setSyncBadge === 'function') setSyncBadge('err');
-          if(typeof renderAccountUI === 'function') renderAccountUI(user);
-          var err = byId('err');
-          if(err){
-            err.textContent = '登入成功，但自選股同步暫時失敗。你仍可查詢股票，請稍後重新整理。';
-            err.style.display = 'block';
-          }
-        }
-      }
-    }catch(e){
-      console.error('forceOpenApp failed:', e);
-      showLoginError('登入後初始化失敗：' + (e.message || e.code || '未知錯誤'));
-    }
-  };
-
-  googleLogin = async function(){
-    try{
-      clearLoginError();
-      if(!ensureFirebaseReady()) return;
-      await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-      var provider = new firebase.auth.GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      var result = await auth.signInWithPopup(provider);
-      var user = (result && result.user) || auth.currentUser;
-      if(user){ await forceOpenApp(user); }
-      else { showLoginError('Google 登入完成，但沒有取得使用者資料，請再試一次。'); }
-    }catch(e){
-      console.error('Google login failed:', e);
-      var msg = e && (e.message || e.code) ? (e.message || e.code) : '未知錯誤';
-      if(e && e.code === 'auth/popup-blocked') msg = '瀏覽器封鎖登入視窗，請允許彈出視窗後再試。';
-      if(e && e.code === 'auth/popup-closed-by-user') msg = '你關閉了登入視窗，請再按一次登入。';
-      if(e && e.code === 'auth/unauthorized-domain') msg = '此網域尚未加入 Firebase Authentication 授權網域，請加入 taiwanstock-ben.web.app。';
-      showLoginError('Google 登入失敗：' + msg);
-    }
-  };
-
-  initFirebase = function(){
-    if(!ensureFirebaseReady()){
-      if(typeof showLoginOverlay === 'function') showLoginOverlay();
-      return;
-    }
-    try{
-      auth.onAuthStateChanged(function(user){
-        if(user){
-          forceOpenApp(user);
-        }else{
-          currentUser = null;
-          if(typeof clearAllState === 'function') clearAllState();
-          if(typeof showLoginOverlay === 'function') showLoginOverlay();
-        }
-      });
-      auth.getRedirectResult().then(function(result){
-        if(result && result.user) return forceOpenApp(result.user);
-        if(auth.currentUser) return forceOpenApp(auth.currentUser);
-      }).catch(function(e){ console.warn('getRedirectResult:', e); });
-    }catch(e){
-      console.error('Auth listener failed:', e);
-      showLoginError('Firebase Auth 監聽失敗：' + (e.message || e.code || '未知錯誤'));
-    }
-  };
-
-  var _origSafeBind = (typeof safeBind === 'function') ? safeBind : null;
-  safeBind = function(id, eventName, handler){
-    try{
-      var el = byId(id);
-      if(el) el.addEventListener(eventName, handler);
-    }catch(e){ console.warn('bind failed:', id, e); }
-  };
-})();
+// V10.4 extra init bindings merged into the main initApp above.
 
 document.addEventListener("DOMContentLoaded",initApp);
 </script>
