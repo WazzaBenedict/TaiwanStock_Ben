@@ -1426,11 +1426,22 @@ async function doSearch(){
   const dash=$("dash");if(dash)dash.style.display="none";
   destroyChart();
 
-  // Step 1 stock-lite
+  // Step 1 stock-lite：先顯示即時資料與輕量 AI，避免完整分析慢時整張卡片空白
+  let liteData=null, liteAI=null;
   try{
     const r1=await apiFetch(`${API}/api/stock-lite/${id}`,{},20000);
-    if(r1.ok){const d1=await r1.json();renderStockLite(d1);const ai1=d1.ai_signal||{};WL_CACHE[id]={name:d1.stock_name||id,price:d1.price??null,changePct:d1.change_pct??null,signal:ai1.signal||null,confidence:ai1.confidence??null,scoreQuality:ai1.score_quality||"none",entryPrice:ai1.entry_price??null,targetPrice:ai1.target_price??null,stopLoss:ai1.stop_loss??null,entryStatus:ai1.entry_status||"",entryStatusText:ai1.entry_status_text||"",canEnter:ai1.can_enter||false,error:false,noData:false};renderWL();}
-  }catch{}
+    if(r1.ok){
+      const d1=await r1.json();
+      liteData=d1;
+      liteAI=d1.ai_signal||{};
+      renderStockLite(d1);
+      WL_CACHE[id]={name:d1.stock_name||id,price:d1.price??null,changePct:d1.change_pct??null,signal:liteAI.signal||null,confidence:liteAI.confidence??null,scoreQuality:liteAI.score_quality||"none",entryPrice:liteAI.entry_price??null,targetPrice:liteAI.target_price??null,stopLoss:liteAI.stop_loss??null,entryStatus:liteAI.entry_status||"",entryStatusText:liteAI.entry_status_text||"",canEnter:liteAI.can_enter||false,error:false,noData:false};
+      renderWL();
+    }
+  }catch(e){
+    console.warn("stock-lite failed", e);
+    renderAIStatus("輕量 AI 暫時無法取得，正在嘗試完整技術分析…");
+  }
 
   // Step 2 full stock
   let wakeT=null;
@@ -1440,22 +1451,46 @@ async function doSearch(){
     clearTimeout(wakeT);hideErr();
     if(!r2.ok){const e=await r2.json().catch(()=>({}));throw new Error(e.detail||`HTTP ${r2.status}`);}
     const d2=await r2.json();
-    if(d2.error || !d2.ai_signal || d2.ai_signal.confidence==null){
+    if(d2.error){
       throw new Error(d2.error || "完整技術資料暫時無法取得，已保留即時報價資料");
     }
+    // 若完整 AI 回傳不完整，不要把 stock-lite 已顯示的資料覆蓋成空白
+    const fullAI=d2.ai_signal||{};
+    const mergedAI={...(liteAI||{}), ...fullAI};
+    if(fullAI.confidence==null && liteAI && liteAI.confidence!=null){
+      mergedAI.confidence=liteAI.confidence;
+      mergedAI.signal=fullAI.signal||liteAI.signal;
+      mergedAI.summary=fullAI.summary||liteAI.summary||"完整技術信號載入較慢，暫以即時輕量 AI 顯示。";
+    }
+    d2.ai_signal=mergedAI;
     renderStock(d2);
-    const ai2=d2.ai_signal||{};WL_CACHE[id]={name:d2.stock_name||id,price:d2.price?.close??null,changePct:d2.price?.change_pct??null,signal:ai2.signal||null,confidence:ai2.confidence??null,scoreQuality:ai2.score_quality||"none",entryPrice:ai2.entry_price??null,targetPrice:ai2.target_price??null,stopLoss:ai2.stop_loss??null,entryStatus:ai2.entry_status||"",entryStatusText:ai2.entry_status_text||"",canEnter:ai2.can_enter||false,error:false,noData:false};
+    const ai2=d2.ai_signal||{};WL_CACHE[id]={name:d2.stock_name||id,price:d2.price?.close??liteData?.price??null,changePct:d2.price?.change_pct??liteData?.change_pct??null,signal:ai2.signal||null,confidence:ai2.confidence??null,scoreQuality:ai2.score_quality||"none",entryPrice:ai2.entry_price??null,targetPrice:ai2.target_price??null,stopLoss:ai2.stop_loss??null,entryStatus:ai2.entry_status||"",entryStatusText:ai2.entry_status_text||"",canEnter:ai2.can_enter||false,error:false,noData:false};
     renderWL();checkLineStatus();
     renderCandlestickChart(d2.chart_data||[],d2.ai_signal||{});
     if(d4ES)d4ES.style.display="block";
   }catch(e){
     if(wakeT)clearTimeout(wakeT);
-    const dash2=$("dash");if(dash2&&dash2.style.display==="block"){const dSrc=$("dSource");if(dSrc)dSrc.textContent="部分資料暫時無法取得";}
+    console.warn("full stock failed", e);
+    const dash2=$("dash");
+    if(dash2&&dash2.style.display==="block"){
+      const dSrc=$("dSource");if(dSrc)dSrc.textContent="完整技術分析載入較慢，已保留即時報價 / 輕量 AI";
+      if(liteAI && liteAI.confidence!=null){renderAI(liteAI);}
+      else{renderAIStatus("完整技術信號暫時無法自動取得，請稍後重新查詢或確認後端資料源。 ");}
+    }
     else showErr("查詢失敗："+e.message);
   }
 }
 
 // ── render functions ───────────────────────────────────────────────
+function renderAIStatus(msg){
+  setTxt("aiLabel","👀 WATCH");
+  setTxt("aiConf","信心：—");
+  setTxt("aiEp","—");setTxt("aiTp","—");setTxt("aiSl","—");setTxt("aiRr","—");
+  setTxt("aiSummary",msg||"完整技術信號載入中…");
+  const aeEl=$("aiEntry");if(aeEl)aeEl.innerHTML='<div class="ai-reason" style="color:var(--muted)">等待完整技術資料</div>';
+  const arEl=$("aiRisk");if(arEl)arEl.innerHTML='<div class="ai-reason" style="color:var(--yellow)">若資料源較慢，會先保留即時報價</div>';
+}
+
 function renderStockLite(d){
   const dash=$("dash");if(dash)dash.style.display="block";
   const ai=d.ai_signal||{},rt=d.realtime_quote||{};
@@ -1465,6 +1500,9 @@ function renderStockLite(d){
   setTxt("dConc","載入中…");const ce=$("dConc");if(ce)ce.className="conclusion neu";
   const rtEl=$("rtInfo");if(rtEl)rtEl.innerHTML=rt?.price!=null?`<span class="pill pill-ok">⚡ ${rt.source||"TWSE MIS"}</span>`:`<span class="pill pill-warn">休市或無成交</span>`;
   renderAI(ai);
+  if(ai.confidence==null){
+    renderAIStatus("完整技術信號自動載入中…若 Render 或資料源較慢，會先顯示即時價格。");
+  }
 }
 
 function renderStock(d){
