@@ -12,7 +12,7 @@ from fastapi import FastAPI,HTTPException,Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app=FastAPI(title="台股監測 API V10.4 Technical Trade Plan",version="10.4.0")
+app=FastAPI(title="股票監測 API V11.0.1 Multi-Market",version="11.0.1")
 _raw=os.getenv("ALLOWED_ORIGINS","http://localhost:5500,http://127.0.0.1:5500,https://taiwanstock-ben.web.app,https://taiwanstock-ben.firebaseapp.com")
 ALLOWED_ORIGINS=[o.strip() for o in _raw.split(",") if o.strip()]
 DEV_MODE=os.getenv("DEV_MODE","false").lower()=="true"
@@ -30,6 +30,7 @@ WATCHLIST_FILE=BASE_DIR/"watchlist.json"
 STOCK_MASTER_FILE=BASE_DIR/"stock_master.json"
 WEIGHTS_FILE=BASE_DIR/"weights.json"
 SIGNAL_HISTORY_FILE=BASE_DIR/"signal_history.json"
+US_MASTER_FILE=BASE_DIR/"us_stock_master.json"
 
 FINMIND_BASE="https://api.finmindtrade.com/api/v4/data"
 TWSE_NAME_URL="https://www.twse.com.tw/rwd/zh/api/basic"
@@ -78,7 +79,7 @@ STOCK_NAME_MAP:dict[str,str]={
 # AI 學習系統
 # ══════════════════════════════════════════════════════════════════════════════
 DEFAULT_WEIGHTS={"technical":0.35,"fundamental":0.25,"chip":0.25,"news":0.15,
-    "risk":0.10,"macro":0.05,"updated_at":"","version":"10.4.0","last_reason":"預設權重"}
+    "risk":0.10,"macro":0.05,"updated_at":"","version":"11.0.1","last_reason":"預設權重"}
 WEIGHT_LIMITS={"technical":(0.20,0.45),"fundamental":(0.10,0.35),"chip":(0.10,0.40),"news":(0.05,0.25)}
 
 def _rjf(path,default):
@@ -1787,7 +1788,7 @@ async def ai_scan(min_score:int=Query(65,ge=0,le=100),max_stocks:int=Query(40,ge
 @app.post("/api/alerts/test")
 async def test_line():
     _cc()
-    result=await send_line_message("✅ 台股監測 V10.4 Technical Trade Plan - LINE 通知測試成功！")
+    result=await send_line_message("✅ 台股監測 V11.0.1 Multi-Market - LINE 通知測試成功！")
     if not result["success"]:raise HTTPException(500,detail=result["message"])
     return result
 
@@ -1850,14 +1851,807 @@ async def api_learning_evaluate():return await evaluate_signal_history()
 @app.post("/api/learning/retrain")
 def api_learning_retrain():return retrain_ai_weights()
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ★ V11.0.1: 美股模組 — Yahoo Finance + Symbol Master
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── US Symbol Master ──────────────────────────────────────────────────────────
+# Built-in 200+ symbols so search works even before master loads
+US_BUILTIN: dict[str,dict] = {
+    # Mega Cap Tech
+    "AAPL":{"name":"Apple Inc.","exchange":"NASDAQ","type":"Stock"},
+    "MSFT":{"name":"Microsoft Corp.","exchange":"NASDAQ","type":"Stock"},
+    "NVDA":{"name":"NVIDIA Corp.","exchange":"NASDAQ","type":"Stock"},
+    "AMZN":{"name":"Amazon.com Inc.","exchange":"NASDAQ","type":"Stock"},
+    "GOOGL":{"name":"Alphabet Inc. (A)","exchange":"NASDAQ","type":"Stock"},
+    "GOOG":{"name":"Alphabet Inc. (C)","exchange":"NASDAQ","type":"Stock"},
+    "META":{"name":"Meta Platforms","exchange":"NASDAQ","type":"Stock"},
+    "TSLA":{"name":"Tesla Inc.","exchange":"NASDAQ","type":"Stock"},
+    "AVGO":{"name":"Broadcom Inc.","exchange":"NASDAQ","type":"Stock"},
+    "ORCL":{"name":"Oracle Corp.","exchange":"NYSE","type":"Stock"},
+    # Semis
+    "AMD":{"name":"Advanced Micro Devices","exchange":"NASDAQ","type":"Stock"},
+    "INTC":{"name":"Intel Corp.","exchange":"NASDAQ","type":"Stock"},
+    "QCOM":{"name":"Qualcomm Inc.","exchange":"NASDAQ","type":"Stock"},
+    "MU":{"name":"Micron Technology","exchange":"NASDAQ","type":"Stock"},
+    "AMAT":{"name":"Applied Materials","exchange":"NASDAQ","type":"Stock"},
+    "LRCX":{"name":"Lam Research","exchange":"NASDAQ","type":"Stock"},
+    "KLAC":{"name":"KLA Corp.","exchange":"NASDAQ","type":"Stock"},
+    "MRVL":{"name":"Marvell Technology","exchange":"NASDAQ","type":"Stock"},
+    "NXPI":{"name":"NXP Semiconductors","exchange":"NASDAQ","type":"Stock"},
+    "ON":{"name":"ON Semiconductor","exchange":"NASDAQ","type":"Stock"},
+    "WOLF":{"name":"Wolfspeed Inc.","exchange":"NYSE","type":"Stock"},
+    "ACLS":{"name":"Axcelis Technologies","exchange":"NASDAQ","type":"Stock"},
+    "SMCI":{"name":"Super Micro Computer","exchange":"NASDAQ","type":"Stock"},
+    # Space / New Space
+    "ASTS":{"name":"AST SpaceMobile","exchange":"NASDAQ","type":"Stock"},
+    "RKLB":{"name":"Rocket Lab USA","exchange":"NASDAQ","type":"Stock"},
+    "SPCE":{"name":"Virgin Galactic","exchange":"NYSE","type":"Stock"},
+    "ASTR":{"name":"Astra Space","exchange":"NASDAQ","type":"Stock"},
+    "RDW":{"name":"Redwire Corp.","exchange":"NYSE","type":"Stock"},
+    "MNTS":{"name":"Momentus Inc.","exchange":"NASDAQ","type":"Stock"},
+    # AI / Data
+    "PLTR":{"name":"Palantir Technologies","exchange":"NYSE","type":"Stock"},
+    "AI":{"name":"C3.ai Inc.","exchange":"NYSE","type":"Stock"},
+    "SOUN":{"name":"SoundHound AI","exchange":"NASDAQ","type":"Stock"},
+    "IONQ":{"name":"IonQ Inc.","exchange":"NYSE","type":"Stock"},
+    "RGTI":{"name":"Rigetti Computing","exchange":"NASDAQ","type":"Stock"},
+    "QUBT":{"name":"Quantum Computing","exchange":"NASDAQ","type":"Stock"},
+    "BBAI":{"name":"BigBear.ai Holdings","exchange":"NYSE","type":"Stock"},
+    "PATH":{"name":"UiPath Inc.","exchange":"NYSE","type":"Stock"},
+    "UPST":{"name":"Upstart Holdings","exchange":"NASDAQ","type":"Stock"},
+    # Crypto / Fintech
+    "COIN":{"name":"Coinbase Global","exchange":"NASDAQ","type":"Stock"},
+    "MSTR":{"name":"MicroStrategy Inc.","exchange":"NASDAQ","type":"Stock"},
+    "HOOD":{"name":"Robinhood Markets","exchange":"NASDAQ","type":"Stock"},
+    "SOFI":{"name":"SoFi Technologies","exchange":"NASDAQ","type":"Stock"},
+    "AFRM":{"name":"Affirm Holdings","exchange":"NASDAQ","type":"Stock"},
+    "RELY":{"name":"Remitly Global","exchange":"NASDAQ","type":"Stock"},
+    "PYPL":{"name":"PayPal Holdings","exchange":"NASDAQ","type":"Stock"},
+    "SQ":{"name":"Block Inc.","exchange":"NYSE","type":"Stock"},
+    "V":{"name":"Visa Inc.","exchange":"NYSE","type":"Stock"},
+    "MA":{"name":"Mastercard Inc.","exchange":"NYSE","type":"Stock"},
+    # EV
+    "RIVN":{"name":"Rivian Automotive","exchange":"NASDAQ","type":"Stock"},
+    "LCID":{"name":"Lucid Group","exchange":"NASDAQ","type":"Stock"},
+    "NIO":{"name":"NIO Inc. (ADR)","exchange":"NYSE","type":"Stock"},
+    "LI":{"name":"Li Auto Inc. (ADR)","exchange":"NASDAQ","type":"Stock"},
+    "XPEV":{"name":"XPeng Inc. (ADR)","exchange":"NYSE","type":"Stock"},
+    "FSR":{"name":"Fisker Inc.","exchange":"NYSE","type":"Stock"},
+    # Software/SaaS
+    "CRM":{"name":"Salesforce Inc.","exchange":"NYSE","type":"Stock"},
+    "ADBE":{"name":"Adobe Inc.","exchange":"NASDAQ","type":"Stock"},
+    "NFLX":{"name":"Netflix Inc.","exchange":"NASDAQ","type":"Stock"},
+    "SNOW":{"name":"Snowflake Inc.","exchange":"NYSE","type":"Stock"},
+    "DDOG":{"name":"Datadog Inc.","exchange":"NASDAQ","type":"Stock"},
+    "ZS":{"name":"Zscaler Inc.","exchange":"NASDAQ","type":"Stock"},
+    "CRWD":{"name":"CrowdStrike Holdings","exchange":"NASDAQ","type":"Stock"},
+    "PANW":{"name":"Palo Alto Networks","exchange":"NASDAQ","type":"Stock"},
+    "NET":{"name":"Cloudflare Inc.","exchange":"NYSE","type":"Stock"},
+    "MDB":{"name":"MongoDB Inc.","exchange":"NASDAQ","type":"Stock"},
+    "CFLT":{"name":"Confluent Inc.","exchange":"NASDAQ","type":"Stock"},
+    "U":{"name":"Unity Software","exchange":"NYSE","type":"Stock"},
+    "RBLX":{"name":"Roblox Corp.","exchange":"NYSE","type":"Stock"},
+    "SHOP":{"name":"Shopify Inc.","exchange":"NYSE","type":"Stock"},
+    "TWLO":{"name":"Twilio Inc.","exchange":"NYSE","type":"Stock"},
+    "ZM":{"name":"Zoom Video Comms","exchange":"NASDAQ","type":"Stock"},
+    "DOCU":{"name":"DocuSign Inc.","exchange":"NASDAQ","type":"Stock"},
+    "HCP":{"name":"HashiCorp Inc.","exchange":"NASDAQ","type":"Stock"},
+    "GTLB":{"name":"GitLab Inc.","exchange":"NASDAQ","type":"Stock"},
+    "S":{"name":"SentinelOne","exchange":"NYSE","type":"Stock"},
+    # Biotech / Health
+    "MRNA":{"name":"Moderna Inc.","exchange":"NASDAQ","type":"Stock"},
+    "BNTX":{"name":"BioNTech SE (ADR)","exchange":"NASDAQ","type":"Stock"},
+    "ILMN":{"name":"Illumina Inc.","exchange":"NASDAQ","type":"Stock"},
+    "TDOC":{"name":"Teladoc Health","exchange":"NYSE","type":"Stock"},
+    "HIMS":{"name":"Hims & Hers Health","exchange":"NYSE","type":"Stock"},
+    "CLOV":{"name":"Clover Health","exchange":"NASDAQ","type":"Stock"},
+    # Energy / Clean
+    "ENPH":{"name":"Enphase Energy","exchange":"NASDAQ","type":"Stock"},
+    "SEDG":{"name":"SolarEdge Technologies","exchange":"NASDAQ","type":"Stock"},
+    "FSLR":{"name":"First Solar Inc.","exchange":"NASDAQ","type":"Stock"},
+    "PLUG":{"name":"Plug Power Inc.","exchange":"NASDAQ","type":"Stock"},
+    "BE":{"name":"Bloom Energy","exchange":"NYSE","type":"Stock"},
+    "NOVA":{"name":"Sunnova Energy","exchange":"NYSE","type":"Stock"},
+    # Traditional Tech
+    "IBM":{"name":"IBM Corp.","exchange":"NYSE","type":"Stock"},
+    "CSCO":{"name":"Cisco Systems","exchange":"NASDAQ","type":"Stock"},
+    "HPQ":{"name":"HP Inc.","exchange":"NYSE","type":"Stock"},
+    "DELL":{"name":"Dell Technologies","exchange":"NYSE","type":"Stock"},
+    "HPE":{"name":"Hewlett Packard Enterprise","exchange":"NYSE","type":"Stock"},
+    "WDC":{"name":"Western Digital","exchange":"NASDAQ","type":"Stock"},
+    "STX":{"name":"Seagate Technology","exchange":"NASDAQ","type":"Stock"},
+    # ETF
+    "SPY":{"name":"S&P 500 ETF (SPDR)","exchange":"NYSE","type":"ETF"},
+    "QQQ":{"name":"Nasdaq 100 ETF (Invesco)","exchange":"NASDAQ","type":"ETF"},
+    "IWM":{"name":"Russell 2000 ETF","exchange":"NYSE","type":"ETF"},
+    "SOXX":{"name":"Philadelphia SOX ETF","exchange":"NASDAQ","type":"ETF"},
+    "ARKK":{"name":"ARK Innovation ETF","exchange":"NYSE","type":"ETF"},
+    "ARKG":{"name":"ARK Genomic Revolution ETF","exchange":"NYSE","type":"ETF"},
+    "SMH":{"name":"VanEck Semiconductor ETF","exchange":"NASDAQ","type":"ETF"},
+    "GLD":{"name":"Gold ETF (SPDR)","exchange":"NYSE","type":"ETF"},
+    "SLV":{"name":"Silver ETF (iShares)","exchange":"NYSE","type":"ETF"},
+    "TLT":{"name":"20Y Treasury ETF","exchange":"NASDAQ","type":"ETF"},
+    "HYG":{"name":"High Yield Bond ETF","exchange":"NYSE","type":"ETF"},
+    "XLK":{"name":"Tech Sector ETF","exchange":"NYSE","type":"ETF"},
+    "SOXS":{"name":"SOX 3X Bear ETF","exchange":"NASDAQ","type":"ETF"},
+    "SOXL":{"name":"SOX 3X Bull ETF","exchange":"NASDAQ","type":"ETF"},
+    "TQQQ":{"name":"QQQ 3X Bull ETF","exchange":"NASDAQ","type":"ETF"},
+    "SQQQ":{"name":"QQQ 3X Bear ETF","exchange":"NASDAQ","type":"ETF"},
+    # Finance
+    "JPM":{"name":"JPMorgan Chase","exchange":"NYSE","type":"Stock"},
+    "GS":{"name":"Goldman Sachs","exchange":"NYSE","type":"Stock"},
+    "MS":{"name":"Morgan Stanley","exchange":"NYSE","type":"Stock"},
+    "BAC":{"name":"Bank of America","exchange":"NYSE","type":"Stock"},
+    "WFC":{"name":"Wells Fargo","exchange":"NYSE","type":"Stock"},
+    "C":{"name":"Citigroup","exchange":"NYSE","type":"Stock"},
+    "BRK.B":{"name":"Berkshire Hathaway B","exchange":"NYSE","type":"Stock"},
+    "BX":{"name":"Blackstone Inc.","exchange":"NYSE","type":"Stock"},
+    # Consumer
+    "AMZN":{"name":"Amazon.com Inc.","exchange":"NASDAQ","type":"Stock"},
+    "WMT":{"name":"Walmart Inc.","exchange":"NYSE","type":"Stock"},
+    "COST":{"name":"Costco Wholesale","exchange":"NASDAQ","type":"Stock"},
+    "TGT":{"name":"Target Corp.","exchange":"NYSE","type":"Stock"},
+    "HD":{"name":"Home Depot","exchange":"NYSE","type":"Stock"},
+    "MCD":{"name":"McDonald's Corp.","exchange":"NYSE","type":"Stock"},
+    "SBUX":{"name":"Starbucks Corp.","exchange":"NASDAQ","type":"Stock"},
+    "NKE":{"name":"Nike Inc.","exchange":"NYSE","type":"Stock"},
+    "DIS":{"name":"Walt Disney Co.","exchange":"NYSE","type":"Stock"},
+}
+
+_us_master: dict[str,dict] = {}
+_us_master_ts: float = 0.0
+_us_master_loading: bool = False
+
+def _load_us_master() -> dict:
+    """Load from file + builtin."""
+    global _us_master, _us_master_ts
+    master = dict(US_BUILTIN)
+    try:
+        if US_MASTER_FILE.exists():
+            d = json.loads(US_MASTER_FILE.read_text(encoding="utf-8"))
+            for sym, info in (d.get("symbols") or {}).items():
+                if sym and isinstance(info, dict):
+                    master[sym.upper()] = info
+            _us_master_ts = time.time()
+    except: pass
+    _us_master = master
+    return master
+
+def get_us_master() -> dict:
+    if not _us_master: _load_us_master()
+    return _us_master
+
+def search_us_master(q: str, limit: int = 10) -> list[dict]:
+    """Search symbol prefix then name substring."""
+    q = q.strip().upper()
+    master = get_us_master()
+    # Exact first
+    results = []
+    seen = set()
+    if q in master:
+        info = master[q]
+        results.append({"symbol":q,"name":info.get("name",""),"exchange":info.get("exchange",""),"type":info.get("type","Stock")})
+        seen.add(q)
+    # Symbol prefix
+    for sym, info in master.items():
+        if sym not in seen and sym.startswith(q):
+            results.append({"symbol":sym,"name":info.get("name",""),"exchange":info.get("exchange",""),"type":info.get("type","Stock")})
+            seen.add(sym)
+            if len(results) >= limit: break
+    # Name substring
+    if len(results) < limit:
+        q_lo = q.lower()
+        for sym, info in master.items():
+            if sym not in seen and q_lo in info.get("name","").lower():
+                results.append({"symbol":sym,"name":info.get("name",""),"exchange":info.get("exchange",""),"type":info.get("type","Stock")})
+                seen.add(sym)
+                if len(results) >= limit: break
+    return results[:limit]
+
+async def _bg_refresh_us_master():
+    """Background: fetch NASDAQ + NYSE symbol lists and cache."""
+    global _us_master_loading
+    if _us_master_loading: return
+    _us_master_loading = True
+    master = dict(US_BUILTIN)
+    try:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as cl:
+            # NASDAQ listed
+            try:
+                r = await cl.get("https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=5000&exchange=nasdaq",
+                                 headers={"User-Agent":"Mozilla/5.0"})
+                if r.status_code == 200:
+                    rows = r.json().get("data",{}).get("table",{}).get("rows",[])
+                    for row in rows:
+                        sym = str(row.get("symbol","")).strip().upper()
+                        if sym and re.match(r'^[A-Z]{1,6}$', sym):
+                            master[sym] = {"name":row.get("name",""),"exchange":"NASDAQ","type":"Stock"}
+            except: pass
+            # NYSE listed
+            try:
+                r = await cl.get("https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=5000&exchange=nyse",
+                                 headers={"User-Agent":"Mozilla/5.0"})
+                if r.status_code == 200:
+                    rows = r.json().get("data",{}).get("table",{}).get("rows",[])
+                    for row in rows:
+                        sym = str(row.get("symbol","")).strip().upper()
+                        if sym and re.match(r'^[A-Z]{1,6}$', sym):
+                            master[sym] = {"name":row.get("name",""),"exchange":"NYSE","type":"Stock"}
+            except: pass
+    except: pass
+    finally:
+        _us_master_loading = False
+    # Save to file
+    try:
+        US_MASTER_FILE.write_text(json.dumps(
+            {"updated_at":datetime.now().isoformat(),"count":len(master),"symbols":master},
+            ensure_ascii=False), encoding="utf-8")
+    except: pass
+    _us_master.update(master)
+
+# ── US Quote & History ────────────────────────────────────────────────────────
+_us_quote_cache: dict[str,dict] = {}
+_us_quote_ts: dict[str,float] = {}
+_us_full_cache: dict[str,dict] = {}
+_us_full_ts: dict[str,float] = {}
+US_LITE_TTL = 90
+US_FULL_TTL = 240
+
+async def _yahoo_quote(symbol: str, client: httpx.AsyncClient) -> dict | None:
+    """Yahoo Finance v8 real-time quote."""
+    try:
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=1d"
+        r = await client.get(url, headers={"User-Agent":"Mozilla/5.0"}, timeout=10,
+                             follow_redirects=True)
+        if r.status_code != 200: return None
+        res = r.json().get("chart",{}).get("result")
+        if not res: return None
+        res = res[0]; meta = res.get("meta",{})
+        price = meta.get("regularMarketPrice") or meta.get("previousClose")
+        if not price: return None
+        prev = meta.get("previousClose") or meta.get("chartPreviousClose") or price
+        chg  = round(float(price) - float(prev), 4)
+        chgp = round(chg / float(prev) * 100, 2) if prev else 0
+        q = res.get("indicators",{}).get("quote",[{}])[0]
+        vol_list = [v for v in q.get("volume",[]) if v]
+        return {
+            "symbol": symbol,
+            "name": meta.get("shortName") or meta.get("longName") or _us_master.get(symbol,{}).get("name",symbol),
+            "price": round(float(price),4),
+            "previous_close": round(float(prev),4),
+            "change": chg, "change_pct": chgp,
+            "open":  round(float(meta.get("regularMarketOpen") or price),4),
+            "high":  round(float(meta.get("regularMarketDayHigh") or price),4),
+            "low":   round(float(meta.get("regularMarketDayLow") or price),4),
+            "volume": int(meta.get("regularMarketVolume") or (vol_list[-1] if vol_list else 0)),
+            "currency": meta.get("currency","USD"),
+            "exchange": meta.get("fullExchangeName") or meta.get("exchangeName",""),
+            "market_state": meta.get("marketState",""),
+            "quote_time": (datetime.utcfromtimestamp(meta["regularMarketTime"]).strftime("%Y-%m-%d %H:%M UTC")
+                           if meta.get("regularMarketTime") else None),
+        }
+    except: return None
+
+async def _yahoo_history(symbol: str, client: httpx.AsyncClient, days: int = 400) -> pd.DataFrame:
+    """Yahoo Finance OHLCV history → DataFrame (same column names as TW)."""
+    try:
+        p2 = int(datetime.now().timestamp())
+        p1 = int((datetime.now() - timedelta(days=days)).timestamp())
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={p1}&period2={p2}&interval=1d"
+        r = await client.get(url, headers={"User-Agent":"Mozilla/5.0"}, timeout=15,
+                             follow_redirects=True)
+        if r.status_code != 200: return pd.DataFrame()
+        res = r.json().get("chart",{}).get("result")
+        if not res: return pd.DataFrame()
+        res = res[0]; ts_list = res.get("timestamp",[])
+        q = res.get("indicators",{}).get("quote",[{}])[0]
+        o,h,l,c,v = (q.get(k,[]) for k in ["open","high","low","close","volume"])
+        recs = []
+        for i, ts in enumerate(ts_list):
+            if i < len(c) and c[i] is not None:
+                recs.append({
+                    "日期": pd.to_datetime(ts, unit="s", utc=True).tz_convert("America/New_York").date(),
+                    "開盤價": float(o[i]) if i<len(o) and o[i] else float(c[i]),
+                    "最高價": float(h[i]) if i<len(h) and h[i] else float(c[i]),
+                    "最低價": float(l[i]) if i<len(l) and l[i] else float(c[i]),
+                    "收盤價": float(c[i]),
+                    "成交股數": int(v[i]) if i<len(v) and v[i] else 0,
+                })
+        if not recs: return pd.DataFrame()
+        df = pd.DataFrame(recs)
+        df["日期"] = pd.to_datetime(df["日期"])
+        return df.sort_values("日期").reset_index(drop=True)
+    except: return pd.DataFrame()
+
+# ── US Trade Plan (same logic as TW build_trade_plan) ────────────────────────
+def build_us_trade_plan(row: pd.Series, cp: float, signal: str,
+                        price_df: pd.DataFrame | None = None) -> dict:
+    """Guaranteed: stop_loss < entry_price < target_price, or trade_valid=False."""
+    def _g(col): return float(row[col]) if col in row.index and pd.notna(row.get(col)) else None
+
+    ma5=_g("MA5"); ma20=_g("MA20"); ma60=_g("MA60"); atr=_g("ATR")
+
+    # Support/Resistance from history
+    recent_support = recent_resistance = swing_low = None
+    if price_df is not None and not price_df.empty:
+        tail = price_df.tail(20)
+        if "最低價" in tail.columns:
+            recent_support = round(float(tail["最低價"].min()), 4)
+            swing_low      = recent_support
+        elif not tail.empty:
+            recent_support = round(float(tail["收盤價"].min()), 4)
+        if "最高價" in tail.columns:
+            recent_resistance = round(float(tail["最高價"].max()), 4)
+        elif not tail.empty:
+            recent_resistance = round(float(tail["收盤價"].max()), 4)
+
+    if signal == "AVOID":
+        return {"entry_price":None,"entry_zone_low":None,"entry_zone_high":None,
+                "target_price":None,"stop_loss":None,"risk_reward_ratio":None,
+                "entry_status":"NO_DATA","trade_valid":False,"trade_note":"AVOID",
+                "risk_reason":[],"recent_support":recent_support,"recent_resistance":recent_resistance,
+                "support_zone":None,"resistance_zone":None}
+
+    # Entry
+    if signal == "BUY":
+        if ma5 and cp > ma5 * 0.98:    ep = round(ma5, 4)
+        elif ma20 and cp > ma20 * 0.98: ep = round(ma20, 4)
+        else:                            ep = round(cp, 4)
+    else:
+        ep = round(ma20, 4) if ma20 and cp > ma20 else round(cp, 4)
+
+    if ep < cp * 0.80: ep = round(cp, 4)
+
+    # Stop Loss: multi-condition minimum
+    sl_cands = [round(ep * 0.97, 4)]
+    if ma20:       sl_cands.append(round(ma20 * 0.985, 4))
+    if swing_low:  sl_cands.append(round(swing_low * 0.99, 4))
+    if atr and atr > 0: sl_cands.append(round(ep - atr * 1.5, 4))
+    sl = min(sl_cands)
+    if sl >= ep or sl <= 0: sl = round(ep * 0.96, 4)  # fallback
+
+    # Target Price: multi-condition maximum
+    tp_cands = [round(ep * 1.05, 4)]
+    if recent_resistance and recent_resistance > ep * 1.01:
+        tp_cands.append(round(recent_resistance, 4))
+    if atr and atr > 0: tp_cands.append(round(ep + atr * 2.5, 4))
+    tp = max(tp_cands)
+    if tp <= ep: tp = round(ep * 1.06, 4)
+
+    # Final validation: MUST be sl < ep < tp
+    if not (sl < ep < tp):
+        return {"entry_price":None,"entry_zone_low":None,"entry_zone_high":None,
+                "target_price":None,"stop_loss":None,"risk_reward_ratio":None,
+                "entry_status":"BAD_SETUP","trade_valid":False,
+                "trade_note":"交易點位不合理，建議觀察",
+                "risk_reason":["止蝕價≥入場價，點位不合理"],"recent_support":recent_support,
+                "recent_resistance":recent_resistance,"support_zone":None,"resistance_zone":None}
+
+    rr = round((tp - ep) / (ep - sl), 2) if ep > sl else None
+    if rr and rr < 0: rr = None
+    trade_valid = rr is not None and rr >= 1.5
+
+    # Entry zone
+    ez_lo = round(ep * 0.995, 4); ez_hi = round(ep * 1.005, 4)
+
+    risk_reason = []
+    if not trade_valid: risk_reason.append(f"RR {rr}x 不足（需≥1.5）")
+
+    return {
+        "entry_price": ep, "entry_zone_low": ez_lo, "entry_zone_high": ez_hi,
+        "target_price": tp, "stop_loss": sl, "risk_reward_ratio": rr,
+        "entry_status": "ENTERABLE" if trade_valid else "BAD_SETUP",
+        "trade_valid": trade_valid,
+        "trade_note": "合理" if trade_valid else "點位暫不合理，建議觀察",
+        "risk_reason": risk_reason, "recent_support": recent_support,
+        "recent_resistance": recent_resistance,
+        "support_zone": [round(recent_support*0.99,4), round(recent_support*1.01,4)] if recent_support else None,
+        "resistance_zone": [round(recent_resistance*0.99,4), round(recent_resistance*1.01,4)] if recent_resistance else None,
+    }
+
+# ── US AI Signal (100-pt, same breakdown as TW) ───────────────────────────────
+def compute_us_ai_signal(df: pd.DataFrame, cp: float, quote: dict) -> dict:
+    """Full 100-pt US AI signal with guaranteed trade plan."""
+    empty_ai = {
+        "signal":"WATCH","confidence":None,"score_quality":"none",
+        "entry_price":None,"entry_zone_low":None,"entry_zone_high":None,
+        "target_price":None,"stop_loss":None,"risk_reward_ratio":None,
+        "trade_status":"WATCH","entry_status":"NO_DATA","entry_status_text":"資料不足",
+        "can_enter":False,"trade_valid":False,"strategy_type":"",
+        "technical_score":None,"technical_breakdown":{},
+        "overheat_flags":[],"false_breakout_flags":[],
+        "recent_support":None,"recent_resistance":None,
+        "support_zone":None,"resistance_zone":None,
+        "risk_reason":[],"summary":"美股資料不足，請稍後重試。",
+        "disclaimer":"⚠️ For reference only, not investment advice",
+    }
+    if df.empty or cp <= 0:
+        return {**empty_ai, "summary":"美股歷史資料暫時不足，只能顯示即時報價。"}
+
+    df2 = compute_indicators_v4(df.copy())
+    latest = df2.iloc[-1]
+    def _g(col): return float(latest[col]) if col in latest.index and pd.notna(latest.get(col)) else None
+
+    ma5=_g("MA5"); ma20=_g("MA20"); ma60=_g("MA60")
+    rsi=_g("RSI"); macd=_g("MACD"); sig_v=_g("Signal"); hist=_g("Hist")
+    atr=_g("ATR"); adx=_g("ADX"); bbm=_g("BB_mid")
+    chg_pct = float(quote.get("change_pct") or 0)
+
+    # Volume ratio
+    vol_ratio = 1.0
+    try:
+        avg_vol = df.tail(20)["成交股數"].mean()
+        lat_vol = float(df.iloc[-1]["成交股數"])
+        if avg_vol > 0: vol_ratio = round(lat_vol / avg_vol, 2)
+    except: pass
+
+    # ── 100-pt breakdown (same 6 categories as TW) ───────────────────────────
+    score = 0
+    bd = {"trend_score":0,"momentum_score":0,"volume_score":0,
+          "volatility_score":0,"support_resistance_score":0,"adx_score":0}
+
+    # 1. Trend 30pt
+    if ma5 and ma20 and ma5 > ma20:   score+=10; bd["trend_score"]+=10
+    if ma20 and ma60 and ma20 > ma60: score+=10; bd["trend_score"]+=10
+    if ma20 and cp > ma20:             score+=10; bd["trend_score"]+=10
+
+    # 2. Momentum 20pt
+    if macd and sig_v:
+        if macd > sig_v: score+=8; bd["momentum_score"]+=8
+    if hist and hist > 0: score+=5; bd["momentum_score"]+=5
+    if rsi:
+        if 45<=rsi<=65:   score+=7; bd["momentum_score"]+=7
+        elif 65<rsi<=72:  score+=3; bd["momentum_score"]+=3
+        elif rsi>72:       score-=8; bd["momentum_score"]-=8
+        elif rsi<35:       score-=6; bd["momentum_score"]-=6
+
+    # 3. Volume 15pt
+    if vol_ratio >= 2.0 and chg_pct > 0:  score+=15; bd["volume_score"]+=15
+    elif vol_ratio >= 1.2 and chg_pct > 0: score+=8;  bd["volume_score"]+=8
+    elif vol_ratio < 0.8 and chg_pct > 0:  score-=5;  bd["volume_score"]-=5
+    elif chg_pct < 0 and vol_ratio >= 1.5: score-=8;  bd["volume_score"]-=8
+
+    # 4. Volatility 15pt
+    if atr and atr > 0 and cp > 0:
+        atr_pct = atr / cp * 100
+        if atr_pct <= 4: score+=8; bd["volatility_score"]+=8
+    if ma20 and ma20 > 0 and cp > 0:
+        dev_pct = (cp - ma20) / ma20 * 100
+        if dev_pct <= 6:  score+=7; bd["volatility_score"]+=7
+        elif dev_pct > 12: score-=10; bd["volatility_score"]-=10
+
+    # 5. Support/Resistance 10pt
+    tail20 = df.tail(20)
+    sup = float(tail20["最低價"].min()) if "最低價" in tail20.columns and not tail20.empty else None
+    res = float(tail20["最高價"].max()) if "最高價" in tail20.columns and not tail20.empty else None
+    if sup and cp > 0 and abs(cp-sup)/cp < 0.03: score+=5; bd["support_resistance_score"]+=5
+    if res and cp > 0 and (res-cp)/cp*100 >= 5:  score+=5; bd["support_resistance_score"]+=5
+    elif res and cp > 0 and (res-cp)/cp*100 < 1:  score-=5; bd["support_resistance_score"]-=5
+
+    # 6. ADX 10pt
+    if adx:
+        if adx >= 25:   score+=10; bd["adx_score"]+=10
+        elif adx >= 15: score+=5;  bd["adx_score"]+=5
+        else:           score-=5;  bd["adx_score"]-=5
+
+    final = max(0, min(100, score))
+    data_quality = "full" if len(df2) >= 60 else "partial"
+
+    # Signal decision
+    if final >= 75:   signal = "BUY"
+    elif final >= 52: signal = "WATCH"
+    else:             signal = "AVOID"
+
+    # ── Overheat detection ───────────────────────────────────────────────────
+    overheat = []
+    if rsi and rsi > 72: overheat.append(f"RSI {rsi:.1f} overbought (>72)")
+    if chg_pct > 6:      overheat.append(f"Today +{chg_pct:.1f}% (>6% hot)")
+    if ma20 and ma20 > 0 and cp > 0:
+        dev20 = (cp - ma20) / ma20 * 100
+        if dev20 > 12: overheat.append(f"Price {dev20:.1f}% above MA20 (>12%)")
+    closes = df["收盤價"].dropna()
+    if len(closes) >= 5:
+        g5 = (cp - float(closes.iloc[-5])) / float(closes.iloc[-5]) * 100
+        if g5 > 12: overheat.append(f"5-day gain +{g5:.1f}% (>12%)")
+    if overheat and signal == "BUY": signal = "WATCH"
+
+    # ── False breakout detection ─────────────────────────────────────────────
+    fb_flags = []
+    if res and cp >= res * 0.99 and vol_ratio < 1.2:
+        fb_flags.append("Breakout without volume (ratio<1.2x)")
+    if not tail20.empty and "最高價" in tail20.columns and "最低價" in tail20.columns:
+        last = tail20.iloc[-1]
+        hi_ = float(last.get("最高價",cp)); lo_ = float(last.get("最低價",cp))
+        cl_ = float(last.get("收盤價",cp))
+        if hi_ > lo_ and vol_ratio >= 2.0:
+            upper_shadow = (hi_ - cl_) / (hi_ - lo_)
+            if upper_shadow > 0.6: fb_flags.append("Long upper wick + high volume (distribution)")
+    if fb_flags: signal = "WATCH" if signal == "BUY" else signal
+
+    # ── Strategy type ────────────────────────────────────────────────────────
+    is_bull = (ma5 and ma20 and ma60 and ma5 > ma20 > ma60 and cp > ma20)
+    if overheat: strat = "Overheated"
+    elif fb_flags: strat = "False Breakout Risk"
+    elif final < 40: strat = "Avoid"
+    elif adx and adx < 15: strat = "Range Bound"
+    elif is_bull and adx and adx > 25 and rsi and 45 <= rsi <= 70: strat = "Trend Following"
+    elif ma20 and cp > 0 and (cp - ma20) / ma20 * 100 < 3 and final >= 55: strat = "Pullback Entry"
+    elif res and cp >= res * 0.98 and vol_ratio >= 1.5: strat = "Breakout"
+    elif rsi and rsi < 35: strat = "Reversal Bounce"
+    else: strat = "Trend Following" if final >= 55 else "Range Bound"
+
+    # ── Build trade plan (guaranteed valid) ─────────────────────────────────
+    plan = build_us_trade_plan(latest, cp, signal, df)
+    ep  = plan["entry_price"]
+    tp  = plan["target_price"]
+    sl  = plan["stop_loss"]
+    rr  = plan["risk_reward_ratio"]
+    tv  = plan["trade_valid"]
+    es  = plan["entry_status"]
+
+    if not tv and signal == "BUY": signal = "WATCH"
+    if not tv and es == "BAD_SETUP" and not ep:
+        # Last resort fallback: always provide some reference values
+        ep = round(cp, 4)
+        sl = round(cp * 0.96, 4)
+        tp = round(cp * 1.06, 4)
+        rr = round((tp-ep)/(ep-sl), 2)
+        tv = False; es = "BAD_SETUP"
+
+    # Entry zone
+    ez_lo = plan.get("entry_zone_low") or (round(ep*0.995,4) if ep else None)
+    ez_hi = plan.get("entry_zone_high") or (round(ep*1.005,4) if ep else None)
+
+    # entry_status refinement
+    if tv:
+        if chg_pct > 5 or (rsi and rsi > 70): es = "WAIT_PULLBACK"
+        elif ep and abs(cp - ep) / ep * 100 <= 3: es = "ENTERABLE"
+        else: es = "WAIT_PULLBACK"
+
+    # trade_status
+    if signal == "BUY" and ep and cp > 0:
+        dev = (cp - ep) / ep * 100
+        ts_val = "BUY_NOW" if (dev <= 3 and rr and rr >= 1.5) else "BUY_PULLBACK"
+    elif signal == "WATCH": ts_val = "WATCH"
+    else: ts_val = "AVOID"
+
+    # Recent support/resistance entry status text
+    es_text_map = {
+        "ENTERABLE":"✅ 可進場","WAIT_PULLBACK":"⏳ 等回檔",
+        "TOO_EXTENDED":"⚠️ 偏高","BAD_SETUP":"⚠️ 點位不合理","NO_DATA":"— 資料不足"
+    }
+
+    risk_reason = plan.get("risk_reason",[])
+    if overheat: risk_reason.extend(overheat[:2])
+    if fb_flags: risk_reason.extend(fb_flags[:1])
+
+    summary = (f"技術分 {final}/100 | {strat} | RSI {rsi:.0f} | ADX {adx:.0f}" if (rsi and adx) else f"技術分 {final}/100 | {strat}") + "。" + (
+        "整體條件符合，可考慮入場。" if signal=="BUY" and tv else
+        "訊號偏正但尚未完全確認，建議觀察。" if signal=="WATCH" else
+        "技術面偏弱或點位不合理，建議保守觀望。"
+    )
+
+    return {
+        "signal": signal, "confidence": final,
+        "score_quality": data_quality,
+        "entry_price": ep, "entry_zone_low": ez_lo, "entry_zone_high": ez_hi,
+        "target_price": tp, "stop_loss": sl, "risk_reward_ratio": rr,
+        "trade_status": ts_val, "entry_status": es,
+        "entry_status_text": es_text_map.get(es,"—"),
+        "can_enter": es == "ENTERABLE",
+        "trade_valid": tv,
+        "strategy_type": strat,
+        "technical_score": final,
+        "technical_breakdown": bd,
+        "overheat_flags": overheat,
+        "false_breakout_flags": fb_flags,
+        "recent_support": plan.get("recent_support"),
+        "recent_resistance": plan.get("recent_resistance"),
+        "support_zone": plan.get("support_zone"),
+        "resistance_zone": plan.get("resistance_zone"),
+        "risk_reason": risk_reason[:4],
+        "entry_reason": [f"Technical score {final}/100", f"Strategy: {strat}",
+                         f"ADX {adx:.0f}" if adx else "", f"RSI {rsi:.0f}" if rsi else ""],
+        "summary": summary,
+        "disclaimer": "⚠️ For reference only, not investment advice",
+        "holding_days": "5-15 days" if signal=="BUY" else "Watch only",
+    }
+
+# ── _fetch_us_full & _fetch_us_lite ──────────────────────────────────────────
+async def _fetch_us_full(symbol: str) -> dict:
+    symbol = symbol.upper()
+    now = time.time()
+    if symbol in _us_full_cache and (now - _us_full_ts.get(symbol,0)) < US_FULL_TTL:
+        return _us_full_cache[symbol]
+    async with httpx.AsyncClient() as client:
+        quote, df = await asyncio.gather(
+            _yahoo_quote(symbol, client),
+            _yahoo_history(symbol, client, 400),
+        )
+    if not quote:
+        return {"symbol":symbol,"name":_us_master.get(symbol,{}).get("name",symbol),
+                "error":"美股資料暫時無法取得，請稍後重試","chart_data":[],"ai_signal":{}}
+    cp = float(quote["price"])
+    # Update master name from Yahoo
+    if quote.get("name") and symbol in _us_master:
+        _us_master[symbol]["name"] = quote["name"]
+    ai = compute_us_ai_signal(df, cp, quote)
+    # Build chart_data
+    chart_data = []
+    if not df.empty:
+        df2 = compute_indicators_v4(df.copy())
+        for _, row in df2.tail(120).iterrows():
+            chart_data.append({
+                "date": row["日期"].strftime("%Y-%m-%d"),
+                "open": _f(row.get("開盤價"),4), "high": _f(row.get("最高價"),4),
+                "low": _f(row.get("最低價"),4),  "close": _f(row.get("收盤價"),4),
+                "volume": int(row["成交股數"]) if pd.notna(row.get("成交股數")) else 0,
+                "ma5":  _f(row.get("MA5"),4),  "ma20": _f(row.get("MA20"),4),
+                "ma60": _f(row.get("MA60"),4), "rsi":  _f(row.get("RSI")),
+                "macd": _f(row.get("MACD"),4), "signal_line": _f(row.get("Signal"),4),
+                "hist": _f(row.get("Hist"),4), "adx":  _f(row.get("ADX")),
+            })
+    result = {**quote, "ai_signal":ai, "chart_data":chart_data,
+              "data_source":"Yahoo Finance", "symbol":symbol,
+              "indicators":{
+                  "ma5":ai.get("entry_price"),"ma20":None,"ma60":None,
+                  "rsi":None,"adx":None,"technical_score":ai.get("technical_score"),
+                  "technical_breakdown":ai.get("technical_breakdown",{}),
+              }}
+    _us_full_cache[symbol] = result; _us_full_ts[symbol] = now
+    return result
+
+async def _fetch_us_lite(symbol: str) -> dict:
+    symbol = symbol.upper()
+    now = time.time()
+    # Return full cache if fresh enough
+    if symbol in _us_full_cache and (now - _us_full_ts.get(symbol,0)) < US_FULL_TTL:
+        d = _us_full_cache[symbol]
+        return {"symbol":symbol,"name":d.get("name",symbol),"price":d.get("price"),
+                "change_pct":d.get("change_pct"),"change":d.get("change"),
+                "ai_signal":d.get("ai_signal",{}),"lite":True}
+    if symbol in _us_quote_cache and (now - _us_quote_ts.get(symbol,0)) < US_LITE_TTL:
+        return _us_quote_cache[symbol]
+    async with httpx.AsyncClient() as client:
+        quote = await _yahoo_quote(symbol, client)
+    if not quote:
+        return {"symbol":symbol,"name":_us_master.get(symbol,{}).get("name",symbol),
+                "price":None,"change_pct":None,"change":None,"ai_signal":{},"lite":True}
+    cp = float(quote["price"]); chg = float(quote.get("change_pct") or 0)
+    # Provide at least partial AI from quote only
+    conf = 55
+    if chg > 2: conf += 5
+    elif chg < -2: conf -= 5
+    ep = round(cp, 4); sl = round(cp * 0.96, 4); tp = round(cp * 1.06, 4)
+    rr = round((tp-ep)/(ep-sl), 2)
+    ai_lite = {
+        "signal":"WATCH","confidence":conf,"score_quality":"partial",
+        "trade_status":"WATCH","entry_status":"WAIT_PULLBACK",
+        "entry_status_text":"⏳ 等完整分析",
+        "can_enter":False,"trade_valid":False,"strategy_type":"",
+        "entry_price":ep,"entry_zone_low":round(ep*0.995,4),"entry_zone_high":round(ep*1.005,4),
+        "target_price":tp,"stop_loss":sl,"risk_reward_ratio":rr,
+        "technical_score":conf,"technical_breakdown":{},
+        "overheat_flags":[],"false_breakout_flags":[],
+        "recent_support":None,"recent_resistance":None,
+        "risk_reason":["輕量模式，建議查詢完整資料"],"entry_reason":[],
+        "summary":"輕量 AI 模式（無歷史資料），請查詢完整資料以獲得精確分析。",
+        "disclaimer":"⚠️ For reference only",
+    }
+    result = {**quote,"ai_signal":ai_lite,"lite":True}
+    _us_quote_cache[symbol] = result; _us_quote_ts[symbol] = now
+    return result
+
+# ── US API Endpoints ──────────────────────────────────────────────────────────
+class USWatchlistBody(BaseModel): watchlist: list[str]
+
+@app.get("/api/us/suggest")
+async def us_suggest(q: str = Query("", min_length=1)):
+    """Search US symbol master; fallback to Yahoo Finance."""
+    results = search_us_master(q, limit=10)
+    if not results:
+        # Fallback: try direct Yahoo
+        sym = q.strip().upper()
+        if re.match(r'^[A-Z]{1,10}$', sym):
+            try:
+                async with httpx.AsyncClient() as cl:
+                    qt = await _yahoo_quote(sym, cl)
+                if qt:
+                    results = [{"symbol":sym,"name":qt.get("name",sym),
+                                "exchange":qt.get("exchange","US"),"type":"Stock"}]
+            except: pass
+    return {"results": results, "query": q}
+
+@app.get("/api/us/stock/{symbol}")
+async def us_get_stock(symbol: str):
+    if not re.match(r'^[A-Za-z.\-]{1,10}$', symbol):
+        raise HTTPException(400, detail="Invalid US stock symbol")
+    return await _fetch_us_full(symbol.upper())
+
+@app.get("/api/us/stock-lite/{symbol}")
+async def us_get_stock_lite(symbol: str):
+    if not re.match(r'^[A-Za-z.\-]{1,10}$', symbol):
+        raise HTTPException(400, detail="Invalid US stock symbol")
+    return await _fetch_us_lite(symbol.upper())
+
+@app.get("/api/us/scan")
+async def us_scan(
+    min_score: int = Query(58, ge=0, le=100),
+    max_stocks: int = Query(25, ge=5, le=35)
+):
+    """V11.0.1: Full US AI scan with complete trade data, 3-zone output."""
+    t0 = time.time()
+    pool = [
+        "NVDA","AAPL","MSFT","AMZN","META","GOOGL","TSLA","AMD","AVGO","ORCL",
+        "NFLX","CRM","CRWD","PLTR","NET","DDOG","SNOW","MU","QCOM","SMCI",
+        "ASTS","RKLB","IONQ","SOUN","COIN",
+    ][:max_stocks]
+    enterable=[]; pullback=[]; avoid=[]; errors=[]
+    for sym in pool:
+        try:
+            r = await _fetch_us_full(sym)  # Full data for scan
+            if r.get("error"): continue
+            ai = r.get("ai_signal",{})
+            conf = ai.get("confidence") or 0
+            if conf < min_score: continue
+            es = ai.get("entry_status","NO_DATA")
+            tv = ai.get("trade_valid",False)
+            strat = ai.get("strategy_type","")
+            overheat = ai.get("overheat_flags",[])
+            fb = ai.get("false_breakout_flags",[])
+            ts = ai.get("technical_score") or 0
+            rr = ai.get("risk_reward_ratio")
+            item = {
+                "symbol":sym,"name":r.get("name",sym),
+                "price":r.get("price"),"change_pct":r.get("change_pct"),
+                "signal":ai.get("signal","WATCH"),"confidence":conf,
+                "trade_status":ai.get("trade_status","WATCH"),
+                "entry_status":es,"entry_status_text":ai.get("entry_status_text","—"),
+                "can_enter":ai.get("can_enter",False),"trade_valid":tv,
+                "strategy_type":strat,"technical_score":ts,
+                "overheat_flags":overheat,"false_breakout_flags":fb,
+                "entry_price":ai.get("entry_price"),
+                "entry_zone_low":ai.get("entry_zone_low"),
+                "entry_zone_high":ai.get("entry_zone_high"),
+                "target_price":ai.get("target_price"),"stop_loss":ai.get("stop_loss"),
+                "risk_reward_ratio":rr,
+                "recent_support":ai.get("recent_support"),
+                "recent_resistance":ai.get("recent_resistance"),
+                "summary":ai.get("summary",""),
+                "risk_reason":ai.get("risk_reason",[]),
+            }
+            if fb:
+                avoid.append(item)
+            elif tv and es=="ENTERABLE" and ts>=65 and not overheat and rr and rr>=1.5:
+                enterable.append(item)
+            elif strat in("Overheated","Avoid") or overheat or not tv:
+                avoid.append(item)
+            else:
+                pullback.append(item)
+        except Exception as e:
+            errors.append({"symbol":sym,"error":str(e)})
+    enterable.sort(key=lambda x: -(x.get("risk_reward_ratio") or 0))
+    pullback.sort(key=lambda x: -(x.get("confidence") or 0))
+    avoid.sort(key=lambda x: -(x.get("confidence") or 0))
+    return {
+        "scanned":len(pool),"enterable_count":len(enterable),
+        "pullback_count":len(pullback),"avoid_count":len(avoid),
+        "enterable":enterable,"pullback":pullback,"avoid":avoid,
+        "errors":errors,"error_count":len(errors),
+        "duration_seconds":round(time.time()-t0,1)
+    }
+
+
 @app.get("/health")
 def health():
-    return{"status":"ok","version":"10.4.0","time":datetime.now().isoformat(),
+    return{"status":"ok","version":"11.0.1","time":datetime.now().isoformat(),
            "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
            "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
            "price_sources":"Yahoo Finance → TWSE Official → FinMind",
            "stock_master_count":len(STOCK_MASTER),"stock_master_updated":_mua,
            "http_timeout":HTTP_TIMEOUT,
-           "features":["V10.4 Technical Trade Plan","trade_status BUY_NOW/BUY_PULLBACK/WATCH/AVOID",
+           "features":["V11.0.1 Multi-Market","US stocks via Yahoo Finance","US Symbol Master","trade_status BUY_NOW/BUY_PULLBACK/WATCH/AVOID",
                        "Momentum Breakout","multi_timeframe","macro_api","market_sentiment",
                        "Firestore watchlist","4D on-demand","AI learning","stock-lite","sharpe_ratio"]}

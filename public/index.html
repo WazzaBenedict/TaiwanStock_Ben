@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>台股 V10.4.1 Technical Trade Plan</title>
+<title>V11.0.1 Multi-Market 股票監測</title>
 <script src="config.js"></script>
 <style>
 :root{
@@ -393,6 +393,41 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .tp-row:last-child{border-bottom:none}
 .tp-lbl{color:var(--muted)}
 
+
+/* ══ V11 Market Switcher ════════════════════════════════════════════ */
+.mkt-switcher{display:flex;align-items:center;gap:0;background:#0d1728;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.mkt-btn{font-family:var(--mono);font-size:12px;font-weight:700;padding:6px 16px;border:none;background:transparent;color:var(--muted);cursor:pointer;min-height:0;border-radius:0;transition:all .15s;letter-spacing:.04em}
+.mkt-btn:hover:not(.active-tw):not(.active-us){color:var(--text)}
+.mkt-btn.active-tw{background:var(--up);color:#fff}
+.mkt-btn.active-us{background:#2563eb;color:#fff}
+/* ══ US colors (international: green=up, red=down) ══════════════════ */
+.us-up{color:#22c55e!important}.us-down{color:#ef4444!important}.us-flat{color:var(--muted)}
+/* ══ US AI block ════════════════════════════════════════════════════ */
+.us-ai-buy{background:linear-gradient(135deg,rgba(34,197,94,.15),rgba(22,163,74,.08));border:1px solid rgba(34,197,94,.4);border-radius:12px;padding:14px 16px;margin-bottom:12px}
+.us-ai-watch{background:linear-gradient(135deg,rgba(251,191,36,.12),rgba(245,158,11,.06));border:1px solid rgba(251,191,36,.35);border-radius:12px;padding:14px 16px;margin-bottom:12px}
+.us-ai-avoid{background:linear-gradient(135deg,rgba(239,68,68,.1),rgba(220,38,38,.05));border:1px solid rgba(239,68,68,.3);border-radius:12px;padding:14px 16px;margin-bottom:12px}
+/* ══ US compact grid ════════════════════════════════════════════════ */
+.us-compact-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+@media(max-width:768px){.us-compact-grid{grid-template-columns:repeat(2,1fr)}}
+.us-card{background:#0d1728;border:1px solid rgba(37,99,235,.2);border-radius:10px;padding:10px 12px;cursor:pointer;transition:all .15s;position:relative}
+.us-card:hover{border-color:#2563eb;transform:translateY(-1px)}
+.us-card.selected{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.2)}
+.us-card.us-buy{border-left:3px solid #22c55e}
+.us-card.us-watch{border-left:3px solid #fbbf24}
+.us-card.us-avoid{border-left:3px solid #ef4444}
+/* ══ US scan zones ══════════════════════════════════════════════════ */
+.us-zone-enter{background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:8px 8px 0 0;font-family:var(--mono);font-size:12px;font-weight:700;padding:8px 12px}
+.us-zone-watch{background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.25);border-radius:8px 8px 0 0;font-family:var(--mono);font-size:12px;font-weight:700;padding:8px 12px}
+.us-zone-avoid{background:rgba(239,68,68,.08);color:#ef4444;border:1px solid rgba(239,68,68,.2);border-radius:8px 8px 0 0;font-family:var(--mono);font-size:12px;font-weight:700;padding:8px 12px}
+/* ══ US suggest box ════════════════════════════════════════════════ */
+#usSuggestBox{position:absolute;top:calc(100%+4px);left:0;right:0;background:#0d1728;border:1px solid rgba(37,99,235,.4);border-radius:9px;z-index:200;max-height:260px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5);display:none}
+.us-suggest-item{padding:9px 14px;cursor:pointer;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.us-suggest-item:last-child{border-bottom:none}
+.us-suggest-item:hover{background:rgba(37,99,235,.12)}
+.us-sym{font-weight:700;color:var(--cyan)}.us-sname{color:var(--muted);font-size:10px}
+.us-exch{font-size:9px;color:var(--muted);padding:1px 5px;background:#172946;border-radius:3px}
+.us-kline-badge{font-family:var(--mono);font-size:10px;padding:2px 8px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);border-radius:4px;color:#22c55e}
+
 </style>
 </head>
 <body>
@@ -400,9 +435,15 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="logo">
     <span class="live-dot"></span>
     台股<span style="color:var(--down)">MONITOR</span>
-    <span class="ver">V10.4.1 Technical</span>
+    <span class="ver">V11.0.1 Multi-Market</span>
   </div>
-  <span class="clock" id="clock"></span>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="mkt-switcher">
+      <button class="mkt-btn active-tw" id="btnMktTW">🇹🇼 台股</button>
+      <button class="mkt-btn" id="btnMktUS">🇺🇸 美股</button>
+    </div>
+    <span class="clock" id="clock"></span>
+  </div>
 </header>
 
 <!-- ★ V10.3: 登入遮罩（未登入時全頁顯示）-->
@@ -430,7 +471,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
       使用 Google 帳號登入
     </button>
-    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:16px">V10.4.1 Technical Trade Plan</div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:16px">V11.0.1 Multi-Market</div>
   </div>
 </div>
 
@@ -849,6 +890,132 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 </div>
 </div><!-- /p-account -->
 
+<!-- ★ V11.0.1: US Market Page -->
+<div id="pg-us" style="display:none">
+<div class="wrap">
+
+<!-- US Search -->
+<div class="section" style="background:linear-gradient(135deg,rgba(37,99,235,.1),rgba(37,99,235,.03));border-color:rgba(37,99,235,.3);margin-bottom:14px">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+    <span style="background:#2563eb;color:#fff;font-family:var(--mono);font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px">🇺🇸 US STOCKS</span>
+    <span class="us-kline-badge">Green=Up &nbsp; Red=Down</span>
+    <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">International convention · Yahoo Finance</span>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <div style="position:relative">
+      <input id="usSymbol" placeholder="Symbol or name: AAPL / NVDA / ASTS…" maxlength="12" autocomplete="off"
+        style="background:#0d1728;border:1px solid rgba(37,99,235,.4);border-radius:9px;color:var(--text);padding:11px 14px;width:290px;font-family:var(--mono);font-size:14px;outline:none"/>
+      <div id="usSuggestBox"></div>
+    </div>
+    <button id="btnUsSearch" style="background:#2563eb;color:#fff">🔍 Search</button>
+    <button class="ghost" id="btnUsAdd">＋ Watchlist</button>
+    <button class="ghost sm" id="btnUsScan">🤖 AI Scan</button>
+  </div>
+  <div id="usMasterStatus" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px"></div>
+</div>
+
+<!-- US Watchlist -->
+<div class="section">
+  <div class="section-title">
+    <div class="section-title-left">
+      ⭐ US Watchlist
+      <span class="d-badge" id="usWlCount">0</span>
+      <span class="sync-badge sync-ing" id="usSyncBadge">⏳</span>
+    </div>
+    <div class="row" style="gap:6px">
+      <span class="bar-tick" id="usWlTick" style="font-size:10px">30s refresh</span>
+      <button class="ghost sm" id="btnUsRefresh" style="font-size:11px">↻</button>
+    </div>
+  </div>
+  <div class="bar"><span id="usWlBar" style="width:100%"></span></div>
+  <div class="us-compact-grid" id="usWlCompactGrid"></div>
+  <div class="wl-ticker-wrap" id="usTickerWrap" style="display:none">
+    <div class="wl-ticker-inner" id="usTickerInner"></div>
+  </div>
+</div>
+
+<!-- US Dashboard -->
+<div id="usDash" style="display:none">
+
+  <!-- US AI Signal -->
+  <div id="usAiBadge" class="us-ai-watch">
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em">🤖 US AI Strategy Signal</div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap">
+      <div style="min-width:130px">
+        <div id="usAiLabel" style="font-family:var(--mono);font-size:22px;font-weight:700">👀 WATCH</div>
+        <div id="usAiConf" style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:2px">Confidence — / 100</div>
+        <div style="height:5px;background:#172946;border-radius:3px;margin-top:8px;overflow:hidden">
+          <div id="usConfBar" style="width:0%;height:100%;background:#fbbf24;border-radius:3px;transition:width .6s"></div>
+        </div>
+        <div id="usTradeStatus" style="margin-top:8px"></div>
+      </div>
+      <div style="flex:1;min-width:220px">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px">
+          <div class="aiq"><div class="aiq-lbl">Entry Price</div><div class="aiq-val" id="usAiEp">—</div></div>
+          <div class="aiq"><div class="aiq-lbl">Target</div><div class="aiq-val us-up" id="usAiTp">—</div></div>
+          <div class="aiq"><div class="aiq-lbl">Stop Loss</div><div class="aiq-val us-down" id="usAiSl">—</div></div>
+          <div class="aiq"><div class="aiq-lbl">RR Ratio</div><div class="aiq-val" id="usAiRr">—</div></div>
+          <div class="aiq"><div class="aiq-lbl">Entry Zone</div><div class="aiq-val" id="usAiZone">—</div></div>
+          <div class="aiq"><div class="aiq-lbl">Tech Score</div><div class="aiq-val" id="usAiTs">—</div></div>
+        </div>
+        <div id="usAiTags" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
+        <div id="usAiSummary" style="font-size:12px;color:var(--muted);line-height:1.7;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.15);border-radius:7px;padding:9px 12px"></div>
+      </div>
+    </div>
+    <div id="usAiSupRes" style="margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap"></div>
+    <div id="usAiRiskReasons" style="margin-top:8px"></div>
+  </div>
+
+  <!-- US Price Info -->
+  <div class="section" style="margin-top:14px">
+    <div class="section-title" style="color:#60a5fa">
+      <div>
+        <span id="usName" style="font-size:16px;font-weight:700">—</span>
+        <span id="usSymbolDisplay" style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-left:8px"></span>
+        <span id="usExchange" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-left:6px"></span>
+      </div>
+      <div id="usQuoteTime" style="font-family:var(--mono);font-size:11px;color:var(--muted)">—</div>
+    </div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:baseline;margin-bottom:12px">
+      <span id="usPrice" style="font-family:var(--mono);font-size:36px;font-weight:700">—</span>
+      <span id="usChg" style="font-family:var(--mono);font-size:16px;font-weight:600">—</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-family:var(--mono);font-size:12px">
+      <div><div style="color:var(--muted);font-size:10px;margin-bottom:2px">OPEN</div><div id="usOpen" style="font-weight:600">—</div></div>
+      <div><div style="color:var(--muted);font-size:10px;margin-bottom:2px">HIGH</div><div id="usHigh" class="us-up" style="font-weight:600">—</div></div>
+      <div><div style="color:var(--muted);font-size:10px;margin-bottom:2px">LOW</div><div id="usLow" class="us-down" style="font-weight:600">—</div></div>
+      <div><div style="color:var(--muted);font-size:10px;margin-bottom:2px">VOLUME</div><div id="usVol" style="font-weight:600">—</div></div>
+    </div>
+    <div id="usMarketState" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px"></div>
+  </div>
+
+  <!-- US K-Line -->
+  <div id="usKlineWrap" class="kline-wrap" style="display:none;margin-bottom:14px">
+    <div class="kline-header">
+      <span>📊 K-Line <span class="us-kline-badge" style="margin-left:8px">Green=Up / Red=Down</span></span>
+      <span id="usKlineStatus" style="font-size:11px;color:var(--muted)"></span>
+    </div>
+    <div class="kline-container" id="usKlineContainer">
+      <div class="kline-placeholder">Chart loading…</div>
+    </div>
+  </div>
+
+  <!-- US AI Scan Result -->
+  <div id="usAiScanBox" style="display:none;margin-bottom:14px">
+    <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:#60a5fa;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+      🤖 US AI Scan
+      <span id="usAiScanSummary" style="font-size:11px;color:var(--muted);font-weight:400"></span>
+      <button class="ghost sm" id="btnUsScanAgain" style="font-size:11px;margin-left:auto">Re-scan</button>
+    </div>
+    <div id="usZoneEnterable"></div>
+    <div id="usZonePullback"></div>
+    <div id="usZoneAvoid"></div>
+  </div>
+
+</div><!-- /usDash -->
+</div><!-- /us wrap -->
+</div><!-- /pg-us -->
+
 <div style="text-align:center;padding:20px;font-size:11px;color:var(--muted);font-family:var(--mono);border-top:1px solid var(--line);margin-top:10px;line-height:2.2">
   ⚠️ 本工具僅供技術分析學習參考，不構成任何投資建議。<br>
   台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
@@ -944,18 +1111,21 @@ async function googleLogout() {
 function clearAllState() {
   stopAllTimers();
   WL = []; WL_CACHE = {}; CURRENT_ID = null;
-  const g = document.getElementById("wlGrid");
-  if (g) g.innerHTML = '';
-  const wlC = document.getElementById("wlCount");
-  if (wlC) wlC.textContent = "0 檔";
+  ["wlGrid","wlGridCompact"].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML="";});
+  const wlC = document.getElementById("wlCount"); if(wlC) wlC.textContent="0 檔";
   destroyChart();
-  const dash = document.getElementById("dash");
-  if (dash) dash.style.display = "none";
+  const dash = document.getElementById("dash"); if(dash) dash.style.display="none";
+  // US state
+  if(typeof US_WL!=="undefined"){US_WL=[];US_WL_CACHE={};US_CURRENT=null;}
+  const ug=document.getElementById("usWlCompactGrid"); if(ug) ug.innerHTML="";
+  const ud=document.getElementById("usDash"); if(ud) ud.style.display="none";
+  if(typeof destroyUSChart==="function") destroyUSChart();
 }
 
 function stopAllTimers() {
   clearInterval(wlTimer); wlTimer = null;
   clearInterval(autoTimer); autoTimer = null;
+  if(typeof usWlTimer!=="undefined"){clearInterval(usWlTimer);usWlTimer=null;}
 }
 
 // ── Login overlay ─────────────────────────────────────────────────
@@ -1005,7 +1175,8 @@ async function onUserLogin(user) {
 // ── Firestore refs ────────────────────────────────────────────────
 function userWLRef(uid) {
   if (!db || !uid) return null;
-  return db.collection("users").doc(uid).collection("watchlist").doc("main");
+  // V11.0.1: canonical path
+  return db.collection("users").doc(uid).collection("watchlists").doc("tw");
 }
 function userProfileRef(uid) {
   if (!db || !uid) return null;
@@ -1015,9 +1186,15 @@ function legacyDefaultRef() {
   if (!db) return null;
   return db.collection("watchlists").doc("default");
 }
+function userWLRefLegacy(uid) {
+  // V10.x path — migration source only, never write here
+  if (!db || !uid) return null;
+  return db.collection("users").doc(uid).collection("watchlist").doc("main");
+}
 
 // ── 讀寫 users/{uid}/watchlist/main ──────────────────────────────
 async function loadWatchlist() {
+  // V11.0.1: read from users/{uid}/watchlists/tw; migrate if needed
   if (!currentUser) return;
   const uid = currentUser.uid;
   const ref = userWLRef(uid);
@@ -1025,54 +1202,70 @@ async function loadWatchlist() {
   try {
     const snap = await ref.get();
     if (!snap.exists) {
-      // 第一次登入 → 執行 migration
-      await runMigration(uid);
+      await runMigration(uid, []);
     } else {
       const data = snap.data();
-      WL = normalizeWatchlist(data.watchlist || []);
-      if (!data.migrated) {
-        // migration 標記未設定 → 再跑一次 migration 合併
-        await runMigration(uid, WL);
+      const stored = normalizeWatchlist(data.watchlist || []);
+      if (!data.migrated_from_legacy) {
+        await runMigration(uid, stored);
       } else {
-        // migrated = true → 只用 Firestore 資料，絕不讀舊來源
+        WL = stored;
+        setSyncBadge("ok");
       }
-      setSyncBadge("ok");
     }
   } catch(e) {
     console.warn("loadWatchlist:", e.message);
-    WL = [];
+    WL = loadLegacyWatchlist();
+    if (!WL.length) { try { WL = JSON.parse(localStorage.getItem("tw_wl_v10")||"[]"); } catch {} }
     setSyncBadge("err");
   }
-  lsSaveWL(WL);
+  if (WL.length) lsSaveWL(WL);
 }
 
 async function runMigration(uid, existingItems = []) {
-  // 只在 migrated !== true 時執行
-  let legacyItems = [];
-  // 1. localStorage
+  // V11.0.1: multi-source migration to users/{uid}/watchlists/tw
+  let legacyItems = [...existingItems];
+
+  // Source 1: V10.x Firestore path (users/{uid}/watchlist/main)
+  try {
+    const legRef = userWLRefLegacy(uid);
+    if (legRef) {
+      const snap = await legRef.get();
+      if (snap.exists) {
+        const items = normalizeWatchlist(snap.data().watchlist || []);
+        if (items.length) { legacyItems.push(...items); console.log("Migration: found", items.length, "stocks in V10 path"); }
+      }
+    }
+  } catch(e) { console.warn("V10 path migration:", e.message); }
+
+  // Source 2: localStorage (7 keys)
   legacyItems.push(...loadLegacyWatchlist());
-  // 2. 舊 Firestore watchlists/default
+
+  // Source 3: shared old Firestore watchlists/default
   try {
     const ref = legacyDefaultRef();
-    if (ref) {
-      const snap = await ref.get();
-      if (snap.exists) legacyItems.push(...normalizeWatchlist(snap.data().watchlist || []));
-    }
+    if (ref) { const snap = await ref.get(); if (snap.exists) legacyItems.push(...normalizeWatchlist(snap.data().watchlist || [])); }
   } catch {}
-  // 3. 後端 /api/watchlist
-  if (!legacyItems.length && !existingItems.length) {
+
+  // Source 4: backend fallback
+  if (!legacyItems.length) {
     try {
       const r = await apiFetch(`${API}/api/watchlist`, {}, 8000);
       if (r.ok) { const d = await r.json(); legacyItems.push(...normalizeWatchlist(d.watchlist || [])); }
     } catch {}
   }
-  const merged = mergeWatchlists(existingItems, legacyItems);
+
+  const merged = mergeWatchlists(legacyItems);
+  if (!merged.length && existingItems.length) { WL = existingItems; return; }
+  if (!merged.length) { WL = []; setSyncBadge("ok"); return; }
+
   WL = merged;
-  // 寫入 users/{uid}/watchlist/main 並設 migrated: true
   const ref = userWLRef(uid);
   if (ref) {
-    await ref.set({ watchlist: merged, updated_at: new Date().toISOString(), migrated: true });
-    setSyncBadge(legacyItems.length ? "migrated" : "ok");
+    await ref.set({ market:"tw", watchlist: merged, updated_at: new Date().toISOString(), migrated_from_legacy: true });
+    const wasNew = legacyItems.length > existingItems.length;
+    setSyncBadge(wasNew ? "migrated" : "ok");
+    if (wasNew) console.log("Migration complete:", merged.length, "TW stocks saved to watchlists/tw");
   }
 }
 
@@ -1083,7 +1276,7 @@ async function saveWatchlist() {
   if (!ref) return;
   setSyncBadge("ing");
   try {
-    await ref.set({ watchlist: WL, updated_at: new Date().toISOString(), migrated: true });
+    await ref.set({ market:"tw", watchlist: WL, updated_at: new Date().toISOString(), migrated_from_legacy: true });
     setTxt("userLastSync", new Date().toLocaleTimeString("zh-TW"));
     setTxt("userWlCount", WL.length + " 檔");
     setSyncBadge("ok");
@@ -1128,7 +1321,7 @@ function mergeWatchlists(...lists) {
   return merged;
 }
 function loadLegacyWatchlist() {
-  const keys = ["tw_wl_v10","tw_wl_v9","watchlist","WL_KEY","tw_watchlist"];
+  const keys = ["tw_wl_v10","tw_wl_v9","watchlist","WL_KEY","tw_watchlist","wl","tw_wl_v1"];
   const candidates = [];
   for (const key of keys) {
     try {
@@ -1854,6 +2047,19 @@ async function initApp(){
   safeBind("qnKline","click",()=>scrollToAnchor("anchorKline"));
   safeBind("qnA4d","click",()=>scrollToAnchor("anchorA4d"));
 
+  // V11.0.1: Market switcher
+  var btnTW = document.getElementById("btnMktTW");
+  var btnUS = document.getElementById("btnMktUS");
+  if (btnTW) btnTW.addEventListener("click", function(){ switchMarket("tw"); });
+  if (btnUS) btnUS.addEventListener("click", function(){ switchMarket("us"); });
+  // V11 US buttons
+  safeBind("btnUsSearch",  "click", usDoSearch);
+  safeBind("btnUsAdd",     "click", addUSWL);
+  safeBind("btnUsRefresh", "click", function(){ usWlLeft=30; refreshUSWL(); });
+  safeBind("btnUsScan",    "click", usAiScan);
+  safeBind("btnUsScanAgain","click",usAiScan);
+  initUSSuggest();
+
   // Stock master (doesn't need auth)
   await loadStockMaster();
 }
@@ -2084,6 +2290,537 @@ function scrollToAnchor(id) {
 }
 
 // V10.4 extra init bindings merged into the main initApp above.
+
+
+/* ══════════════════════════════════════════════════════════════════
+   V11.0.1 Multi-Market — US Stocks Module
+   All functions defined at top level (outside any other function)
+   ══════════════════════════════════════════════════════════════════ */
+
+// ── Global US state ────────────────────────────────────────────────
+var US_WL = [];
+var US_WL_CACHE = {};
+var US_CURRENT = null;
+var usWlTimer = null;
+var usWlLeft = 30;
+var usWlRefreshing = false;
+var usLwChart = null;
+var currentMarket = "tw";
+
+// ── Market switch ──────────────────────────────────────────────────
+function switchMarket(mkt) {
+  currentMarket = mkt;
+  var pgUS   = document.getElementById("pg-us");
+  var btnTW  = document.getElementById("btnMktTW");
+  var btnUS  = document.getElementById("btnMktUS");
+  var allPages = document.querySelectorAll(".page");
+
+  if (mkt === "us") {
+    allPages.forEach(function(p) { p.style.display = "none"; });
+    if (pgUS)  { pgUS.style.display  = "block"; }
+    if (btnTW) { btnTW.className = btnTW.className.replace(" active-tw",""); }
+    if (btnUS) { if (btnUS.className.indexOf("active-us") < 0) btnUS.className += " active-us"; }
+    if (currentUser && !US_WL.length) {
+      loadUSWatchlist().then(function() { refreshUSWL(); startUSWLTimer(); });
+    } else if (US_WL.length) {
+      renderUSWL();
+    }
+  } else {
+    if (pgUS) { pgUS.style.display = "none"; }
+    allPages.forEach(function(p) { p.style.display = ""; });
+    showPage("p-trade");
+    if (btnTW) { if (btnTW.className.indexOf("active-tw") < 0) btnTW.className += " active-tw"; }
+    if (btnUS) { btnUS.className = btnUS.className.replace(" active-us",""); }
+  }
+}
+
+// ── US Firestore refs ──────────────────────────────────────────────
+function usWLRef(uid) {
+  if (!db || !uid) return null;
+  return db.collection("users").doc(uid).collection("watchlists").doc("us");
+}
+
+async function loadUSWatchlist() {
+  if (!currentUser) return;
+  var uid = currentUser.uid;
+  var badge = document.getElementById("usSyncBadge");
+  if (badge) { badge.textContent = "⏳"; badge.className = "sync-badge sync-ing"; }
+  var ref = usWLRef(uid);
+  if (!ref) { US_WL = []; return; }
+  try {
+    var snap = await ref.get();
+    US_WL = snap.exists ? (snap.data().watchlist || []).filter(function(x){ return x && x.symbol; }) : [];
+    if (badge) { badge.textContent = "☁️"; badge.className = "sync-badge sync-ok"; }
+  } catch(e) {
+    US_WL = [];
+    if (badge) { badge.textContent = "⚠️"; badge.className = "sync-badge sync-err"; }
+  }
+}
+
+async function saveUSWatchlist() {
+  if (!currentUser) return;
+  var ref = usWLRef(currentUser.uid);
+  if (!ref) return;
+  try {
+    await ref.set({ market:"us", watchlist: US_WL, updated_at: new Date().toISOString() });
+  } catch(e) { console.warn("saveUSWatchlist:", e.message); }
+}
+
+// ── US helpers ─────────────────────────────────────────────────────
+function usColorCls(n) { return Number(n) > 0 ? "us-up" : Number(n) < 0 ? "us-down" : "us-flat"; }
+function usSigCls(sig) { return sig==="BUY" ? "us-buy" : sig==="AVOID" ? "us-avoid" : "us-watch"; }
+function usSigIcon(sig) { return sig==="BUY" ? "📈 BUY" : sig==="AVOID" ? "🚫 AVOID" : "👀 WATCH"; }
+function fUS(n, d) { d = d || 2; return (n == null || isNaN(Number(n))) ? "—" : "$"+Number(n).toFixed(d); }
+function pctUS(n) { if(n==null) return "—"; return (Number(n)>0?"+":"")+Number(n).toFixed(2)+"%"; }
+function setTxtUS(id, v) { var el=document.getElementById(id); if(el) el.textContent=v; }
+
+function usCompactCard(item) {
+  var sym = item.symbol;
+  var c   = US_WL_CACHE[sym] || {};
+  var name = c.name || item.name || sym;
+  var clr  = usColorCls(c.changePct);
+  var sig  = c.signal || "WATCH";
+  var cls  = usSigCls(sig);
+  var conf = c.confidence != null ? c.confidence+"/100" : "—";
+  var sel  = sym === US_CURRENT ? " selected" : "";
+  var price  = c.price != null ? "$"+Number(c.price).toFixed(2) : "—";
+  var chgStr = c.changePct != null ? pctUS(c.changePct) : "—";
+  var sigBg  = sig==="BUY" ? "rgba(34,197,94,.15)" : sig==="AVOID" ? "rgba(239,68,68,.1)" : "rgba(251,191,36,.12)";
+  var sigFg  = sig==="BUY" ? "#22c55e" : sig==="AVOID" ? "#ef4444" : "#fbbf24";
+  return '<div class="us-card '+cls+sel+'" style="position:relative" data-us-load="'+sym+'">'
+    +'<button style="position:absolute;top:5px;right:6px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;min-height:0;padding:0" data-us-del="'+sym+'">×</button>'
+    +'<div style="font-family:var(--mono);font-size:13px;font-weight:700;margin-bottom:2px">'+sym+'</div>'
+    +'<div style="font-family:var(--mono);font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px">'+name+'</div>'
+    +'<div style="font-family:var(--mono);font-size:17px;font-weight:700" class="'+clr+'">'+price+'</div>'
+    +'<div style="font-family:var(--mono);font-size:11px" class="'+clr+'">'+chgStr+'</div>'
+    +'<div style="font-family:var(--mono);font-size:10px;margin-top:3px;display:flex;gap:4px;align-items:center">'
+    +'<span style="font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;background:'+sigBg+';color:'+sigFg+'">'+usSigIcon(sig)+'</span>'
+    +'<span style="color:var(--muted)">'+conf+'</span>'
+    +'</div></div>';
+}
+
+function usTickerItemHTML(item) {
+  var sym = item.symbol;
+  var c   = US_WL_CACHE[sym] || {};
+  var clr = usColorCls(c.changePct);
+  return '<div class="ticker-item" data-us-load="'+sym+'">'
+    +'<span style="font-weight:700;color:var(--text);font-family:var(--mono)">'+sym+'</span>'
+    +'<span class="ticker-price '+clr+'">'+(c.price!=null?"$"+Number(c.price).toFixed(2):"—")+'</span>'
+    +'<span class="ticker-chg '+clr+'">'+pctUS(c.changePct)+'</span>'
+    +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted)">'+(c.name||item.name||"")+'</span>'
+    +'</div>';
+}
+
+function renderUSWL() {
+  var cnt = document.getElementById("usWlCount");
+  if (cnt) cnt.textContent = US_WL.length+" stocks";
+  var COMPACT_N = window.innerWidth <= 768 ? 2 : 4;
+  var compact = US_WL.slice(0, COMPACT_N);
+  var tickers = US_WL.slice(COMPACT_N);
+
+  var cg = document.getElementById("usWlCompactGrid");
+  if (cg) {
+    cg.innerHTML = compact.length
+      ? compact.map(usCompactCard).join("")
+      : '<div class="empty" style="grid-column:1/-1">Search a symbol and click ＋ Watchlist</div>';
+    cg.querySelectorAll("[data-us-load]").forEach(function(el) {
+      el.addEventListener("click", function(e) {
+        if (!e.target.closest("[data-us-del]")) usLoadStock(el.dataset.usLoad);
+      });
+    });
+    cg.querySelectorAll("[data-us-del]").forEach(function(btn) {
+      btn.addEventListener("click", function(e) { e.stopPropagation(); removeUSWL(btn.dataset.usDel); });
+    });
+  }
+
+  var tw = document.getElementById("usTickerWrap");
+  var inner = document.getElementById("usTickerInner");
+  if (tw && inner) {
+    if (tickers.length) {
+      tw.style.display = "block";
+      var items = tickers.map(usTickerItemHTML).join("");
+      inner.innerHTML = items + items;
+      inner.querySelectorAll("[data-us-load]").forEach(function(el) {
+        el.addEventListener("click", function() { usLoadStock(el.dataset.usLoad); });
+      });
+      requestAnimationFrame(function() {
+        var hw  = Math.round(inner.scrollWidth / 2);
+        var dur = Math.min(120, Math.max(20, tickers.length * 8));
+        tw.style.setProperty("--ticker-half", "-"+hw+"px");
+        inner.style.animation = "ticker-scroll "+dur+"s linear infinite";
+      });
+    } else {
+      tw.style.display = "none";
+    }
+  }
+}
+
+async function fetchUSLite(sym) {
+  try {
+    var r = await apiFetch(API+"/api/us/stock-lite/"+sym, {}, 12000);
+    if (!r.ok) return;
+    var d = await r.json(); var ai = d.ai_signal || {};
+    US_WL_CACHE[sym] = { name:d.name||sym, price:d.price, changePct:d.change_pct,
+      signal:ai.signal||"WATCH", confidence:ai.confidence };
+  } catch(e) {}
+}
+
+async function refreshUSWL() {
+  if (usWlRefreshing || !US_WL.length) return;
+  usWlRefreshing = true;
+  try {
+    for (var i=0; i<US_WL.length; i+=3) {
+      var batch = US_WL.slice(i, i+3);
+      await Promise.allSettled(batch.map(function(item) { return fetchUSLite(item.symbol).catch(function(){}); }));
+      renderUSWL();
+      if (i+3 < US_WL.length) await new Promise(function(r){setTimeout(r,700);});
+    }
+  } finally { usWlRefreshing = false; }
+}
+
+function startUSWLTimer() {
+  clearInterval(usWlTimer); usWlLeft = 30;
+  usWlTimer = setInterval(function() {
+    usWlLeft--;
+    var bar = document.getElementById("usWlBar");
+    if (bar) bar.style.width = Math.max(0, usWlLeft/30*100)+"%";
+    var tick = document.getElementById("usWlTick");
+    if (tick) tick.textContent = Math.max(0,usWlLeft)+"s refresh";
+    if (usWlLeft <= 0) { usWlLeft = 30; refreshUSWL(); }
+  }, 1000);
+}
+
+async function addUSWL() {
+  if (!requireAuth("addUSWL")) return;
+  var inp = document.getElementById("usSymbol");
+  var raw = inp ? inp.value.trim().toUpperCase() : "";
+  if (!raw || !/^[A-Z.\-]{1,12}$/.test(raw)) { alert("Please enter a valid US stock symbol (letters only)"); return; }
+  if (US_WL.find(function(x){ return x.symbol===raw; })) { alert(raw+" is already in watchlist"); return; }
+  var name = raw, exchange = "US";
+  try {
+    var r = await apiFetch(API+"/api/us/suggest?q="+encodeURIComponent(raw), {}, 5000);
+    if (r.ok) {
+      var d = await r.json();
+      var hit = (d.results||[]).find(function(x){ return x.symbol===raw; });
+      if (hit) { name = hit.name; exchange = hit.exchange; }
+    }
+  } catch(e) {}
+  US_WL.push({ symbol:raw, name:name, exchange:exchange });
+  renderUSWL();
+  await saveUSWatchlist();
+  await fetchUSLite(raw);
+  renderUSWL();
+}
+
+function removeUSWL(sym) {
+  US_WL = US_WL.filter(function(x){ return x.symbol !== sym; });
+  delete US_WL_CACHE[sym];
+  renderUSWL();
+  saveUSWatchlist();
+}
+
+// ── US Chart ────────────────────────────────────────────────────────
+function destroyUSChart() {
+  if (usLwChart) { try { usLwChart.remove(); } catch(e){} usLwChart = null; }
+}
+
+async function usLoadStock(sym) {
+  if (!requireAuth("usLoadStock")) return;
+  sym = sym.toUpperCase();
+  US_CURRENT = sym;
+  var inp = document.getElementById("usSymbol"); if (inp) inp.value = sym;
+  var dash = document.getElementById("usDash"); if (dash) dash.style.display = "block";
+  var kw   = document.getElementById("usKlineWrap"); if (kw) kw.style.display = "none";
+  destroyUSChart();
+  setTxtUS("usName", sym); setTxtUS("usSymbolDisplay","");
+  setTxtUS("usPrice","…"); setTxtUS("usChg","");
+  setTxtUS("usAiSummary","Loading…");
+  // Step 1: lite (fast)
+  try {
+    var rl = await apiFetch(API+"/api/us/stock-lite/"+sym, {}, 12000);
+    if (rl.ok) { var dl = await rl.json(); renderUSQuote(dl); renderUSAI(dl.ai_signal||{}); }
+  } catch(e) {}
+  // Step 2: full (history + complete AI)
+  try {
+    var r = await apiFetch(API+"/api/us/stock/"+sym, {}, 45000);
+    if (!r.ok) throw new Error("HTTP "+r.status);
+    var d = await r.json();
+    if (d.error) { setTxtUS("usAiSummary", d.error); return; }
+    renderUSQuote(d);
+    renderUSAI(d.ai_signal||{});
+    renderUSKline(d.chart_data||[], d.ai_signal||{});
+    var ai = d.ai_signal||{};
+    US_WL_CACHE[sym] = { name:d.name||sym, price:d.price, changePct:d.change_pct,
+      signal:ai.signal||"WATCH", confidence:ai.confidence };
+    renderUSWL();
+  } catch(e) {
+    setTxtUS("usAiSummary","美股資料暫時無法取得，請稍後重試 ("+sym+")");
+  }
+}
+
+function renderUSQuote(d) {
+  setTxtUS("usName", d.name||d.symbol||"—");
+  setTxtUS("usSymbolDisplay", d.symbol||"");
+  setTxtUS("usExchange", d.exchange||"");
+  setTxtUS("usQuoteTime", d.quote_time||"");
+  var n   = Number(d.change_pct);
+  var clr = usColorCls(n);
+  var prEl = document.getElementById("usPrice");
+  if (prEl) { prEl.textContent = d.price!=null ? "$"+Number(d.price).toFixed(2) : "—"; prEl.className = clr; }
+  var chgEl = document.getElementById("usChg");
+  if (chgEl) {
+    var c = d.change, p = d.change_pct;
+    chgEl.textContent = (c!=null&&p!=null)
+      ? (c>0?"+":"")+Number(c).toFixed(2)+" ("+pctUS(p)+")" : "—";
+    chgEl.className = clr;
+  }
+  setTxtUS("usOpen", d.open!=null ? "$"+Number(d.open).toFixed(2) : "—");
+  var hi=document.getElementById("usHigh"); if(hi){hi.textContent=d.high!=null?"$"+Number(d.high).toFixed(2):"—";hi.className="us-up";}
+  var lo=document.getElementById("usLow");  if(lo){lo.textContent=d.low!=null?"$"+Number(d.low).toFixed(2):"—"; lo.className="us-down";}
+  setTxtUS("usVol", d.volume ? Math.round(d.volume/1000).toLocaleString()+"K" : "—");
+  setTxtUS("usMarketState", d.market_state ? "Market: "+d.market_state : "");
+}
+
+function renderUSAI(ai) {
+  var sig   = ai.signal || "WATCH";
+  var badge = document.getElementById("usAiBadge");
+  if (badge) badge.className = sig==="BUY" ? "us-ai-buy" : sig==="AVOID" ? "us-ai-avoid" : "us-ai-watch";
+  setTxtUS("usAiLabel", usSigIcon(sig));
+  var conf  = ai.confidence != null ? ai.confidence : 0;
+  setTxtUS("usAiConf", "Confidence "+conf+" / 100");
+  var bar = document.getElementById("usConfBar");
+  if (bar) { bar.style.width = conf+"%"; bar.style.background = conf>=75?"#22c55e":conf>=52?"#fbbf24":"#ef4444"; }
+  // Trade status
+  var tsEl = document.getElementById("usTradeStatus");
+  if (tsEl) {
+    var ts = ai.trade_status||"WATCH";
+    var es = ai.entry_status||""; var esText = ai.entry_status_text||"";
+    var tsBg = ts==="BUY_NOW"?"rgba(34,197,94,.15)":ts==="BUY_PULLBACK"?"rgba(251,191,36,.12)":"rgba(100,116,139,.15)";
+    var tsFg = ts==="BUY_NOW"?"#22c55e":ts==="BUY_PULLBACK"?"#fbbf24":"#64748b";
+    var tsLbl = {"BUY_NOW":"✅ BUY NOW","BUY_PULLBACK":"⏳ Wait Pullback","WATCH":"👀 Watch","AVOID":"🚫 Avoid"};
+    tsEl.innerHTML = '<span style="font-family:var(--mono);font-size:11px;font-weight:700;padding:3px 10px;border-radius:6px;background:'+tsBg+';color:'+tsFg+'">'+(tsLbl[ts]||ts)+'</span>'
+      + (es ? '<span style="font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:4px;background:#172946;color:var(--muted);margin-left:5px">'+esText+'</span>' : '');
+  }
+  // Price levels
+  setTxtUS("usAiEp",   ai.entry_price!=null  ? fUS(ai.entry_price,2)  : "—");
+  setTxtUS("usAiTp",   ai.target_price!=null ? fUS(ai.target_price,2) : "—");
+  setTxtUS("usAiSl",   ai.stop_loss!=null    ? fUS(ai.stop_loss,2)    : "—");
+  var rrEl = document.getElementById("usAiRr");
+  if (rrEl) {
+    if (ai.risk_reward_ratio!=null) { rrEl.textContent=ai.risk_reward_ratio+"x"; rrEl.className=ai.risk_reward_ratio>=1.5?"us-up":"us-down"; }
+    else rrEl.textContent="—";
+  }
+  var ezLo=ai.entry_zone_low, ezHi=ai.entry_zone_high;
+  setTxtUS("usAiZone", (ezLo&&ezHi) ? "$"+Number(ezLo).toFixed(2)+" ~ $"+Number(ezHi).toFixed(2) : "—");
+  setTxtUS("usAiTs", ai.technical_score!=null ? ai.technical_score+"/100" : "—");
+  // Tags
+  var tagsEl = document.getElementById("usAiTags");
+  if (tagsEl) {
+    var tags = [];
+    if (ai.strategy_type) tags.push('<span style="font-family:var(--mono);font-size:10px;padding:2px 8px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.3);border-radius:4px;color:#60a5fa">'+ai.strategy_type+'</span>');
+    if (ai.trade_valid===true)  tags.push('<span style="font-family:var(--mono);font-size:10px;padding:2px 8px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);border-radius:4px;color:#22c55e">✅ Valid Setup</span>');
+    if (ai.trade_valid===false) tags.push('<span style="font-family:var(--mono);font-size:10px;padding:2px 8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:4px;color:#ef4444">⚠️ Invalid Setup</span>');
+    var oh = ai.overheat_flags||[];
+    if (oh.length) tags.push('<span style="font-family:var(--mono);font-size:10px;padding:2px 8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:4px;color:#ef4444">🌡 '+oh[0]+'</span>');
+    tagsEl.innerHTML = tags.join("");
+  }
+  // Support / Resistance
+  var srEl = document.getElementById("usAiSupRes");
+  if (srEl) {
+    var parts = [];
+    if (ai.recent_support)    parts.push('Support: <b style="color:#60a5fa">$'+Number(ai.recent_support).toFixed(2)+'</b>');
+    if (ai.recent_resistance) parts.push('Resistance: <b style="color:#f97316">$'+Number(ai.recent_resistance).toFixed(2)+'</b>');
+    srEl.innerHTML = parts.join(' &nbsp;|&nbsp; ');
+  }
+  // Risk reasons
+  var rrReasonEl = document.getElementById("usAiRiskReasons");
+  if (rrReasonEl) {
+    var rr = ai.risk_reason||[];
+    rrReasonEl.innerHTML = rr.map(function(r){ return '<div style="font-family:var(--mono);font-size:11px;color:#ef4444;margin-top:3px">⚠️ '+r+'</div>'; }).join("");
+  }
+  setTxtUS("usAiSummary", ai.summary||(sig==="AVOID"?"Technical analysis suggests caution.":"—"));
+}
+
+function renderUSKline(chartData, aiSignal) {
+  var wrap      = document.getElementById("usKlineWrap");
+  var container = document.getElementById("usKlineContainer");
+  if (!wrap||!container) return;
+  if (!chartData||!chartData.length) { wrap.style.display="none"; return; }
+  wrap.style.display = "block";
+  destroyUSChart();
+  try {
+    if (typeof LightweightCharts==="undefined") { wrap.style.display="none"; return; }
+    var h = window.innerWidth<=768 ? 320 : 420;
+    container.style.height = h+"px";
+    // US: green=up, red=down (international)
+    usLwChart = LightweightCharts.createChart(container, {
+      width:container.offsetWidth, height:h,
+      layout:{background:{color:"#0d1728"},textColor:"#6f86a8"},
+      grid:{vertLines:{color:"rgba(29,49,80,.5)"},horzLines:{color:"rgba(29,49,80,.5)"}},
+      crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+      rightPriceScale:{borderColor:"#1d3150"},
+      timeScale:{borderColor:"#1d3150",timeVisible:true},
+    });
+    var cs = usLwChart.addCandlestickSeries({
+      upColor:"#22c55e", downColor:"#ef4444",
+      borderUpColor:"#22c55e", borderDownColor:"#ef4444",
+      wickUpColor:"#22c55e", wickDownColor:"#ef4444",
+    });
+    var cd = chartData.filter(function(d){ return d.open&&d.high&&d.low&&d.close; })
+                      .map(function(d){ return {time:d.date,open:d.open,high:d.high,low:d.low,close:d.close}; });
+    if (cd.length) cs.setData(cd);
+    // MA lines
+    var maLines = [
+      {fn:function(d){return d.ma5;},  color:"#fbbf24", style:0},
+      {fn:function(d){return d.ma20;}, color:"#f97316", style:0},
+      {fn:function(d){return d.ma60;}, color:"#ef4444", style:2},
+    ];
+    maLines.forEach(function(m) {
+      var s = usLwChart.addLineSeries({color:m.color,lineWidth:1,lineStyle:m.style,priceLineVisible:false});
+      s.setData(chartData.filter(function(d){return m.fn(d)!=null;}).map(function(d){return {time:d.date,value:m.fn(d)};}));
+    });
+    // Trade lines
+    var ai = aiSignal||{};
+    if (ai.trade_valid!==false && cd.length) {
+      if (ai.entry_price)  cs.createPriceLine({price:ai.entry_price, color:"#fbbf24",lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:"Entry"});
+      if (ai.target_price) cs.createPriceLine({price:ai.target_price,color:"#22c55e",lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:"Target"});
+      if (ai.stop_loss)    cs.createPriceLine({price:ai.stop_loss,   color:"#ef4444",lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:"Stop"});
+    }
+    if (cd.length && ai.recent_support) {
+      var sl=usLwChart.addLineSeries({color:"rgba(96,165,250,.5)",lineWidth:1,lineStyle:3,priceLineVisible:false});
+      sl.setData([{time:cd[0].time,value:ai.recent_support},{time:cd[cd.length-1].time,value:ai.recent_support}]);
+    }
+    if (cd.length && ai.recent_resistance) {
+      var rl=usLwChart.addLineSeries({color:"rgba(249,115,22,.4)",lineWidth:1,lineStyle:3,priceLineVisible:false});
+      rl.setData([{time:cd[0].time,value:ai.recent_resistance},{time:cd[cd.length-1].time,value:ai.recent_resistance}]);
+    }
+    // Volume
+    var vs = usLwChart.addHistogramSeries({color:"rgba(34,197,94,.3)",priceFormat:{type:"volume"},priceScaleId:"vol",scaleMargins:{top:0.8,bottom:0}});
+    var vd = chartData.filter(function(d){return d.volume!=null&&d.close!=null;}).map(function(d){
+      return {time:d.date,value:d.volume,color:d.close>=(d.open||d.close)?"rgba(34,197,94,.4)":"rgba(239,68,68,.4)"};
+    });
+    if (vd.length) vs.setData(vd);
+    usLwChart.timeScale().fitContent();
+    setTxtUS("usKlineStatus", cd.length+" bars");
+    try {
+      var ro = new ResizeObserver(function(){ if(usLwChart&&container) usLwChart.applyOptions({width:container.offsetWidth}); });
+      ro.observe(container);
+    } catch(e) {}
+  } catch(e) { console.warn("US kline:", e.message); wrap.style.display="none"; }
+}
+
+// ── US AI Scan ─────────────────────────────────────────────────────
+async function usAiScan() {
+  if (!requireAuth("usAiScan")) return;
+  var box = document.getElementById("usAiScanBox");
+  if (box) box.style.display = "block";
+  var sum = document.getElementById("usAiScanSummary");
+  if (sum) sum.textContent = "Scanning… (~30-90 sec)";
+  ["usZoneEnterable","usZonePullback","usZoneAvoid"].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.innerHTML="";
+  });
+  var dash = document.getElementById("usDash"); if (dash) dash.style.display="block";
+  setTimeout(function(){ if(box) box.scrollIntoView({behavior:"smooth",block:"start"}); }, 200);
+  try {
+    var r = await apiFetch(API+"/api/us/scan?min_score=58&max_stocks=25", {}, 120000);
+    var d = await r.json();
+    if (sum) sum.textContent = "Scanned "+d.scanned+" stocks in "+d.duration_seconds+"s";
+    renderUSScan(d);
+  } catch(e) {
+    if (sum) sum.textContent = "Scan failed: "+e.message;
+  }
+}
+
+function renderUSScan(data) {
+  function zone(elId, title, css, items, emptyMsg) {
+    var el = document.getElementById(elId); if (!el) return;
+    if (!items||!items.length) {
+      el.innerHTML = '<div class="'+css+'" style="border-radius:8px">'+title+' <span>0</span></div><div class="empty-scan">'+emptyMsg+'</div>';
+      return;
+    }
+    el.innerHTML = '<div class="'+css+'">'+title+' <span class="sq-tag">'+items.length+'</span></div>'
+      +'<div class="grid-cards" style="margin-bottom:10px">'+items.map(usScanCard).join("")+'</div>';
+    el.querySelectorAll("[data-us-load]").forEach(function(el){ el.addEventListener("click",function(){ usLoadStock(el.dataset.usLoad); }); });
+  }
+  zone("usZoneEnterable","✅ Enterable Candidates","us-zone-enter",data.enterable,"No stocks meet entry criteria. Avoid chasing.");
+  zone("usZonePullback","⏳ Watch / Wait for Pullback","us-zone-watch",data.pullback,"—");
+  zone("usZoneAvoid","⚠️ Avoid / Risk Watch","us-zone-avoid",data.avoid,"—");
+}
+
+function usScanCard(r) {
+  var clr  = usColorCls(r.change_pct);
+  var sig  = r.signal||"WATCH";
+  var rr   = r.risk_reward_ratio;
+  var tv   = r.trade_valid;
+  var sigBg = sig==="BUY"?"rgba(34,197,94,.15)":sig==="AVOID"?"rgba(239,68,68,.1)":"rgba(251,191,36,.12)";
+  var sigFg = sig==="BUY"?"#22c55e":sig==="AVOID"?"#ef4444":"#fbbf24";
+  return '<div class="scan-card" data-us-load="'+r.symbol+'" style="cursor:pointer">'
+    +'<div class="scan-card-top">'
+    +'<div><div style="font-weight:700;font-size:13px">'+r.symbol+'</div>'
+    +'<div style="font-family:var(--mono);font-size:10px;color:var(--muted)">'+(r.name||"")+(r.strategy_type?' <span style="font-size:9px">'+r.strategy_type+'</span>':'')+'</div></div>'
+    +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">'
+    +'<span style="font-family:var(--mono);font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;background:'+sigBg+';color:'+sigFg+'">'+usSigIcon(sig)+'</span>'
+    +(tv===true?'<span style="font-family:var(--mono);font-size:9px;color:#22c55e">✅ Valid</span>':tv===false?'<span style="font-family:var(--mono);font-size:9px;color:#ef4444">⚠️ Invalid</span>':'')
+    +'</div></div>'
+    +'<div style="font-family:var(--mono);font-size:16px;font-weight:600;margin:4px 0" class="'+clr+'">'
+    +(r.price!=null?"$"+Number(r.price).toFixed(2):"—")
+    +' <span style="font-size:12px">'+pctUS(r.change_pct)+'</span></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px 12px;font-family:var(--mono);font-size:11px;margin-top:6px">'
+    +'<div><span style="color:var(--muted)">Entry</span> '+(r.entry_price!=null?"$"+Number(r.entry_price).toFixed(2):"—")+'</div>'
+    +'<div><span style="color:var(--muted)">Target</span> <span class="us-up">'+(r.target_price!=null?"$"+Number(r.target_price).toFixed(2):"—")+'</span></div>'
+    +'<div><span style="color:var(--muted)">Stop</span> <span class="us-down">'+(r.stop_loss!=null?"$"+Number(r.stop_loss).toFixed(2):"—")+'</span></div>'
+    +'<div><span style="color:var(--muted)">RR</span> <span class="'+((rr||0)>=1.5?"us-up":"us-down")+'">'+(rr!=null?rr+"x":"—")+'</span></div>'
+    +'</div>'
+    +((r.risk_reason&&r.risk_reason.length)?'<div style="font-family:var(--mono);font-size:10px;color:#ef4444;margin-top:5px">⚠️ '+r.risk_reason[0]+'</div>':"")
+    +'</div>';
+}
+
+// ── US Symbol Suggest ──────────────────────────────────────────────
+var usSuggestTimer = null;
+
+function initUSSuggest() {
+  var inp = document.getElementById("usSymbol");
+  var box = document.getElementById("usSuggestBox");
+  if (!inp||!box) return;
+  inp.addEventListener("input", function() {
+    clearTimeout(usSuggestTimer);
+    var q = inp.value.trim();
+    if (q.length < 1) { box.style.display="none"; return; }
+    usSuggestTimer = setTimeout(function(){ fetchUSSuggest(q); }, 250);
+  });
+  inp.addEventListener("keydown", function(e){ if(e.key==="Enter") usDoSearch(); });
+  inp.addEventListener("blur",    function(){ setTimeout(function(){ box.style.display="none"; }, 200); });
+  box.addEventListener("mousedown", function(e) {
+    var item = e.target.closest("[data-us-sym]");
+    if (item) { inp.value=item.dataset.usSym; box.style.display="none"; usDoSearch(); }
+  });
+}
+
+async function fetchUSSuggest(q) {
+  var box = document.getElementById("usSuggestBox"); if (!box) return;
+  try {
+    var r = await apiFetch(API+"/api/us/suggest?q="+encodeURIComponent(q), {}, 5000);
+    if (!r.ok) return;
+    var d = await r.json(); var results = d.results||[];
+    if (!results.length) { box.style.display="none"; return; }
+    box.innerHTML = results.map(function(r){
+      return '<div class="us-suggest-item" data-us-sym="'+r.symbol+'">'
+        +'<div><span class="us-sym">'+r.symbol+'</span> <span class="us-sname">'+r.name+'</span></div>'
+        +'<span class="us-exch">'+(r.exchange||r.type||"")+'</span>'
+        +'</div>';
+    }).join("");
+    box.style.display = "block";
+  } catch(e) {}
+}
+
+function usDoSearch() {
+  var inp = document.getElementById("usSymbol");
+  var sym = inp ? inp.value.trim().toUpperCase() : "";
+  if (/^[A-Z.\-]{1,12}$/.test(sym)) usLoadStock(sym);
+  else if (sym) alert("Please enter a valid US stock symbol (letters only)");
+}
+
+// End of V11.0.1 US module
 
 document.addEventListener("DOMContentLoaded",initApp);
 </script>
