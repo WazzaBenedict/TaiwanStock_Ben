@@ -12,7 +12,7 @@ from fastapi import FastAPI,HTTPException,Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app=FastAPI(title="股票監測 API V11 Multi-Market",version="11.0.0")
+app=FastAPI(title="台股監測 API V10.4 Technical Trade Plan",version="10.4.0")
 _raw=os.getenv("ALLOWED_ORIGINS","http://localhost:5500,http://127.0.0.1:5500,https://taiwanstock-ben.web.app,https://taiwanstock-ben.firebaseapp.com")
 ALLOWED_ORIGINS=[o.strip() for o in _raw.split(",") if o.strip()]
 DEV_MODE=os.getenv("DEV_MODE","false").lower()=="true"
@@ -78,7 +78,7 @@ STOCK_NAME_MAP:dict[str,str]={
 # AI 學習系統
 # ══════════════════════════════════════════════════════════════════════════════
 DEFAULT_WEIGHTS={"technical":0.35,"fundamental":0.25,"chip":0.25,"news":0.15,
-    "risk":0.10,"macro":0.05,"updated_at":"","version":"11.0.0","last_reason":"預設權重"}
+    "risk":0.10,"macro":0.05,"updated_at":"","version":"10.4.0","last_reason":"預設權重"}
 WEIGHT_LIMITS={"technical":(0.20,0.45),"fundamental":(0.10,0.35),"chip":(0.10,0.40),"news":(0.05,0.25)}
 
 def _rjf(path,default):
@@ -1787,7 +1787,7 @@ async def ai_scan(min_score:int=Query(65,ge=0,le=100),max_stocks:int=Query(40,ge
 @app.post("/api/alerts/test")
 async def test_line():
     _cc()
-    result=await send_line_message("✅ 台股監測 V11 Multi-Market - LINE 通知測試成功！")
+    result=await send_line_message("✅ 台股監測 V10.4 Technical Trade Plan - LINE 通知測試成功！")
     if not result["success"]:raise HTTPException(500,detail=result["message"])
     return result
 
@@ -1850,354 +1850,14 @@ async def api_learning_evaluate():return await evaluate_signal_history()
 @app.post("/api/learning/retrain")
 def api_learning_retrain():return retrain_ai_weights()
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# ★ V11: 美股模組（Yahoo Finance → Stooq fallback）
-# ══════════════════════════════════════════════════════════════════════════════
-
-US_SCAN_POOL = [
-    "NVDA","AAPL","MSFT","AMZN","META","GOOGL","TSLA","AMD","AVGO","ORCL",
-    "NFLX","ADBE","CRM","INTC","QCOM","MU","AMAT","LRCX","KLAC","MRVL",
-    "SPY","QQQ","SOXX","GLD","TLT",
-]
-
-US_NAME_MAP: dict[str, str] = {
-    "NVDA":"NVIDIA","AAPL":"Apple","MSFT":"Microsoft","AMZN":"Amazon",
-    "META":"Meta","GOOGL":"Alphabet","TSLA":"Tesla","AMD":"AMD",
-    "AVGO":"Broadcom","ORCL":"Oracle","NFLX":"Netflix","ADBE":"Adobe",
-    "CRM":"Salesforce","INTC":"Intel","QCOM":"Qualcomm","MU":"Micron",
-    "AMAT":"Applied Materials","LRCX":"Lam Research","KLAC":"KLA Corp",
-    "MRVL":"Marvell","SPY":"S&P 500 ETF","QQQ":"Nasdaq 100 ETF",
-    "SOXX":"SOX ETF","GLD":"Gold ETF","TLT":"20Y Treasury ETF",
-}
-
-_us_cache: dict[str,dict] = {}
-_us_cache_ts: dict[str,float] = {}
-US_LITE_TTL = 120   # 2 min lite cache
-US_FULL_TTL = 300   # 5 min full cache
-
-def _get_us_name(symbol: str) -> str:
-    return US_NAME_MAP.get(symbol.upper(), symbol)
-
-async def fetch_us_quote_yahoo(symbol: str, client: httpx.AsyncClient) -> dict | None:
-    """Fetch Yahoo Finance v8 chart for US quote + history."""
-    try:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=1d"
-        r = await client.get(url, headers={"User-Agent":"Mozilla/5.0"}, timeout=8)
-        if r.status_code != 200: return None
-        res = r.json().get("chart",{}).get("result")
-        if not res: return None
-        res = res[0]
-        meta = res.get("meta",{})
-        price = meta.get("regularMarketPrice") or meta.get("previousClose")
-        prev  = meta.get("previousClose") or meta.get("chartPreviousClose")
-        if not price: return None
-        chg = round(price - prev, 4) if prev else None
-        chgp = round(chg / prev * 100, 2) if (chg and prev) else None
-        q = res.get("indicators",{}).get("quote",[{}])[0]
-        closes = [c for c in q.get("close",[]) if c is not None]
-        vol = q.get("volume",[])
-        return {
-            "symbol": symbol,
-            "name": _get_us_name(symbol),
-            "price": round(price, 4),
-            "previous_close": round(prev, 4) if prev else None,
-            "change": chg,
-            "change_pct": chgp,
-            "open": round(float(meta.get("regularMarketOpen") or price), 4),
-            "high": round(float(meta.get("regularMarketDayHigh") or price), 4),
-            "low": round(float(meta.get("regularMarketDayLow") or price), 4),
-            "volume": int(meta.get("regularMarketVolume") or (vol[-1] if vol else 0) or 0),
-            "currency": meta.get("currency","USD"),
-            "exchange": meta.get("exchangeName",""),
-            "market_state": meta.get("marketState",""),
-            "quote_time": datetime.utcfromtimestamp(meta.get("regularMarketTime",0)).strftime("%Y-%m-%d %H:%M UTC") if meta.get("regularMarketTime") else None,
-        }
-    except Exception as e:
-        return None
-
-async def fetch_us_history_yahoo(symbol: str, client: httpx.AsyncClient, days: int = 400) -> pd.DataFrame:
-    """Fetch Yahoo Finance OHLCV history for US stock."""
-    try:
-        p2 = int(datetime.now().timestamp())
-        p1 = int((datetime.now() - timedelta(days=days)).timestamp())
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={p1}&period2={p2}&interval=1d"
-        r = await client.get(url, headers={"User-Agent":"Mozilla/5.0"}, timeout=12)
-        if r.status_code != 200: return pd.DataFrame()
-        res = r.json().get("chart",{}).get("result")
-        if not res: return pd.DataFrame()
-        res = res[0]; ts_list = res.get("timestamp",[])
-        q = res.get("indicators",{}).get("quote",[{}])[0]
-        o,h,l,c,v = q.get("open",[]),q.get("high",[]),q.get("low",[]),q.get("close",[]),q.get("volume",[])
-        if not ts_list or not c: return pd.DataFrame()
-        recs = []
-        for i,ts in enumerate(ts_list):
-            if i < len(c) and c[i] is not None:
-                recs.append({
-                    "日期": pd.to_datetime(ts, unit="s", utc=True).tz_convert("America/New_York").date(),
-                    "開盤價": o[i] if i<len(o) and o[i] else c[i],
-                    "最高價": h[i] if i<len(h) and h[i] else c[i],
-                    "最低價": l[i] if i<len(l) and l[i] else c[i],
-                    "收盤價": c[i],
-                    "成交股數": int(v[i]) if i<len(v) and v[i] else 0,
-                })
-        df = pd.DataFrame(recs)
-        if df.empty: return df
-        df["日期"] = pd.to_datetime(df["日期"])
-        return df.sort_values("日期").reset_index(drop=True)
-    except:
-        return pd.DataFrame()
-
-def compute_us_ai_signal(df: pd.DataFrame, cp: float, quote: dict) -> dict:
-    """Simple but solid US AI signal using same indicator logic."""
-    if df.empty or cp <= 0:
-        return {"signal":"WATCH","confidence":None,"score_quality":"none",
-                "entry_price":None,"target_price":None,"stop_loss":None,
-                "risk_reward_ratio":None,"trade_status":"WATCH","entry_status":"NO_DATA",
-                "entry_status_text":"資料不足","can_enter":False,"trade_valid":False,
-                "strategy_type":"","summary":"美股資料不足。","disclaimer":"⚠️ 本工具僅供參考，非投資建議"}
-
-    df = compute_indicators_v4(df)
-    latest = df.iloc[-1]
-    def _g(col): return float(latest[col]) if col in latest.index and pd.notna(latest.get(col)) else None
-
-    ma5=_g("MA5"); ma20=_g("MA20"); ma60=_g("MA60")
-    rsi=_g("RSI"); macd=_g("MACD"); sig_v=_g("Signal"); hist=_g("Hist")
-    atr=_g("ATR"); adx=_g("ADX")
-    chg_pct = quote.get("change_pct") or 0
-    vol_ratio = 1.0
-    try:
-        avg_vol = df.tail(20)["成交股數"].mean()
-        lat_vol = float(df.iloc[-1]["成交股數"])
-        vol_ratio = round(lat_vol / avg_vol, 2) if avg_vol > 0 else 1.0
-    except: pass
-
-    # Score (100-pt)
-    score = 0
-    if ma5 and ma20 and ma5 > ma20:   score += 10
-    if ma20 and ma60 and ma20 > ma60: score += 10
-    if ma20 and cp > ma20:             score += 10
-    if macd and sig_v and macd > sig_v: score += 15
-    if hist and hist > 0:              score += 5
-    if rsi:
-        if 45 <= rsi <= 65:   score += 15
-        elif 65 < rsi <= 72:  score += 8
-        elif rsi > 72:        score -= 12
-        elif rsi < 35:        score -= 8
-    if adx:
-        if adx >= 25: score += 10
-        elif adx >= 15: score += 5
-        else: score -= 3
-    if vol_ratio >= 1.5 and chg_pct > 0: score += 10
-    elif vol_ratio < 0.8 and chg_pct > 0: score -= 5
-    # MA20 deviation
-    if ma20 and ma20 > 0:
-        dev = (cp - ma20) / ma20 * 100
-        if dev > 12: score -= 10
-        elif dev <= 5: score += 5
-    final = max(0, min(100, score))
-
-    if final >= 75:   signal = "BUY"
-    elif final >= 52: signal = "WATCH"
-    else:             signal = "AVOID"
-
-    # Trade plan (long only, US style)
-    ep = tp = sl = rr = None
-    if signal != "AVOID":
-        ep = round(ma5, 4) if ma5 and cp > ma5 * 0.98 else round(cp, 4)
-        # Support / resistance
-        tail20 = df.tail(20)
-        sup = float(tail20["最低價"].min()) if "最低價" in tail20.columns else None
-        res = float(tail20["最高價"].max()) if "最高價" in tail20.columns else None
-        # Stop
-        sl_cands = [ep * 0.97]
-        if ma20: sl_cands.append(ma20 * 0.985)
-        if sup:  sl_cands.append(sup * 0.99)
-        if atr:  sl_cands.append(ep - atr * 1.5)
-        sl = round(min(sl_cands), 4)
-        if sl >= ep: sl = round(ep * 0.96, 4)
-        # Target
-        tp_cands = [ep * 1.07]
-        if res and res > ep * 1.01: tp_cands.append(res)
-        if atr: tp_cands.append(ep + atr * 2.5)
-        tp = round(max(tp_cands), 4)
-        if tp <= ep: tp = round(ep * 1.07, 4)
-        # RR
-        if ep > sl > 0 and tp > ep:
-            rr = round((tp - ep) / (ep - sl), 2)
-        else:
-            signal = "WATCH"; ep=tp=sl=rr=None
-
-    trade_valid = (rr is not None and rr >= 1.5)
-    if not trade_valid and signal == "BUY": signal = "WATCH"
-
-    # entry_status
-    es = "NO_DATA"
-    if signal == "AVOID": es = "NO_DATA"
-    elif not trade_valid: es = "BAD_SETUP"
-    elif rsi and rsi > 72: es = "TOO_EXTENDED"
-    elif ma20 and ma20>0 and (cp-ma20)/ma20*100 > 8: es = "WAIT_PULLBACK"
-    elif ep and abs(cp-ep)/ep*100 <= 3: es = "ENTERABLE"
-    else: es = "WAIT_PULLBACK"
-
-    # overheat
-    overheat = []
-    if rsi and rsi > 72: overheat.append(f"RSI {rsi:.1f} overbought")
-    if chg_pct > 6: overheat.append(f"Today +{chg_pct:.1f}% hot")
-    if ma20 and ma20>0 and (cp-ma20)/ma20*100 > 10: overheat.append("Extended >10% above MA20")
-
-    # strategy
-    full_bull = (ma5 and ma20 and ma60 and ma5>ma20>ma60 and cp>ma20)
-    if overheat: strat = "Overheated"
-    elif final < 40: strat = "Avoid"
-    elif adx and adx < 15: strat = "Range Bound"
-    elif full_bull and adx and adx > 25 and rsi and 45 <= rsi <= 70: strat = "Trend Following"
-    elif ma20 and cp > 0 and (cp-ma20)/ma20*100 < 3: strat = "Pullback Entry"
-    else: strat = "Trend Following" if final >= 60 else "Range Bound"
-
-    est = ENTRY_STATUS_TEXT.get(es, "—")
-    trade_status = "AVOID"
-    if signal == "BUY":
-        if ep and cp > 0 and (cp-ep)/ep*100 > 4: trade_status = "BUY_PULLBACK"
-        elif rr and rr >= 1.5: trade_status = "BUY_NOW"
-        else: trade_status = "WATCH"
-    elif signal == "WATCH": trade_status = "WATCH"
-
-    summary = f"技術分 {final}/100。策略型態：{strat}。" + (
-        "整體條件符合，可考慮入場。" if signal=="BUY" else
-        "訊號偏正但尚未確認，建議觀察。" if signal=="WATCH" else "條件不足，建議保守觀望。"
-    )
-
-    return {
-        "signal": signal, "confidence": final, "score_quality": "full" if len(df)>=60 else "partial",
-        "entry_price": ep, "target_price": tp, "stop_loss": sl, "risk_reward_ratio": rr,
-        "trade_status": trade_status, "entry_status": es, "entry_status_text": est,
-        "can_enter": es == "ENTERABLE", "trade_valid": trade_valid,
-        "strategy_type": strat, "overheat_flags": overheat, "false_breakout_flags": [],
-        "holding_days": "5-15 days" if signal=="BUY" else "Watch only",
-        "summary": summary, "disclaimer": "⚠️ Not investment advice",
-        "entry_reason": [f"Tech score {final}/100", f"Strategy: {strat}"],
-        "risk_reason": overheat[:3],
-    }
-
-async def _fetch_us_full(symbol: str) -> dict:
-    """Full US stock data with history + AI."""
-    symbol = symbol.upper()
-    now = time.time()
-    if symbol in _us_cache and (now - _us_cache_ts.get(symbol, 0)) < US_FULL_TTL:
-        return _us_cache[symbol]
-    async with httpx.AsyncClient() as client:
-        quote, df = await asyncio.gather(
-            fetch_us_quote_yahoo(symbol, client),
-            fetch_us_history_yahoo(symbol, client, 400),
-        )
-    if not quote:
-        return {"symbol":symbol,"name":_get_us_name(symbol),"error":"美股資料暫時無法取得，請稍後重試","chart_data":[]}
-
-    cp = quote["price"]
-    ai = compute_us_ai_signal(df, cp, quote)
-
-    chart_data = []
-    if not df.empty:
-        df2 = compute_indicators_v4(df.copy())
-        for _, row in df2.tail(120).iterrows():
-            chart_data.append({
-                "date": row["日期"].strftime("%Y-%m-%d"),
-                "open": _f(row.get("開盤價"),4), "high": _f(row.get("最高價"),4),
-                "low": _f(row.get("最低價"),4), "close": _f(row.get("收盤價"),4),
-                "volume": int(row["成交股數"]) if pd.notna(row.get("成交股數")) else 0,
-                "ma5": _f(row.get("MA5"),4), "ma20": _f(row.get("MA20"),4), "ma60": _f(row.get("MA60"),4),
-                "rsi": _f(row.get("RSI")), "macd": _f(row.get("MACD"),4),
-                "signal_line": _f(row.get("Signal"),4), "hist": _f(row.get("Hist"),4),
-            })
-
-    result = {**quote, "ai_signal": ai, "chart_data": chart_data,
-              "data_source": "Yahoo Finance", "symbol": symbol}
-    _us_cache[symbol] = result; _us_cache_ts[symbol] = now
-    return result
-
-async def _fetch_us_lite(symbol: str) -> dict:
-    """Lite US stock (quote + AI only, no history chart)."""
-    symbol = symbol.upper()
-    now = time.time()
-    if symbol in _us_cache and (now - _us_cache_ts.get(symbol, 0)) < US_LITE_TTL:
-        cached = _us_cache[symbol]
-        return {"symbol":symbol,"name":cached.get("name",symbol),
-                "price":cached.get("price"),"change_pct":cached.get("change_pct"),
-                "change":cached.get("change"),"ai_signal":cached.get("ai_signal",{}),"lite":True}
-    async with httpx.AsyncClient() as client:
-        quote = await fetch_us_quote_yahoo(symbol, client)
-    if not quote:
-        return {"symbol":symbol,"name":_get_us_name(symbol),"price":None,"change_pct":None,
-                "change":None,"ai_signal":{},"lite":True,"error":"暫時無法取得"}
-    cp = quote["price"]
-    # Minimal AI from quote only (no history for speed)
-    chg = quote.get("change_pct") or 0
-    conf = 60
-    if chg > 2: conf += 5
-    elif chg < -2: conf -= 5
-    ai_lite = {"signal":"WATCH","confidence":conf,"score_quality":"partial","trade_status":"WATCH",
-               "entry_status":"NO_DATA","entry_status_text":"資料不足","can_enter":False,
-               "trade_valid":False,"summary":"輕量 AI，請查詢完整資料以獲得詳細分析。",
-               "disclaimer":"⚠️ Not investment advice"}
-    return {**quote, "ai_signal":ai_lite, "lite":True}
-
-# ── US API endpoints ──────────────────────────────────────────────────────────
-class USWatchlistBody(BaseModel): watchlist: list[str]
-
-@app.get("/api/us/stock/{symbol}")
-async def us_get_stock(symbol: str):
-    if not re.match(r"^[A-Za-z]{1,10}$", symbol):
-        raise HTTPException(400, detail="Invalid US stock symbol")
-    return await _fetch_us_full(symbol.upper())
-
-@app.get("/api/us/stock-lite/{symbol}")
-async def us_get_stock_lite(symbol: str):
-    if not re.match(r"^[A-Za-z]{1,10}$", symbol):
-        raise HTTPException(400, detail="Invalid US stock symbol")
-    return await _fetch_us_lite(symbol.upper())
-
-@app.get("/api/us/scan")
-async def us_scan(min_score: int = Query(60, ge=0, le=100),
-                  max_stocks: int = Query(20, ge=5, le=30)):
-    """Scan US stocks for AI signals, 3-zone output."""
-    t0 = time.time()
-    pool = US_SCAN_POOL[:max_stocks]
-    enterable = []; pullback = []; errors = []
-    for sym in pool:
-        try:
-            r = await _fetch_us_lite(sym)
-            ai = r.get("ai_signal", {}); conf = ai.get("confidence") or 0
-            if conf < min_score: continue
-            es = ai.get("entry_status","NO_DATA")
-            item = {"symbol":sym,"name":r.get("name",sym),"price":r.get("price"),
-                    "change_pct":r.get("change_pct"),
-                    "signal":ai.get("signal","WATCH"),"confidence":conf,
-                    "trade_status":ai.get("trade_status","WATCH"),
-                    "entry_status":es,"entry_status_text":ai.get("entry_status_text","—"),
-                    "can_enter":ai.get("can_enter",False),
-                    "strategy_type":ai.get("strategy_type",""),
-                    "entry_price":ai.get("entry_price"),"target_price":ai.get("target_price"),
-                    "stop_loss":ai.get("stop_loss"),"risk_reward_ratio":ai.get("risk_reward_ratio"),
-                    "summary":ai.get("summary","")}
-            if es == "ENTERABLE": enterable.append(item)
-            else: pullback.append(item)
-        except Exception as e:
-            errors.append({"symbol":sym,"error":str(e)})
-    enterable.sort(key=lambda x: -(x.get("confidence") or 0))
-    pullback.sort(key=lambda x: -(x.get("confidence") or 0))
-    return {"scanned":len(pool),"enterable":enterable,"pullback":pullback,
-            "errors":errors,"duration_seconds":round(time.time()-t0,1)}
-
-
 @app.get("/health")
 def health():
-    return{"status":"ok","version":"11.0.0","time":datetime.now().isoformat(),
+    return{"status":"ok","version":"10.4.0","time":datetime.now().isoformat(),
            "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
            "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
            "price_sources":"Yahoo Finance → TWSE Official → FinMind",
            "stock_master_count":len(STOCK_MASTER),"stock_master_updated":_mua,
            "http_timeout":HTTP_TIMEOUT,
-           "features":["V11 Multi-Market","US stocks via Yahoo Finance","trade_status BUY_NOW/BUY_PULLBACK/WATCH/AVOID",
+           "features":["V10.4 Technical Trade Plan","trade_status BUY_NOW/BUY_PULLBACK/WATCH/AVOID",
                        "Momentum Breakout","multi_timeframe","macro_api","market_sentiment",
                        "Firestore watchlist","4D on-demand","AI learning","stock-lite","sharpe_ratio"]}
