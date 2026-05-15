@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>V12.0.1 AI Picker Pro</title>
+<title>V12.0.2 AI Picker Pro</title>
 <script src="config.js"></script>
 <!-- Firebase compat SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -275,6 +275,15 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .bt-trades{font-family:var(--mono);font-size:11px;width:100%;border-collapse:collapse}
 .bt-trades th,.bt-trades td{padding:4px 8px;border-bottom:1px solid var(--line);text-align:left}
 .bt-trades .win td{color:var(--up)}.bt-trades .loss td{color:var(--down)}
+
+/* ── System Health / Version Panel ───────────────────────────────── */
+.system-health{background:rgba(13,23,40,.92);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.system-health-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.health-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:7px;margin-top:8px}
+.health-chip{background:#172946;border:1px solid var(--line);border-radius:7px;padding:6px 8px;display:flex;justify-content:space-between;gap:6px;align-items:center}
+.health-ok{color:var(--down)}.health-warn{color:var(--yellow)}.health-bad{color:var(--up)}
+.version-warn{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);color:var(--yellow);border-radius:7px;padding:7px 9px;margin-top:8px;display:none;line-height:1.6}
+
 /* ── footer ──────────────────────────────────────────────────────── */
 .footer{text-align:center;padding:20px;font-size:11px;color:var(--muted);font-family:var(--mono);border-top:1px solid var(--line);margin-top:20px;line-height:1.8}
 /* ── misc ────────────────────────────────────────────────────────── */
@@ -311,7 +320,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       使用 Google 帳號登入
     </button>
     <div id="loginError"></div>
-    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12 Global Trading Intelligence · AI Picker Pro</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.0.2 Global Trading Intelligence · AI Picker Pro</div>
   </div>
 </div>
 
@@ -320,7 +329,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="logo">
     <span class="live-dot"></span>
     <span>AI<span style="color:var(--up)">PICKER</span></span>
-    <span class="ver">V12</span>
+    <span class="ver">V12.0.2</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="mkt-switcher">
@@ -330,6 +339,25 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
     <span class="clock" id="clock"></span>
   </div>
 </header>
+
+<!-- System Health / Version Check -->
+<div class="wrap" style="padding-bottom:0">
+  <div class="system-health" id="systemHealthPanel">
+    <div class="system-health-head">
+      <div>🩺 系統狀態 <span id="sysHealthShort">檢查中…</span></div>
+      <button class="ghost sm" id="btnHealthRefresh">重新檢查</button>
+    </div>
+    <div class="version-warn" id="versionWarn"></div>
+    <div class="health-grid" id="healthGrid">
+      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.0.2</b></div>
+      <div class="health-chip"><span>Backend</span><b id="hBackend">—</b></div>
+      <div class="health-chip"><span>Firestore</span><b id="hFirestore">待登入</b></div>
+      <div class="health-chip"><span>Yahoo</span><b id="hYahoo">—</b></div>
+      <div class="health-chip"><span>TWSE</span><b id="hTwse">—</b></div>
+      <div class="health-chip"><span>US Context</span><b id="hUsCtx">—</b></div>
+    </div>
+  </div>
+</div>
 
 <!-- ═══════════════ TW PAGE ════════════════════════════════════════ -->
 <div id="pgTW">
@@ -811,12 +839,12 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 <div class="footer">
   ⚠️ 本工具僅供技術分析學習參考，不構成任何投資建議。台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
   資料來源：TWSE MIS · Yahoo Finance · TWSE Official · FinMind · Google News RSS（均為免費公開）<br>
-  V12 Global Trading Intelligence · AI Picker Pro
+  V12.0.2 Global Trading Intelligence · AI Picker Pro
 </div>
 
 <script>
 /* ══════════════════════════════════════════════════════════════════
-   V12 Global Trading Intelligence — AI Picker Pro
+   V12.0.2 Global Trading Intelligence — AI Picker Pro
    Complete frontend JavaScript
    ══════════════════════════════════════════════════════════════════ */
 
@@ -824,6 +852,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
+var FRONTEND_VERSION="12.0.2";
 var API = window.API_BASE_URL || "https://taiwanstock-ben-1.onrender.com";
 var FB_CFG = window.FIREBASE_CONFIG || {};
 
@@ -1269,7 +1298,7 @@ async function aiScan() {
     var r=await apiFetch(API+"/api/scan/ai?min_score=65&max_stocks=50",{},120000);
     var d=await r.json();
     var s=d.summary||{};
-    if(sum)sum.textContent="掃描 "+d.scanned+"+ 檔，耗時 "+d.duration_seconds+"s | 市場分數 "+s.market_score+"/100";
+    if(sum)sum.textContent="掃描 "+safeVal(d.scanned,0)+" 檔 | 分類 "+safeVal(d.classified,0)+" | 失敗 "+safeVal(d.failed||d.error_count,0)+" | "+safeVal(d.duration_seconds,"—")+"s | 市場 "+safeVal(s.market_score??d.market_score,"—")+"/100"+(s.message?" — "+s.message:"");
     renderTWScan(d);
   } catch(e) { if(sum)sum.textContent="掃描失敗："+e.message; }
   finally { if(btn)btn.disabled=false; if(btn2)btn2.disabled=false; }
@@ -1827,7 +1856,9 @@ function renderUSCtxInline(ctx) {
   if(!ctx) return;
   var sc=ctx.market_score||50;
   var scoreEl=$I("usCtxScore");if(scoreEl){scoreEl.textContent=sc;scoreEl.className="ctx-score "+(sc>=65?"us-up":sc>=45?"":"us-down");}
-  setTxtUS("usCtxSentiment",ctx.sentiment||"—");setTxtUS("usCtxNote",ctx.note||"—");
+  setTxtUS("usCtxSentiment",ctx.sentiment||"—");
+  var ex=(ctx.explanations||[]).slice(0,4).map(function(x){return (x.impact>0?"+":"")+x.impact+" "+x.text;}).join(" | ");
+  setTxtUS("usCtxNote",ex||ctx.note||"—");
   var grid=$I("usCtxGrid");if(grid){
     var keys=["spy","qqq","soxx","vix","us10y","btc"];
     grid.innerHTML=keys.map(function(k){var v=(ctx.components||{})[k];if(!v)return'<div class="ctx-item"><div class="ctx-lbl">'+k.toUpperCase()+'</div><div class="ctx-val">—</div></div>';var clr=usColorCls(v.change_pct);return'<div class="ctx-item"><div class="ctx-lbl">'+k.toUpperCase()+'</div><div class="ctx-val">'+Number(v.price).toFixed(k==="btc"?0:2)+'</div><div class="ctx-chg '+clr+'">'+pctUS(v.change_pct)+'</div></div>';}).join("");
@@ -1862,11 +1893,11 @@ async function usAiScan() {
     var d=await r.json();
     if(!d || (!Array.isArray(d.enterable) && !Array.isArray(d.pullback) && !Array.isArray(d.near_miss) && !d.summary)){
       console.warn("Unexpected US scan payload", d);
-      throw new Error("US scan payload is not V12 format. Please confirm Render backend is deployed to V12.0.1.");
+      throw new Error("US scan payload is not V12 format. Please confirm Render backend is deployed to V12.0.2.");
     }
     d=normalizeUSScanPayload(d);
     var s=d.summary||{};
-    if(sum)sum.textContent="Scanned "+d.scanned+" stocks in "+d.duration_seconds+"s | Market "+(s.market_score??d.market_score??"—")+"/100 | Classified "+(d.classified??0);
+    if(sum)sum.textContent="Scanned "+safeVal(d.scanned,0)+" stocks | Classified "+safeVal(d.classified,0)+" | Failed "+safeVal(d.failed||d.error_count,0)+" | "+safeVal(d.duration_seconds,"—")+"s | Market "+safeVal(s.market_score??d.market_score,"—")+"/100"+(s.message?" — "+s.message:"");
     renderUSScan(d);
   } catch(e){
     console.error("US AI scan failed", e);
@@ -1888,6 +1919,7 @@ function normalizeUSScanPayload(d){
   var total=d.enterable.length+d.pullback.length+d.breakout_watch.length+d.risk_watch.length+d.avoid.length+d.near_miss.length;
   d.scanned=d.scanned??s.scanned??s.attempted??d.attempted??(total+(d.error_count||0));
   d.classified=d.classified??s.classified??total;
+  d.failed=d.failed??s.failed??d.error_count??0;
   d.found=d.found??s.found??(d.enterable.length+d.pullback.length+d.breakout_watch.length+d.risk_watch.length+d.near_miss.length);
   d.duration_seconds=d.duration_seconds??s.duration_seconds??0;
   d.market_score=d.market_score??s.market_score??"—";
@@ -1908,11 +1940,11 @@ function renderUSScan(data) {
     el.querySelectorAll("[data-us-load]").forEach(function(el2){el2.addEventListener("click",function(){usLoadStock(el2.dataset.usLoad);});});
   }
   zone("usZoneEnterable","✅ Enterable Candidates","sz-us-enter",data.enterable,"No stocks meet entry criteria. Patience is key.");
-  zone("usZonePullback","⏳ Watch / Wait Pullback","sz-us-pull",data.pullback,"—");
-  zone("usZoneBreakout","🔭 Breakout Watch","sz-breakout",data.breakout_watch,"—");
-  zone("usZoneNearMiss","💫 Near Miss","sz-near",data.near_miss,"—");
+  zone("usZonePullback","⏳ Watch / Wait Pullback","sz-us-pull",data.pullback,"目前沒有等回檔候選。");
+  zone("usZoneBreakout","🔭 Breakout Watch","sz-breakout",data.breakout_watch,"目前沒有突破觀察候選。");
+  zone("usZoneNearMiss","💫 Near Miss","sz-near",data.near_miss,"目前沒有差一點候選；若可進場為 0，代表條件仍距離較遠或資料暫不足。");
   var riskCombined=(data.risk_watch||[]).concat(data.avoid||[]);
-  zone("usZoneRisk","⚠️ Avoid / Risk Watch","sz-risk",riskCombined,"—");
+  zone("usZoneRisk","⚠️ Avoid / Risk Watch","sz-risk",riskCombined,"目前沒有風險觀察 / 避免清單。");
 }
 
 function usScanCard(r) {
@@ -1936,6 +1968,39 @@ function usScanCard(r) {
     ((r.reasons&&r.reasons.length)?'<div class="scan-reasons" style="color:#22c55e">✅ '+r.reasons.slice(0,2).join(" / ")+'</div>':'')+
     ((r.risk_reason&&r.risk_reason.length)?'<div class="scan-reasons">⚠️ '+r.risk_reason[0]+'</div>':'')+
     '</div>';
+}
+
+
+// ── System Health / Version Check ─────────────────────────────────
+function safeVal(v, fallback){ if(v===undefined||v===null||Number.isNaN(v)) return fallback||"—"; return v; }
+function setHealth(id, text, cls){var el=$I(id);if(!el)return;el.textContent=text;el.className=cls||"";}
+function statusCls(st){st=String(st||"").toLowerCase();return st==="ok"?"health-ok":(st==="partial"||st==="degraded"?"health-warn":"health-bad");}
+async function loadSystemHealth(){
+  setTxt("sysHealthShort","檢查中…");
+  setHealth("hFrontend","V"+FRONTEND_VERSION,"health-ok");
+  setHealth("hFirestore",currentUser?"Connected":"待登入",currentUser?"health-ok":"health-warn");
+  try{
+    var r=await apiFetch(API+"/api/health/full",{},15000);
+    var d=await r.json();
+    if(!r.ok)throw new Error(d.detail||"health failed");
+    var bv=d.version||((d.backend||{}).version)||"—";
+    setHealth("hBackend","V"+bv,bv===FRONTEND_VERSION?"health-ok":"health-warn");
+    var us=((d.data_health||{}).us||{}).checks||{};
+    var tw=((d.data_health||{}).tw||{}).checks||{};
+    setHealth("hYahoo",((us.yahoo_quote||{}).status||"—"),statusCls((us.yahoo_quote||{}).status));
+    setHealth("hTwse",((tw.twse_mis||{}).status||"—"),statusCls((tw.twse_mis||{}).status));
+    setHealth("hUsCtx",((us.market_context||{}).status||"—"),statusCls((us.market_context||{}).status));
+    var vw=$I("versionWarn");
+    if(vw){
+      if(bv!==FRONTEND_VERSION){vw.style.display="block";vw.textContent="前後端版本不一致：Frontend V"+FRONTEND_VERSION+"，Backend V"+bv+"。請確認 Render 是否已部署最新版本，或按 Ctrl+F5。";}
+      else{vw.style.display="none";vw.textContent="";}
+    }
+    setTxt("sysHealthShort","Backend V"+bv+" · US "+(((d.data_health||{}).us||{}).overall||"—")+" · TW "+(((d.data_health||{}).tw||{}).overall||"—"));
+  }catch(e){
+    console.warn("system health failed",e);
+    setTxt("sysHealthShort","檢查失敗："+(e.message||e));
+    setHealth("hBackend","檢查失敗","health-bad");
+  }
 }
 
 // ── Scroll to anchor ────────────────────────────────────────────────
@@ -1997,6 +2062,7 @@ function bindAllButtons() {
   safeBind("btnUsScan","click",usAiScan);
   safeBind("btnUsScanAgain","click",usAiScan);
   safeBind("btnUsCtx","click",loadUSMarketContext);
+  safeBind("btnHealthRefresh","click",loadSystemHealth);
   initUSSuggest();
 }
 
@@ -2005,6 +2071,7 @@ async function initApp() {
   bindAllButtons();
   initFirebase();
   await loadStockMaster();
+  loadSystemHealth();
   var statusEl=$I("usMasterStatus");if(statusEl)setTimeout(function(){statusEl.textContent="Symbol master: 80+ built-in symbols loaded. Background update running…";},2000);
 }
 

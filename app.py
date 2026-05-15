@@ -1,7 +1,7 @@
 """
 V12 Global Trading Intelligence - AI Picker Pro
 架構：TW Engine / US Engine / Shared Engine（三層分離）
-版本：12.0.1
+版本：12.0.2
 """
 import os, re, asyncio, json, time
 from datetime import datetime, timedelta
@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="V12 Global Trading Intelligence", version="12.0.1")
+app = FastAPI(title="V12 Global Trading Intelligence", version="12.0.2")
 _raw = os.getenv("ALLOWED_ORIGINS",
     "http://localhost:5500,http://127.0.0.1:5500,"
     "https://taiwanstock-ben.web.app,https://taiwanstock-ben.firebaseapp.com")
@@ -651,7 +651,7 @@ def get_stock_name(sid: str, api_name: str | None=None) -> str:
 # TW LEARNING / WEIGHTS
 # ══════════════════════════════════════════════════════════════════════════════
 TW_DEFAULT_WEIGHTS={"technical":0.35,"fundamental":0.25,"chip":0.25,"news":0.15,
-    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.0.1","last_reason":"預設權重"}
+    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.0.2","last_reason":"預設權重"}
 TW_WEIGHT_LIMITS={"technical":(0.20,0.45),"fundamental":(0.10,0.35),"chip":(0.10,0.40),"news":(0.05,0.25)}
 
 def _rjf(path,default):
@@ -1409,49 +1409,75 @@ async def fetch_us_profile(symbol: str) -> dict:
 _us_ctx_cache: dict={}; _us_ctx_ts: float=0.0; US_CTX_TTL=180
 
 async def fetch_us_market_context() -> dict:
+    """US Market Context with explanation and graceful partial fallback."""
     global _us_ctx_cache,_us_ctx_ts
     if _us_ctx_cache and (time.time()-_us_ctx_ts)<US_CTX_TTL: return _us_ctx_cache
     syms={"spy":"SPY","qqq":"QQQ","soxx":"^SOX","iwm":"IWM","vix":"^VIX","us10y":"^TNX","dxy":"DX-Y.NYB","btc":"BTC-USD"}
     result={k:None for k in syms}
+    errors=[]
     try:
         async with httpx.AsyncClient(timeout=8) as cl:
             for key,sym in syms.items():
                 try:
                     r=await cl.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?interval=1d&range=5d",
                                    headers={"User-Agent":"Mozilla/5.0"},follow_redirects=True)
-                    if r.status_code==200:
-                        res=r.json().get("chart",{}).get("result")
-                        if res:
-                            meta=res[0].get("meta",{})
-                            closes=res[0].get("indicators",{}).get("quote",[{}])[0].get("close",[])
-                            valid=[c for c in closes if c is not None]
-                            if valid:
-                                result[key]={"price":round(valid[-1],2),"change_pct":round((valid[-1]-valid[-2])/valid[-2]*100,2) if len(valid)>1 else 0}
-                except: pass
-    except: pass
-    # Compute market_score
-    score=50
-    spy=result.get("spy"); qqq=result.get("qqq"); soxx=result.get("soxx")
-    vix=result.get("vix"); us10y=result.get("us10y"); btc=result.get("btc")
-    notes=[]
-    if spy: score+=5 if (spy.get("change_pct") or 0)>0 else -5; notes.append(f"SPY {spy['price']}")
-    if qqq: score+=5 if (qqq.get("change_pct") or 0)>0 else -5
-    if soxx: score+=5 if (soxx.get("change_pct") or 0)>0 else -5
+                    if r.status_code!=200:
+                        errors.append({"component":key,"symbol":sym,"error":f"HTTP {r.status_code}"}); continue
+                    res=r.json().get("chart",{}).get("result")
+                    if not res:
+                        errors.append({"component":key,"symbol":sym,"error":"no result"}); continue
+                    closes=res[0].get("indicators",{}).get("quote",[{}])[0].get("close",[])
+                    valid=[c for c in closes if c is not None]
+                    if valid:
+                        result[key]={"price":round(float(valid[-1]),2),
+                                     "change_pct":round((float(valid[-1])-float(valid[-2]))/float(valid[-2])*100,2) if len(valid)>1 and valid[-2] else 0}
+                    else:
+                        errors.append({"component":key,"symbol":sym,"error":"no close"})
+                except Exception as e:
+                    errors.append({"component":key,"symbol":sym,"error":str(e)[:120]})
+    except Exception as e:
+        errors.append({"component":"client","error":str(e)[:120]})
+
+    score=50; explanations=[]; notes=[]
+    spy=result.get("spy"); qqq=result.get("qqq"); soxx=result.get("soxx"); iwm=result.get("iwm")
+    vix=result.get("vix"); us10y=result.get("us10y"); dxy=result.get("dxy"); btc=result.get("btc")
+    def chg(x): return (x or {}).get("change_pct") or 0
+    def price(x, default=None): return (x or {}).get("price", default)
+    if spy:
+        delta=8 if chg(spy)>0 else -8; score+=delta; explanations.append({"name":"SPY","impact":delta,"text":f"SPY {chg(spy):+.2f}% {'supports risk-on' if delta>0 else 'weakens broad market tone'}"})
+    if qqq:
+        delta=10 if chg(qqq)>0 else -10; score+=delta; explanations.append({"name":"QQQ","impact":delta,"text":f"QQQ {chg(qqq):+.2f}% {'supports tech/growth' if delta>0 else 'pressures tech/growth'}"})
+    if soxx:
+        delta=8 if chg(soxx)>0 else -8; score+=delta; explanations.append({"name":"SOXX/SOX","impact":delta,"text":f"Semiconductor index {chg(soxx):+.2f}% {'supports chip names' if delta>0 else 'pressures semiconductor names'}"})
+    if iwm:
+        delta=4 if chg(iwm)>0 else -4; score+=delta; explanations.append({"name":"IWM","impact":delta,"text":f"Small caps {chg(iwm):+.2f}%"})
     if vix:
-        vix_p=vix.get("price",20)
-        if vix_p<15: score+=15; notes.append(f"VIX {vix_p:.1f} low (bullish)")
-        elif vix_p<20: score+=8; notes.append(f"VIX {vix_p:.1f} normal")
-        elif vix_p<30: score-=10; notes.append(f"VIX {vix_p:.1f} elevated")
-        else: score-=25; notes.append(f"VIX {vix_p:.1f} FEAR")
+        v=float(price(vix,20))
+        if v<15: delta=15; txt="VIX low; risk appetite healthy"
+        elif v<20: delta=8; txt="VIX normal; risk environment acceptable"
+        elif v<30: delta=-12; txt="VIX elevated; reduce high-beta risk"
+        else: delta=-25; txt="VIX fear level; avoid aggressive entries"
+        score+=delta; explanations.append({"name":"VIX","impact":delta,"text":f"{txt} ({v:.1f})"}); notes.append(f"VIX {v:.1f}")
     if us10y:
-        y=us10y.get("price",4)
-        if y>4.8: score-=10; notes.append(f"US10Y {y:.2f}% high yield")
-        elif y<4.0: score+=5
-    if btc: score+=5 if (btc.get("change_pct") or 0)>2 else(score-3 if (btc.get("change_pct") or 0)<-5 else 0)
-    market_score=max(0,min(100,score))
+        y=float(price(us10y,4))
+        if y>4.8: delta=-10; txt="US10Y high; growth stocks pressured"
+        elif y<4.0: delta=5; txt="US10Y lower; growth stocks supported"
+        else: delta=0; txt="US10Y neutral"
+        score+=delta; explanations.append({"name":"US10Y","impact":delta,"text":f"{txt} ({y:.2f})"})
+    if dxy:
+        dx=chg(dxy)
+        delta=-5 if dx>0.4 else (3 if dx<-0.4 else 0)
+        score+=delta; explanations.append({"name":"DXY","impact":delta,"text":f"DXY {dx:+.2f}% {'strong dollar headwind' if delta<0 else 'dollar not a headwind' if delta>0 else 'neutral'}"})
+    if btc:
+        bp=chg(btc)
+        delta=5 if bp>2 else (-5 if bp<-5 else 0)
+        score+=delta; explanations.append({"name":"BTC","impact":delta,"text":f"BTC {bp:+.2f}% {'supports crypto-beta names' if delta>0 else 'pressures crypto-beta names' if delta<0 else 'neutral'}"})
+    market_score=max(0,min(100,round(score)))
     sentiment="Bullish 🟢" if market_score>=65 else("Neutral ⚪" if market_score>=45 else "Bearish 🔴")
+    status="ok" if len(errors)<=2 else ("partial" if len(errors)<len(syms) else "degraded")
     ctx={"market_score":market_score,"sentiment":sentiment,"note":" | ".join(notes[:4]),
-         "components":result,"updated_at":datetime.now().isoformat()}
+         "components":result,"explanations":explanations,"status":status,"errors":errors[:8],
+         "updated_at":datetime.now().isoformat()}
     _us_ctx_cache=ctx; _us_ctx_ts=time.time(); return ctx
 
 # ── US AI Signal ────────────────────────────────────────────────────────────
@@ -1859,20 +1885,21 @@ async def api_market_sentiment():
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/api/scan/ai")
 async def tw_ai_scan(min_score:int=Query(65,ge=0,le=100),max_stocks:int=Query(50,ge=5,le=80)):
-    """V12 TW AI scan — 6-zone output with full scoring."""
+    """V12.0.2 TW AI scan — stable 6-zone output with diagnostics."""
     t0=time.time(); pool=list(dict.fromkeys(TW_SCAN_POOL))[:max_stocks]
     try: macro=await asyncio.wait_for(fetch_macro_context(),timeout=6)
-    except: macro={}
+    except Exception as e: macro={"error":str(e)}
     market_score_tw=max(0,min(100,60+(macro.get("macro_adj",0)*2)))
     enterable=[];pullback=[];breakout_watch=[];risk_watch=[];avoid=[];near_miss=[];errors=[]
+    attempted=0; classified=0
     for sid in pool:
+        attempted += 1
         try:
-            r=await _analyze_stock_lite(sid,macro); ai=r.get("ai_signal",{})
+            r=await _analyze_stock_lite(sid,macro); ai=r.get("ai_signal",{}) or {}
             conf=ai.get("confidence") or 0
-            if conf<min_score: continue
             final=ai.get("final_score") or 0
             cat=ai.get("scan_category","AVOID")
-            item={"stock_id":sid,"stock_name":r["stock_name"],"market":"tw",
+            item={"stock_id":sid,"stock_name":r.get("stock_name") or get_stock_name(sid),"market":"tw",
                   "signal":ai.get("signal","WATCH"),"confidence":conf,
                   "trade_status":ai.get("trade_status","WATCH"),
                   "entry_status":ai.get("entry_status","NO_DATA"),
@@ -1880,7 +1907,7 @@ async def tw_ai_scan(min_score:int=Query(65,ge=0,le=100),max_stocks:int=Query(50
                   "can_enter":ai.get("can_enter",False),"trade_valid":ai.get("trade_valid",False),
                   "strategy_type":ai.get("strategy_type",""),
                   "technical_score":ai.get("technical_score"),"final_score":final,
-                  "market_score":ai.get("market_score",50),"risk_score":ai.get("risk_score",50),
+                  "market_score":ai.get("market_score",market_score_tw),"risk_score":ai.get("risk_score",50),
                   "rr_score":ai.get("rr_score",0),
                   "overheat_flags":ai.get("overheat_flags",[]),"false_breakout_flags":ai.get("false_breakout_flags",[]),
                   "price":r.get("price"),"change_pct":r.get("change_pct"),
@@ -1889,28 +1916,40 @@ async def tw_ai_scan(min_score:int=Query(65,ge=0,le=100),max_stocks:int=Query(50
                   "target_price":ai.get("target_price"),"stop_loss":ai.get("stop_loss"),
                   "risk_reward_ratio":ai.get("risk_reward_ratio"),
                   "recent_support":ai.get("recent_support"),"recent_resistance":ai.get("recent_resistance"),
-                  "reasons":ai.get("entry_reason",[]),"risk_reason":ai.get("risk_reason",[]),
+                  "reasons":ai.get("entry_reason",[]) or ai.get("reasons",[]),"risk_reason":ai.get("risk_reason",[]),
                   "summary":ai.get("summary","")}
-            if cat=="ENTERABLE":      enterable.append(item)
-            elif cat=="PULLBACK":     pullback.append(item)
+            # min_score should not hide all diagnostics. It only blocks ENTERABLE.
+            if conf < min_score:
+                item.setdefault("risk_reason",[]).append(f"Confidence {conf}/100 below scan threshold {min_score}")
+                if final >= 55 or (item.get("technical_score") or 0) >= 55: cat="NEAR_MISS"
+                else: cat="AVOID"
+            if cat=="ENTERABLE": enterable.append(item)
+            elif cat=="PULLBACK": pullback.append(item)
             elif cat=="BREAKOUT_WATCH": breakout_watch.append(item)
-            elif cat=="RISK_WATCH":   risk_watch.append(item)
-            elif cat=="NEAR_MISS":    near_miss.append(item)
-            else:                     avoid.append(item)
-        except Exception as e: errors.append({"stock_id":sid,"error":str(e)})
-    def sort_e(x): return (-(x.get("final_score") or 0),-(x.get("risk_reward_ratio") or 0),-(x.get("confidence") or 0))
-    def sort_p(x): return (-(x.get("technical_score") or 0),-(x.get("confidence") or 0))
+            elif cat=="RISK_WATCH": risk_watch.append(item)
+            elif cat=="NEAR_MISS": near_miss.append(item)
+            else: avoid.append(item)
+            classified += 1
+        except Exception as e:
+            errors.append({"stock_id":sid,"error":str(e)[:160]})
+    def sort_e(x): return (-(x.get("final_score") or 0),-(x.get("risk_reward_ratio") or 0),-(x.get("risk_score") or 0),-(x.get("confidence") or 0))
+    def sort_p(x): return (-(x.get("technical_score") or 0),-(x.get("confidence") or 0),-(x.get("final_score") or 0))
     enterable.sort(key=sort_e); pullback.sort(key=sort_p); breakout_watch.sort(key=sort_p)
-    risk_watch.sort(key=sort_p); near_miss.sort(key=sort_p)
-    msg="目前沒有符合可進場條件的股票，建議等待。" if not enterable else f"發現 {len(enterable)} 檔可進場候選！"
+    risk_watch.sort(key=sort_p); near_miss.sort(key=sort_p); avoid.sort(key=sort_p)
+    found=len(enterable)+len(pullback)+len(breakout_watch)+len(risk_watch)+len(near_miss)
+    msg="目前沒有符合可進場條件的股票，建議等待更好的進場點。" if not enterable else f"發現 {len(enterable)} 檔可進場候選！"
+    dur=round(time.time()-t0,1)
     return{"market":"tw","updated_at":datetime.now().isoformat(),
-           "summary":{"enterable_count":len(enterable),"pullback_count":len(pullback),
+           "scanned":len(pool),"attempted":attempted,"classified":classified,"failed":len(errors),"found":found,
+           "market_score":market_score_tw,"duration_seconds":dur,
+           "summary":{"scanned":len(pool),"attempted":attempted,"classified":classified,"failed":len(errors),
+                      "enterable_count":len(enterable),"pullback_count":len(pullback),
                       "breakout_watch_count":len(breakout_watch),"risk_watch_count":len(risk_watch),
-                      "avoid_count":len(avoid),"near_miss_count":len(near_miss),
+                      "avoid_count":len(avoid),"near_miss_count":len(near_miss),"found":found,
                       "market_score":market_score_tw,"message":msg},
            "enterable":enterable,"pullback":pullback,"breakout_watch":breakout_watch,
            "risk_watch":risk_watch,"avoid":avoid,"near_miss":near_miss,
-           "errors":errors,"error_count":len(errors),"duration_seconds":round(time.time()-t0,1)}
+           "errors":errors,"error_count":len(errors),"duration_seconds":dur}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # API — LINE
@@ -2023,7 +2062,7 @@ async def us_profile(symbol:str):
 
 @app.get("/api/us/scan")
 async def us_ai_scan(min_score:int=Query(60,ge=0,le=100),max_stocks:int=Query(50,ge=5,le=80)):
-    """V12.0.1 US AI scan — always returns a valid 6-zone payload.
+    """V12.0.2 US AI scan — always returns a valid 6-zone payload.
     Important: min_score is a display/quality threshold, NOT a hard pre-filter.
     Previously low-confidence candidates were skipped before classification,
     which caused every zone to be empty and the frontend showed undefined fields.
@@ -2101,9 +2140,9 @@ async def us_ai_scan(min_score:int=Query(60,ge=0,le=100),max_stocks:int=Query(50
     msg="No stocks meet entry criteria currently. Patience is key." if not enterable else f"Found {len(enterable)} enterable candidates!"
     duration=round(time.time()-t0,1)
     return {"market":"us","updated_at":datetime.now().isoformat(),
-            "scanned":len(pool),"attempted":attempted,"classified":classified,"found":found,
+            "scanned":len(pool),"attempted":attempted,"classified":classified,"failed":len(errors),"found":found,
             "market_score":market_score,"duration_seconds":duration,
-            "summary":{"scanned":len(pool),"attempted":attempted,"classified":classified,
+            "summary":{"scanned":len(pool),"attempted":attempted,"classified":classified,"failed":len(errors),
                        "enterable_count":len(enterable),"pullback_count":len(pullback),
                        "breakout_watch_count":len(breakout_watch),"risk_watch_count":len(risk_watch),
                        "avoid_count":len(avoid),"near_miss_count":len(near_miss),
@@ -2114,11 +2153,72 @@ async def us_ai_scan(min_score:int=Query(60,ge=0,le=100),max_stocks:int=Query(50
             "errors":errors,"error_count":len(errors),"duration_seconds":duration}
 
 # ══════════════════════════════════════════════════════════════════════════════
+# API — DATA HEALTH / DIAGNOSTICS
+# ══════════════════════════════════════════════════════════════════════════════
+async def _check_us_data_health() -> dict:
+    checks={}
+    async with httpx.AsyncClient(timeout=8,headers={"User-Agent":"Mozilla/5.0"},follow_redirects=True) as cl:
+        try:
+            q=await fetch_us_quote("AAPL",cl)
+            checks["yahoo_quote"]={"status":"ok" if q and q.get("price") else "fail","symbol":"AAPL","price":(q or {}).get("price")}
+        except Exception as e: checks["yahoo_quote"]={"status":"fail","error":str(e)[:120]}
+        try:
+            h=await fetch_us_history("AAPL",cl,days=90)
+            checks["yahoo_history"]={"status":"ok" if h is not None and not h.empty else "fail","rows":0 if h is None else int(len(h))}
+        except Exception as e: checks["yahoo_history"]={"status":"fail","error":str(e)[:120]}
+    try:
+        master=get_us_master()
+        age=round((time.time()-_us_master_ts)/3600,2) if _us_master_ts else None
+        checks["symbol_master"]={"status":"ok" if master else "fail","count":len(master),"age_hours":age,"file":str(US_MASTER_FILE.name)}
+    except Exception as e: checks["symbol_master"]={"status":"fail","error":str(e)[:120]}
+    try:
+        ctx=await fetch_us_market_context()
+        checks["market_context"]={"status":ctx.get("status","ok"),"market_score":ctx.get("market_score"),"errors":ctx.get("errors",[])[:3]}
+    except Exception as e: checks["market_context"]={"status":"fail","error":str(e)[:120]}
+    overall="ok" if all(v.get("status") in ("ok","partial") for v in checks.values()) else "partial"
+    return {"market":"us","overall":overall,"checks":checks,"updated_at":datetime.now().isoformat()}
+
+async def _check_tw_data_health() -> dict:
+    checks={}
+    try:
+        q=await fetch_tw_quote("2330")
+        checks["twse_mis"]={"status":"ok" if q and q.get("price") else "fail","stock_id":"2330","price":(q or {}).get("price")}
+    except Exception as e: checks["twse_mis"]={"status":"fail","error":str(e)[:120]}
+    try:
+        loaded=bool(STOCK_MASTER) or _lfm()
+        checks["tw_stock_master"]={"status":"ok" if loaded else "fail","count":len(STOCK_MASTER),"updated_at":_mua}
+    except Exception as e: checks["tw_stock_master"]={"status":"fail","error":str(e)[:120]}
+    try:
+        macro=await asyncio.wait_for(fetch_macro_context(),timeout=6)
+        checks["macro"]={"status":"ok" if macro else "partial","macro_adj":macro.get("macro_adj") if isinstance(macro,dict) else None}
+    except Exception as e: checks["macro"]={"status":"partial","error":str(e)[:120]}
+    overall="ok" if all(v.get("status") in ("ok","partial") for v in checks.values()) else "partial"
+    return {"market":"tw","overall":overall,"checks":checks,"updated_at":datetime.now().isoformat()}
+
+@app.get("/api/us/data-health")
+async def api_us_data_health():
+    return await _check_us_data_health()
+
+@app.get("/api/tw/data-health")
+async def api_tw_data_health():
+    return await _check_tw_data_health()
+
+@app.get("/api/health/full")
+async def api_health_full():
+    us=await _check_us_data_health(); tw=await _check_tw_data_health()
+    return {"status":"ok","version":"12.0.2","frontend_expected":"12.0.2",
+            "time":datetime.now().isoformat(),"backend":{"title":"V12 Global Trading Intelligence","version":"12.0.2"},
+            "line":{"configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),"enabled":ENABLE_LINE_ALERTS},
+            "cache":{"us_quote_ttl":US_QUOTE_TTL,"us_history_ttl":US_HISTORY_TTL,"us_market_context_ttl":US_CTX_TTL,
+                     "tw_full_cache_seconds":300,"tw_lite_cache_seconds":30},
+            "data_health":{"us":us,"tw":tw}}
+
+# ══════════════════════════════════════════════════════════════════════════════
 # HEALTH
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/health")
 def health():
-    return{"status":"ok","version":"12.0.1","time":datetime.now().isoformat(),
+    return{"status":"ok","version":"12.0.2","frontend_expected":"12.0.2","time":datetime.now().isoformat(),
            "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
            "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
            "price_sources":"Yahoo Finance → TWSE Official → FinMind",
