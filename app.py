@@ -2209,7 +2209,7 @@ async def api_health_full():
     return {"status":"ok","version":"12.0.2","frontend_expected":"12.0.2",
             "time":datetime.now().isoformat(),"backend":{"title":"V12 Global Trading Intelligence","version":"12.0.2"},
             "line":{"configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),"enabled":ENABLE_LINE_ALERTS},
-            "cache":{"us_quote_ttl":US_QUOTE_TTL,"us_history_ttl":US_HISTORY_TTL,"us_market_context_ttl":US_CTX_TTL,
+            "cache":{"us_quote_ttl":US_LITE_TTL,"us_history_ttl":US_FULL_TTL,"us_market_context_ttl":US_CTX_TTL,
                      "tw_full_cache_seconds":300,"tw_lite_cache_seconds":30},
             "data_health":{"us":us,"tw":tw}}
 
