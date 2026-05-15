@@ -1,7 +1,7 @@
 """
-V12.1 AI Picker Reliability & Scan Experience
+V12.2 Trade Plan & Alert Center
 架構：TW Engine / US Engine / Shared Engine（三層分離）
-版本：12.1.0
+版本：12.2.0
 """
 import os, re, asyncio, json, time
 from datetime import datetime, timedelta
@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="V12.1 AI Picker Reliability & Scan Experience", version="12.1.0")
+app = FastAPI(title="V12.2 Trade Plan & Alert Center", version="12.2.0")
 _raw = os.getenv("ALLOWED_ORIGINS",
     "http://localhost:5500,http://127.0.0.1:5500,"
     "https://taiwanstock-ben.web.app,https://taiwanstock-ben.firebaseapp.com")
@@ -653,7 +653,7 @@ def get_stock_name(sid: str, api_name: str | None=None) -> str:
 # TW LEARNING / WEIGHTS
 # ══════════════════════════════════════════════════════════════════════════════
 TW_DEFAULT_WEIGHTS={"technical":0.35,"fundamental":0.25,"chip":0.25,"news":0.15,
-    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.1.0","last_reason":"預設權重"}
+    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.2.0","last_reason":"預設權重"}
 TW_WEIGHT_LIMITS={"technical":(0.20,0.45),"fundamental":(0.10,0.35),"chip":(0.10,0.40),"news":(0.05,0.25)}
 
 def _rjf(path,default):
@@ -2229,7 +2229,7 @@ def api_scan_status():
         for k,(payload,ts) in list(cache.items())[-12:]:
             out.append({"key":k,"age_seconds":round(now-ts,1),"market":payload.get("market"),"mode":payload.get("scan_mode"),"pool":payload.get("pool"),"classified":payload.get("classified"),"failed":payload.get("failed")})
         return out
-    return {"version":"12.1.0","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
+    return {"version":"12.2.0","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # API — DATA HEALTH / DIAGNOSTICS
@@ -2340,12 +2340,12 @@ async def api_health_full():
 
     payload = {
         "status": "ok" if not errors else "partial",
-        "version": "12.1.0",
-        "frontend_expected": "12.1.0",
+        "version": "12.2.0",
+        "frontend_expected": "12.2.0",
         "time": datetime.now().isoformat(),
         "backend": {
-            "title": "V12.1 AI Picker Reliability",
-            "version": "12.1.0"
+            "title": "V12.2 Trade Plan & Alert Center",
+            "version": "12.2.0"
         },
         "line": {
             "configured": bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
@@ -2366,17 +2366,114 @@ async def api_health_full():
     }
     return _json_safe(payload)
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# V12.2 TRADE PLAN & ALERT CENTER HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
+def _trade_plan_status_from_values(price, entry_low=None, entry_high=None, target=None, stop=None):
+    """Evaluate a long-side trade plan against current price. Always returns JSON-safe dict."""
+    try:
+        price = float(price) if price is not None else None
+    except Exception:
+        price = None
+    def n(v):
+        try: return float(v) if v is not None else None
+        except Exception: return None
+    entry_low, entry_high, target, stop = map(n, [entry_low, entry_high, target, stop])
+    if price is None:
+        return {"status":"NO_PRICE","status_text":"無現價資料","distance_to_entry_pct":None,"distance_to_target_pct":None,"distance_to_stop_pct":None}
+    status = "WAITING_ENTRY"; text = "等待入場"
+    if stop is not None and price <= stop:
+        status, text = "STOP_BROKEN", "跌破止損"
+    elif target is not None and price >= target:
+        status, text = "TARGET_REACHED", "達到目標"
+    elif target is not None and price >= target * 0.95:
+        status, text = "NEAR_TARGET", "接近目標價"
+    elif stop is not None and price <= stop * 1.05:
+        status, text = "NEAR_STOP", "接近止損價"
+    elif entry_low is not None and entry_high is not None and entry_low <= price <= entry_high:
+        status, text = "ENTERABLE_NOW", "已進入入場區"
+    elif entry_high is not None and price > entry_high:
+        status, text = "ABOVE_ENTRY_ZONE", "高於入場區，不建議追高"
+    elif entry_low is not None and price < entry_low:
+        status, text = "WAITING_ENTRY", "等待進入入場區"
+    def pct_to(v):
+        if v is None or price == 0: return None
+        return round((v - price) / price * 100, 2)
+    mid = None
+    if entry_low is not None and entry_high is not None:
+        mid = (entry_low + entry_high) / 2
+    elif entry_low is not None:
+        mid = entry_low
+    elif entry_high is not None:
+        mid = entry_high
+    return {
+        "status": status,
+        "status_text": text,
+        "distance_to_entry_pct": pct_to(mid),
+        "distance_to_target_pct": pct_to(target),
+        "distance_to_stop_pct": pct_to(stop),
+    }
+
+@app.get("/api/trade-plan/check")
+async def api_trade_plan_check(
+    market: str = Query(..., description="tw or us"),
+    symbol: str = Query(..., description="stock id or US symbol"),
+    entry_low: float | None = None,
+    entry_high: float | None = None,
+    target: float | None = None,
+    stop: float | None = None,
+):
+    """V12.2 lightweight trade-plan status checker. It does not store user data; Firestore stores plans on frontend."""
+    market = (market or "").lower().strip()
+    symbol = (symbol or "").upper().strip()
+    price = None; name = symbol; source = None; error = None
+    try:
+        if market == "us":
+            async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as cl:
+                q = await fetch_us_quote(symbol, cl)
+            if q:
+                price = q.get("price"); name = q.get("name") or symbol; source = q.get("source")
+        else:
+            q = await fetch_tw_quote(symbol)
+            if q:
+                price = q.get("price"); name = q.get("stock_name") or symbol; source = q.get("source")
+    except Exception as e:
+        error = str(e)[:200]
+    status = _trade_plan_status_from_values(price, entry_low, entry_high, target, stop)
+    return {
+        "market": market,
+        "symbol": symbol,
+        "name": name,
+        "price": price,
+        "source": source,
+        "checked_at": datetime.now().isoformat(),
+        "plan_status": status,
+        "error": error,
+    }
+
+@app.get("/api/debug/trade-plans")
+def api_debug_trade_plans():
+    return {
+        "version": "12.2.0",
+        "storage": "Firestore frontend: users/{uid}/trade_plans/tw and users/{uid}/trade_plans/us",
+        "checker": "/api/trade-plan/check",
+        "statuses": ["WAITING_ENTRY","ENTERABLE_NOW","ABOVE_ENTRY_ZONE","NEAR_TARGET","NEAR_STOP","STOP_BROKEN","TARGET_REACHED","INVALIDATED","NO_PRICE"],
+        "note": "Backend does not persist personal trade plans; authenticated frontend saves them in each user's Firestore.",
+        "time": datetime.now().isoformat(),
+    }
+
 # ══════════════════════════════════════════════════════════════════════════════
 # HEALTH
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/health")
 def health():
-    return{"status":"ok","version":"12.1.0","frontend_expected":"12.1.0","time":datetime.now().isoformat(),
+    return{"status":"ok","version":"12.2.0","frontend_expected":"12.2.0","time":datetime.now().isoformat(),
            "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
            "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
            "price_sources":"Yahoo Finance → TWSE Official → FinMind",
            "us_master_count":len(_us_master),"tw_master_count":len(STOCK_MASTER),
-           "features":["V12.1 AI Picker Reliability","AI Picker Pro",
+           "features":["V12.2 Trade Plan & Alert Center","AI Picker Pro",
                        "TW Engine + US Engine + Shared Engine",
                        "6-zone scan output","US Market Context","Symbol Master 200+",
-                       "validate_trade_plan","compute_final_score","LINE alerts","Quick/Full AI Scan","Watch Closely zone","scan pool selector","scan cache diagnostics"]}
+                       "validate_trade_plan","compute_final_score","LINE alerts","Quick/Full AI Scan","Watch Closely zone","scan pool selector","scan cache diagnostics","Trade Plan Center","trade plan status checker"]}
