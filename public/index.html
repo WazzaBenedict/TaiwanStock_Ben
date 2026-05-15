@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>V12 AI Picker Pro</title>
+<title>V12.0.1 AI Picker Pro</title>
 <script src="config.js"></script>
 <!-- Firebase compat SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1857,17 +1857,53 @@ async function usAiScan() {
   var btn=$I("btnUsScan"),btn2=$I("btnUsScanAgain");if(btn)btn.disabled=true;if(btn2)btn2.disabled=true;
   if(box)setTimeout(function(){box.scrollIntoView({behavior:"smooth",block:"start"});},200);
   try {
-    var r=await apiFetch(API+"/api/us/scan?min_score=60&max_stocks=50",{},120000);var d=await r.json();
-    var s=d.summary||{};if(sum)sum.textContent="Scanned "+d.scanned+" stocks in "+d.duration_seconds+"s | Market "+s.market_score+"/100";
+    var r=await apiFetch(API+"/api/us/scan?min_score=0&max_stocks=50",{},120000);
+    if(!r.ok){throw new Error("US scan API failed: HTTP "+r.status);}
+    var d=await r.json();
+    if(!d || (!Array.isArray(d.enterable) && !Array.isArray(d.pullback) && !Array.isArray(d.near_miss) && !d.summary)){
+      console.warn("Unexpected US scan payload", d);
+      throw new Error("US scan payload is not V12 format. Please confirm Render backend is deployed to V12.0.1.");
+    }
+    d=normalizeUSScanPayload(d);
+    var s=d.summary||{};
+    if(sum)sum.textContent="Scanned "+d.scanned+" stocks in "+d.duration_seconds+"s | Market "+(s.market_score??d.market_score??"—")+"/100 | Classified "+(d.classified??0);
     renderUSScan(d);
-  } catch(e){if(sum)sum.textContent="Scan failed: "+e.message;}
+  } catch(e){
+    console.error("US AI scan failed", e);
+    if(sum)sum.textContent="Scan failed: "+(e.message||e);
+    var risk=$I("usZoneRisk");
+    if(risk)risk.innerHTML='<div class="scan-zone-lbl sz-risk">⚠️ US Scan Error</div><div class="empty" style="padding:8px;font-size:11px">'+escapeHTML(String(e.message||e))+'</div>';
+  }
   finally{if(btn)btn.disabled=false;if(btn2)btn2.disabled=false;}
 }
 
+function normalizeUSScanPayload(d){
+  d=d||{};var s=d.summary||{};
+  d.enterable=Array.isArray(d.enterable)?d.enterable:[];
+  d.pullback=Array.isArray(d.pullback)?d.pullback:[];
+  d.breakout_watch=Array.isArray(d.breakout_watch)?d.breakout_watch:[];
+  d.risk_watch=Array.isArray(d.risk_watch)?d.risk_watch:[];
+  d.avoid=Array.isArray(d.avoid)?d.avoid:[];
+  d.near_miss=Array.isArray(d.near_miss)?d.near_miss:[];
+  var total=d.enterable.length+d.pullback.length+d.breakout_watch.length+d.risk_watch.length+d.avoid.length+d.near_miss.length;
+  d.scanned=d.scanned??s.scanned??s.attempted??d.attempted??(total+(d.error_count||0));
+  d.classified=d.classified??s.classified??total;
+  d.found=d.found??s.found??(d.enterable.length+d.pullback.length+d.breakout_watch.length+d.risk_watch.length+d.near_miss.length);
+  d.duration_seconds=d.duration_seconds??s.duration_seconds??0;
+  d.market_score=d.market_score??s.market_score??"—";
+  if(!d.summary)d.summary={};
+  d.summary.market_score=d.summary.market_score??d.market_score;
+  return d;
+}
+
+function escapeHTML(str){return String(str).replace(/[&<>'"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];});}
+
 function renderUSScan(data) {
+  data=normalizeUSScanPayload(data);
   function zone(elId,lbl,css,items,emptyMsg){
     var el=$I(elId);if(!el)return;
-    if(!items||!items.length){el.innerHTML='<div class="scan-zone-lbl '+css+'">'+lbl+' <span>0</span></div><div class="empty" style="padding:8px;font-size:11px">'+emptyMsg+'</div>';return;}
+    items=Array.isArray(items)?items:[];
+    if(!items.length){el.innerHTML='<div class="scan-zone-lbl '+css+'">'+lbl+' <span>0</span></div><div class="empty" style="padding:8px;font-size:11px">'+emptyMsg+'</div>';return;}
     el.innerHTML='<div class="scan-zone-lbl '+css+'">'+lbl+' <span class="d-badge" style="font-size:10px">'+items.length+'</span></div><div class="scan-grid" style="margin-top:8px;margin-bottom:12px">'+items.map(usScanCard).join("")+'</div>';
     el.querySelectorAll("[data-us-load]").forEach(function(el2){el2.addEventListener("click",function(){usLoadStock(el2.dataset.usLoad);});});
   }
@@ -1875,7 +1911,8 @@ function renderUSScan(data) {
   zone("usZonePullback","⏳ Watch / Wait Pullback","sz-us-pull",data.pullback,"—");
   zone("usZoneBreakout","🔭 Breakout Watch","sz-breakout",data.breakout_watch,"—");
   zone("usZoneNearMiss","💫 Near Miss","sz-near",data.near_miss,"—");
-  zone("usZoneRisk","⚠️ Avoid / Risk Watch","sz-risk",data.avoid,"—");
+  var riskCombined=(data.risk_watch||[]).concat(data.avoid||[]);
+  zone("usZoneRisk","⚠️ Avoid / Risk Watch","sz-risk",riskCombined,"—");
 }
 
 function usScanCard(r) {
