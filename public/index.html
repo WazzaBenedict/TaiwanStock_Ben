@@ -331,6 +331,14 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .scan-mode-pill{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:99px;background:rgba(0,212,255,.10);color:var(--cyan);border:1px solid rgba(0,212,255,.22)}
 .sz-close{background:rgba(34,197,94,.08);color:#22c55e;border:1px solid rgba(34,197,94,.25)}
 
+
+/* ── Toast / compact helpers (V12.2.1) ───────────────────────────── */
+.toast{position:fixed;right:18px;bottom:18px;z-index:300;background:#0d1728;border:1px solid var(--line);border-left:3px solid var(--cyan);color:var(--text);border-radius:10px;padding:10px 14px;font-family:var(--mono);font-size:12px;box-shadow:0 8px 28px rgba(0,0,0,.45);opacity:0;transform:translateY(10px);pointer-events:none;transition:.18s}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.ok{border-left-color:var(--down)}.toast.warn{border-left-color:var(--yellow)}.toast.err{border-left-color:var(--up)}
+.system-health.compact .health-grid{display:none}.system-health.compact .version-warn{display:none!important}
+.name-code{font-weight:800;font-family:var(--mono);letter-spacing:.02em}
+
 </style>
 </head>
 <body>
@@ -356,7 +364,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       使用 Google 帳號登入
     </button>
     <div id="loginError"></div>
-    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.2 Trade Plan & Alert Center</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.2.1 Watchlist UI & Trade Plan Polish</div>
   </div>
 </div>
 
@@ -365,7 +373,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="logo">
     <span class="live-dot"></span>
     <span>AI<span style="color:var(--up)">PICKER</span></span>
-    <span class="ver">V12.2.0</span>
+    <span class="ver">V12.2.1</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="mkt-switcher">
@@ -381,11 +389,11 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="system-health" id="systemHealthPanel">
     <div class="system-health-head">
       <div>🩺 系統狀態 <span id="sysHealthShort">檢查中…</span></div>
-      <button class="ghost sm" id="btnHealthRefresh">重新檢查</button>
+      <div class="row" style="gap:6px"><button class="ghost sm" id="btnHealthToggle">收合</button><button class="ghost sm" id="btnHealthRefresh">重新檢查</button></div>
     </div>
     <div class="version-warn" id="versionWarn"></div>
     <div class="health-grid" id="healthGrid">
-      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.2.0</b></div>
+      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.2.1</b></div>
       <div class="health-chip"><span>Backend</span><b id="hBackend">—</b></div>
       <div class="health-chip"><span>Firestore</span><b id="hFirestore">待登入</b></div>
       <div class="health-chip"><span>Yahoo</span><b id="hYahoo">—</b></div>
@@ -923,12 +931,12 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 <div class="footer">
   ⚠️ 本工具僅供技術分析學習參考，不構成任何投資建議。台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
   資料來源：TWSE MIS · Yahoo Finance · TWSE Official · FinMind · Google News RSS（均為免費公開）<br>
-  V12.2 Trade Plan & Alert Center
+  V12.2.1 Watchlist UI & Trade Plan Polish
 </div>
 
 <script>
 /* ══════════════════════════════════════════════════════════════════
-   V12.2 Trade Plan & Alert Center
+   V12.2.1 Watchlist UI & Trade Plan Polish
    Complete frontend JavaScript
    ══════════════════════════════════════════════════════════════════ */
 
@@ -936,7 +944,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="12.2.0";
+var FRONTEND_VERSION="12.2.1";
 var API = window.API_BASE_URL || "https://taiwanstock-ben-1.onrender.com";
 var FB_CFG = window.FIREBASE_CONFIG || {};
 
@@ -1209,6 +1217,12 @@ function fUS(n,d){d=d||2;return(n==null||isNaN(Number(n)))?"—":"$"+Number(n).t
 function pctUS(n){if(n==null)return"—";return(Number(n)>0?"+":"")+Number(n).toFixed(2)+"%";}
 function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
 
+function esc(s){return String(s==null?"":s).replace(/[&<>'"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c];});}
+function toast(msg,type){var el=$I("toast");if(!el)return alert(msg);el.textContent=msg;el.className="toast show "+(type||"ok");clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(function(){el.className="toast "+(type||"ok");},2200);}
+function twDisplayName(id){var c=WL_CACHE[id]||{},item=WL.find(function(x){return String(x.stock_id)===String(id);})||{};return c.name||item.stock_name||getLocalName(id)||id;}
+function usDisplayName(sym,item){var c=US_WL_CACHE[sym]||{};item=item||US_WL.find(function(x){return String(x.symbol)===String(sym);})||{};return c.name||item.name||sym;}
+
+
 async function apiFetch(url,opt,timeout) {
   timeout=timeout||30000;
   var c=new AbortController(),t=setTimeout(function(){c.abort();},timeout);
@@ -1273,20 +1287,19 @@ function compactCard(id) {
 }
 
 function tickerItemHTML(id) {
-  var c=WL_CACHE[id]||{},item=WL.find(function(x){return x.stock_id===id;})||{};
-  var nm=c.name||item.stock_name||id; var clr=twcc(c.changePct||0);
-  return '<div class="ticker-item" data-load="'+id+'">'+
-    '<span style="font-weight:700;font-family:var(--mono)">'+id+'</span>'+
+  var c=WL_CACHE[id]||{};
+  var nm=twDisplayName(id); var clr=twcc(c.changePct||0);
+  return '<div class="ticker-item" data-load="'+esc(id)+'">'+
+    '<span class="name-code">'+esc(nm)+' <span style="color:var(--muted)">'+esc(id)+'</span></span>'+
     '<span class="ticker-price '+clr+'">'+(c.price!=null?f(c.price):"—")+'</span>'+
     '<span class="ticker-chg '+clr+'">'+pct(c.changePct)+'</span>'+
-    '<span style="font-size:10px;color:var(--muted)">'+nm+'</span>'+
     '</div>';
 }
 
 function renderWL() {
   setTxt("wlCount",WL.length+" 檔");
   var ids=sortWLIds(getWLIds());
-  var COMPACT_N=window.innerWidth<=768?2:4;
+  var COMPACT_N=4;
   var compact=ids.slice(0,COMPACT_N), tickers=ids.slice(COMPACT_N);
 
   if(watchlistExpanded) {
@@ -1301,7 +1314,7 @@ function renderWL() {
   } else {
     var fg=$I("wlGridFull");if(fg)fg.style.display="none";
     var cg=$I("wlGridCompact");
-    if(cg){
+    if(cg){cg.style.display="grid";
       cg.innerHTML=compact.length?compact.map(compactCard).join(""):'<div class="empty" style="grid-column:1/-1;font-size:12px">輸入股票代號後按「＋ 加入自選」</div>';
       bindWLCards(cg);
     }
@@ -1797,18 +1810,17 @@ function usCompactCard(item) {
 }
 
 function usTickerItemHTML(item) {
-  var sym=item.symbol,c=US_WL_CACHE[sym]||{},clr=usColorCls(c.changePct||0);
-  return '<div class="ticker-item" data-us-load="'+sym+'">'+
-    '<span style="font-weight:700;font-family:var(--mono)">'+sym+'</span>'+
+  var sym=item.symbol,c=US_WL_CACHE[sym]||{},clr=usColorCls(c.changePct||0),name=usDisplayName(sym,item);
+  return '<div class="ticker-item" data-us-load="'+esc(sym)+'">'+
+    '<span class="name-code">'+esc(name)+' <span style="color:var(--muted)">'+esc(sym)+'</span></span>'+
     '<span class="ticker-price '+clr+'">'+(c.price!=null?"$"+Number(c.price).toFixed(2):"—")+'</span>'+
     '<span class="ticker-chg '+clr+'">'+pctUS(c.changePct)+'</span>'+
-    '<span style="font-size:10px;color:var(--muted)">'+(c.name||item.name||"")+'</span>'+
     '</div>';
 }
 
 function renderUSWL() {
   setTxt("usWlCount",US_WL.length+" stocks");
-  var COMPACT_N=window.innerWidth<=768?2:4;
+  var COMPACT_N=4;
   var compact=US_WL.slice(0,COMPACT_N),tickers=US_WL.slice(COMPACT_N);
   var cg=$I("usWlGrid");
   if(cg){
@@ -2079,6 +2091,94 @@ function usScanCard(r) {
 }
 
 
+
+// ── Trade Plan Center (V12.2.1 polish) ─────────────────────────────
+function planKey(p){return (p.market||'tw')+":"+(p.symbol||p.stock_id||'');}
+function normalizePlanMarket(m){return (m==='us')?'us':'tw';}
+async function loadTradePlans(){
+  TRADE_PLANS={tw:[],us:[]};
+  if(!currentUser||!db)return TRADE_PLANS;
+  for(var i=0;i<2;i++){
+    var m=i===0?'tw':'us', ref=tradePlanRef(currentUser.uid,m);
+    try{var snap=await ref.get();if(snap.exists){var data=snap.data()||{};TRADE_PLANS[m]=Array.isArray(data.plans)?data.plans:[];}}
+    catch(e){console.warn('load trade plans',m,e);}
+  }
+  return TRADE_PLANS;
+}
+async function saveTradePlans(mkt){
+  mkt=normalizePlanMarket(mkt); if(!currentUser||!db)return;
+  var ref=tradePlanRef(currentUser.uid,mkt); if(!ref)return;
+  await ref.set({market:mkt,plans:TRADE_PLANS[mkt]||[],updated_at:new Date().toISOString()},{merge:true});
+}
+function buildPlanFromCurrent(mkt){
+  mkt=normalizePlanMarket(mkt);
+  var ai=mkt==='us'?LAST_US_AI:LAST_TW_AI, data=mkt==='us'?LAST_US_DATA:LAST_TW_DATA;
+  if(!data||!ai){toast(mkt==='us'?'Please search a US stock first':'請先查詢股票','warn');return null;}
+  var sym=mkt==='us'?(data.symbol||data.stock_id):(data.stock_id||data.symbol);
+  if(!sym){toast('找不到股票代號','err');return null;}
+  var entry=ai.entry_price, elo=ai.entry_zone_low, ehi=ai.entry_zone_high, target=ai.target_price, stop=ai.stop_loss;
+  if(entry==null&&elo!=null&&ehi!=null)entry=(Number(elo)+Number(ehi))/2;
+  var p={
+    id:String(sym),market:mkt,symbol:String(sym),stock_id:String(sym),
+    name:mkt==='us'?(data.name||sym):(data.stock_name||data.name||getLocalName(sym)||sym),
+    price:data.price,change_pct:data.change_pct,
+    entry_price:entry,entry_zone_low:elo,entry_zone_high:ehi,target_price:target,stop_loss:stop,
+    risk_reward_ratio:ai.risk_reward_ratio,signal:ai.signal||ai.trade_status||'WATCH',trade_status:ai.trade_status||'WATCH',
+    strategy_type:ai.strategy_type||'',final_score:ai.final_score,technical_score:ai.technical_score,risk_score:ai.risk_score,
+    summary:ai.summary||'',created_at:new Date().toISOString(),updated_at:new Date().toISOString(),status:'WAITING_ENTRY'
+  };
+  return p;
+}
+async function addCurrentTradePlan(mkt){
+  var p=buildPlanFromCurrent(mkt); if(!p)return;
+  var arr=TRADE_PLANS[p.market]||(TRADE_PLANS[p.market]=[]); var k=planKey(p), found=false;
+  for(var i=0;i<arr.length;i++){if(planKey(arr[i])===k){p.created_at=arr[i].created_at||p.created_at;arr[i]=Object.assign({},arr[i],p,{updated_at:new Date().toISOString()});found=true;break;}}
+  if(!found)arr.unshift(p);
+  await saveTradePlans(p.market); renderTradePlans(); toast(found?'已更新交易追蹤':'已加入交易追蹤','ok');
+}
+async function removeTradePlan(mkt,id){
+  mkt=normalizePlanMarket(mkt); TRADE_PLANS[mkt]=(TRADE_PLANS[mkt]||[]).filter(function(p){return String(p.symbol||p.stock_id)!==String(id);});
+  await saveTradePlans(mkt); renderTradePlans(); toast('已移除交易追蹤','ok');
+}
+function getAllPlans(){return (TRADE_PLANS.tw||[]).concat(TRADE_PLANS.us||[]);}
+function planStatusLabel(st){return {WAITING_ENTRY:'等待入場',ENTERABLE_NOW:'進入入場區',ABOVE_ENTRY_ZONE:'高於入場區',NEAR_TARGET:'接近目標',NEAR_STOP:'接近止損',STOP_BROKEN:'跌破止損',TARGET_REACHED:'達到目標',INVALIDATED:'已失效',NO_PRICE:'無現價'}[st]||st||'等待入場';}
+function planStatusClass(st){if(st==='ENTERABLE_NOW'||st==='TARGET_REACHED')return 'ok'; if(st==='NEAR_TARGET'||st==='WAITING_ENTRY')return 'watch'; if(st==='NEAR_STOP'||st==='STOP_BROKEN'||st==='INVALIDATED')return 'risk'; return 'neutral';}
+function localCheckPlan(p){
+  var cp=Number(p.current_price||p.price), lo=Number(p.entry_zone_low||p.entry_price), hi=Number(p.entry_zone_high||p.entry_price), tp=Number(p.target_price), sl=Number(p.stop_loss); var st='WAITING_ENTRY';
+  if(!cp||isNaN(cp))st='NO_PRICE'; else if(tp&&cp>=tp)st='TARGET_REACHED'; else if(sl&&cp<=sl)st='STOP_BROKEN'; else if(sl&&cp<=sl*1.05)st='NEAR_STOP'; else if(tp&&cp>=tp*0.95)st='NEAR_TARGET'; else if(lo&&hi&&cp>=lo&&cp<=hi)st='ENTERABLE_NOW'; else if(hi&&cp>hi)st='ABOVE_ENTRY_ZONE'; else st='WAITING_ENTRY';
+  var distEntry=(cp&&lo&&hi)?(cp<lo?(lo-cp)/cp*100:(cp>hi?(cp-hi)/cp*100:0)):null;
+  return Object.assign({},p,{status:st,distance_to_entry_pct:distEntry==null?null:Number(distEntry.toFixed(2)),checked_at:new Date().toISOString()});
+}
+async function refreshTradePlans(showMsg){
+  if(showMsg!==false)toast('正在重新檢查交易追蹤…','warn');
+  for(var m of ['tw','us']){
+    for(var i=0;i<(TRADE_PLANS[m]||[]).length;i++){
+      var p=TRADE_PLANS[m][i],sym=p.symbol||p.stock_id;
+      try{
+        var url=API+(m==='us'?'/api/us/stock-lite/':'/api/stock-lite/')+encodeURIComponent(sym);
+        var r=await apiFetch(url,{},12000); if(r.ok){var d=await r.json();p.current_price=d.price;p.price=d.price;p.change_pct=d.change_pct;p.name=d.name||d.stock_name||p.name;}
+      }catch(e){}
+      TRADE_PLANS[m][i]=localCheckPlan(p);
+    }
+    try{await saveTradePlans(m);}catch(e){}
+  }
+  renderTradePlans(); if(showMsg!==false)toast('交易追蹤已更新','ok');
+}
+function renderTradePlans(){
+  var all=getAllPlans().map(localCheckPlan); var filtered=all.filter(function(p){return PLAN_FILTER==='all'||p.market===PLAN_FILTER||p.status===PLAN_FILTER;});
+  setTxt('planTotalBadge',all.length+' plans');
+  var counts={WAITING_ENTRY:0,ENTERABLE_NOW:0,NEAR_TARGET:0,NEAR_STOP:0,STOP_BROKEN:0,TARGET_REACHED:0,ABOVE_ENTRY_ZONE:0,NO_PRICE:0};
+  all.forEach(function(p){counts[p.status]=(counts[p.status]||0)+1;});
+  var sg=$I('planSummaryGrid'); if(sg){sg.innerHTML=[['全部',all.length],['等待入場',counts.WAITING_ENTRY],['入場區',counts.ENTERABLE_NOW],['接近目標',counts.NEAR_TARGET],['接近止損',counts.NEAR_STOP+counts.STOP_BROKEN]].map(function(x){return '<div class="plan-stat"><div class="k">'+x[0]+'</div><div class="v">'+x[1]+'</div></div>';}).join('');}
+  var grid=$I('tradePlanGrid'),empty=$I('tradePlanEmpty'); if(!grid)return;
+  if(empty)empty.style.display=filtered.length?'none':'block';
+  grid.innerHTML=filtered.map(function(p){var sym=p.symbol||p.stock_id,name=p.name||sym,m=p.market||'tw',up=m==='us'?'us-up':'tw-up',down=m==='us'?'us-down':'tw-down';var ch=Number(p.change_pct||0);var clr=ch>0?up:(ch<0?down:'tw-flat');return '<div class="plan-card '+m+'" data-plan-open="'+m+':'+esc(sym)+'">'+
+    '<div class="plan-top"><div><div class="plan-name">'+esc(name)+'</div><div class="plan-code">'+esc(sym)+' · '+m.toUpperCase()+'</div></div><span class="plan-status '+planStatusClass(p.status)+'">'+planStatusLabel(p.status)+'</span></div>'+
+    '<div class="plan-metrics"><span class="lbl">現價</span><span class="val '+clr+'">'+(m==='us'?fUS(p.price):f(p.price))+'</span><span class="lbl">入場區</span><span class="val">'+(p.entry_zone_low?f(p.entry_zone_low)+'~'+f(p.entry_zone_high||p.entry_zone_low):'—')+'</span><span class="lbl">目標</span><span class="val">'+(p.target_price?f(p.target_price):'—')+'</span><span class="lbl">止損</span><span class="val">'+(p.stop_loss?f(p.stop_loss):'—')+'</span><span class="lbl">RR</span><span class="val">'+(p.risk_reward_ratio?p.risk_reward_ratio+'x':'—')+'</span><span class="lbl">距離入場</span><span class="val">'+(p.distance_to_entry_pct!=null?p.distance_to_entry_pct+'%':'—')+'</span></div>'+
+    '<div class="plan-note">'+esc(p.strategy_type||p.summary||'—')+'</div><div class="plan-actions"><button class="ghost sm" data-plan-open-btn="'+m+':'+esc(sym)+'">打開</button><button class="ghost sm danger" data-plan-remove="'+m+':'+esc(sym)+'">移除</button></div></div>';}).join('');
+}
+function openTradePlan(mkt,id){switchMarket(mkt);if(mkt==='us')usLoadStock(id);else loadStock(id);showPage('p-trade');}
+
 // ── System Health / Version Check ─────────────────────────────────
 function safeVal(v, fallback){ if(v===undefined||v===null||Number.isNaN(v)) return fallback||"—"; return v; }
 function setHealth(id, text, cls){var el=$I(id);if(!el)return;el.textContent=text;el.className=cls||"";}
@@ -2174,7 +2274,11 @@ function bindAllButtons() {
   safeBind("btnUsQuickScan","click",function(){usAiScan("quick");});
   safeBind("btnUsFullScan","click",function(){usAiScan("full");});
   safeBind("btnUsCtx","click",loadUSMarketContext);
+  safeBind("btnSavePlanTw","click",function(){addCurrentTradePlan("tw");});
+  safeBind("btnSavePlanUs","click",function(){addCurrentTradePlan("us");});
+  safeBind("btnRefreshPlans","click",function(){refreshTradePlans(true);});
   safeBind("btnHealthRefresh","click",loadSystemHealth);
+  safeBind("btnHealthToggle","click",function(){var p=$I("systemHealthPanel"),b=$I("btnHealthToggle");if(!p)return;p.classList.toggle("compact");if(b)b.textContent=p.classList.contains("compact")?"展開":"收合";});
   initUSSuggest();
 }
 
@@ -2190,5 +2294,6 @@ async function initApp() {
 document.addEventListener("click",function(e){var f=e.target&&e.target.getAttribute&&e.target.getAttribute("data-plan-filter");if(f){PLAN_FILTER=f;renderTradePlans();return;}var rm=e.target&&e.target.getAttribute&&e.target.getAttribute("data-plan-remove");if(rm){e.stopPropagation();var a=rm.split(":");removeTradePlan(a[0],a.slice(1).join(":"));return;}var op=e.target&&e.target.getAttribute&&e.target.getAttribute("data-plan-open-btn");if(op){e.stopPropagation();var b=op.split(":");openTradePlan(b[0],b[1]);return;}var card=e.target&&e.target.closest&&e.target.closest("[data-plan-open]");if(card){var c=card.getAttribute("data-plan-open").split(":");openTradePlan(c[0],c[1]);}});
 document.addEventListener("DOMContentLoaded",initApp);
 </script>
+<div id="toast" class="toast"></div>
 </body>
 </html>
