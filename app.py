@@ -1,5 +1,5 @@
 """
-V12.2.1 Watchlist UI & Trade Plan Polish
+V12.3 Portfolio & Smart Alert Mode
 架構：TW Engine / US Engine / Shared Engine（三層分離）
 版本：12.2.1
 """
@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="V12.2.1 Watchlist UI & Trade Plan Polish", version="12.2.1")
+app = FastAPI(title="V12.3 Portfolio & Smart Alert Mode", version="12.3.0")
 _raw = os.getenv("ALLOWED_ORIGINS",
     "http://localhost:5500,http://127.0.0.1:5500,"
     "https://taiwanstock-ben.web.app,https://taiwanstock-ben.firebaseapp.com")
@@ -653,7 +653,7 @@ def get_stock_name(sid: str, api_name: str | None=None) -> str:
 # TW LEARNING / WEIGHTS
 # ══════════════════════════════════════════════════════════════════════════════
 TW_DEFAULT_WEIGHTS={"technical":0.35,"fundamental":0.25,"chip":0.25,"news":0.15,
-    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.2.1","last_reason":"預設權重"}
+    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.3.0","last_reason":"預設權重"}
 TW_WEIGHT_LIMITS={"technical":(0.20,0.45),"fundamental":(0.10,0.35),"chip":(0.10,0.40),"news":(0.05,0.25)}
 
 def _rjf(path,default):
@@ -2229,7 +2229,7 @@ def api_scan_status():
         for k,(payload,ts) in list(cache.items())[-12:]:
             out.append({"key":k,"age_seconds":round(now-ts,1),"market":payload.get("market"),"mode":payload.get("scan_mode"),"pool":payload.get("pool"),"classified":payload.get("classified"),"failed":payload.get("failed")})
         return out
-    return {"version":"12.2.1","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
+    return {"version":"12.3.0","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # API — DATA HEALTH / DIAGNOSTICS
@@ -2344,7 +2344,7 @@ async def api_health_full():
         "frontend_expected": "12.2.1",
         "time": datetime.now().isoformat(),
         "backend": {
-            "title": "V12.2.1 Watchlist UI & Trade Plan Polish",
+            "title": "V12.3 Portfolio & Smart Alert Mode",
             "version": "12.2.1"
         },
         "line": {
@@ -2463,17 +2463,121 @@ def api_debug_trade_plans():
         "time": datetime.now().isoformat(),
     }
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# V12.3 PORTFOLIO & SMART ALERT MODE HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
+def _position_status_from_values(price, avg_price=None, shares=None, target=None, stop=None):
+    """Evaluate an owned position. Backend only checks; frontend stores private positions in Firestore."""
+    def n(v):
+        try:
+            if v is None or v == "": return None
+            return float(v)
+        except Exception:
+            return None
+    price, avg_price, shares, target, stop = map(n, [price, avg_price, shares, target, stop])
+    if price is None:
+        return {"status":"NO_PRICE","status_text":"無現價資料","unrealized_pnl":None,"unrealized_pnl_pct":None,"risk_amount":None,"distance_to_target_pct":None,"distance_to_stop_pct":None,"alerts":["目前無法取得現價"]}
+    alerts = []
+    pnl = None; pnl_pct = None; risk_amount = None
+    if avg_price is not None and shares is not None:
+        pnl = round((price - avg_price) * shares, 2)
+        if avg_price:
+            pnl_pct = round((price - avg_price) / avg_price * 100, 2)
+    if avg_price is not None and stop is not None and shares is not None:
+        risk_amount = round(max(0, (avg_price - stop) * shares), 2)
+    status, text = "HOLDING_NORMAL", "正常持有"
+    if stop is not None and price <= stop:
+        status, text = "STOP_BROKEN", "跌破止損"
+        alerts.append("已跌破止損，請立即重新評估")
+    elif target is not None and price >= target:
+        status, text = "TARGET_REACHED", "達到目標"
+        alerts.append("已達到目標價，可考慮分批獲利或更新計畫")
+    elif target is not None and price >= target * 0.95:
+        status, text = "NEAR_TARGET", "接近目標"
+        alerts.append("接近目標價")
+    elif stop is not None and price <= stop * 1.05:
+        status, text = "NEAR_STOP", "接近止損"
+        alerts.append("接近止損價，請注意風險")
+    elif pnl_pct is not None and pnl_pct <= -8:
+        status, text = "RISK_UP", "風險升高"
+        alerts.append("未實現損益明顯轉弱")
+    elif pnl_pct is not None and pnl_pct >= 8:
+        status, text = "HOLDING_NORMAL", "正常持有"
+        alerts.append("已有獲利，請留意是否接近目標")
+    def pct_to(v):
+        if v is None or not price: return None
+        return round((v - price) / price * 100, 2)
+    return {
+        "status": status,
+        "status_text": text,
+        "unrealized_pnl": pnl,
+        "unrealized_pnl_pct": pnl_pct,
+        "risk_amount": risk_amount,
+        "distance_to_target_pct": pct_to(target),
+        "distance_to_stop_pct": pct_to(stop),
+        "alerts": alerts,
+    }
+
+@app.get("/api/position/check")
+async def api_position_check(
+    market: str = Query(..., description="tw or us"),
+    symbol: str = Query(..., description="stock id or US symbol"),
+    avg_price: float | None = None,
+    shares: float | None = None,
+    target: float | None = None,
+    stop: float | None = None,
+):
+    """V12.3 lightweight position checker. It does not persist personal data; Firestore stores positions on frontend."""
+    market = (market or "").lower().strip()
+    symbol = (symbol or "").upper().strip()
+    price = None; name = symbol; source = None; error = None
+    try:
+        if market == "us":
+            async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as cl:
+                q = await fetch_us_quote(symbol, cl)
+            if q:
+                price = q.get("price"); name = q.get("name") or symbol; source = q.get("source")
+        else:
+            q = await fetch_tw_quote(symbol)
+            if q:
+                price = q.get("price"); name = q.get("stock_name") or symbol; source = q.get("source")
+    except Exception as e:
+        error = str(e)[:200]
+    status = _position_status_from_values(price, avg_price, shares, target, stop)
+    return {
+        "market": market,
+        "symbol": symbol,
+        "name": name,
+        "price": price,
+        "source": source,
+        "checked_at": datetime.now().isoformat(),
+        "position_status": status,
+        "error": error,
+    }
+
+@app.get("/api/debug/positions")
+def api_debug_positions():
+    return {
+        "version": "12.3.0",
+        "storage": "Firestore frontend: users/{uid}/positions/tw and users/{uid}/positions/us",
+        "checker": "/api/position/check",
+        "statuses": ["HOLDING_NORMAL","NEAR_TARGET","TARGET_REACHED","NEAR_STOP","STOP_BROKEN","RISK_UP","REVIEW_REQUIRED","NO_PRICE"],
+        "note": "Backend does not persist personal positions; authenticated frontend saves them in each user's Firestore.",
+        "time": datetime.now().isoformat(),
+    }
+
 # ══════════════════════════════════════════════════════════════════════════════
 # HEALTH
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/health")
 def health():
-    return{"status":"ok","version":"12.2.1","frontend_expected":"12.2.1","time":datetime.now().isoformat(),
+    return{"status":"ok","version":"12.3.0","frontend_expected":"12.3.0","time":datetime.now().isoformat(),
            "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
            "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
            "price_sources":"Yahoo Finance → TWSE Official → FinMind",
            "us_master_count":len(_us_master),"tw_master_count":len(STOCK_MASTER),
-           "features":["V12.2.1 Watchlist UI & Trade Plan Polish","AI Picker Pro",
+           "features":["V12.3 Portfolio & Smart Alert Mode","AI Picker Pro",
                        "TW Engine + US Engine + Shared Engine",
                        "6-zone scan output","US Market Context","Symbol Master 200+",
-                       "validate_trade_plan","compute_final_score","LINE alerts","Quick/Full AI Scan","Watch Closely zone","scan pool selector","scan cache diagnostics","Trade Plan Center","trade plan status checker","Watchlist UI polish"]}
+                       "validate_trade_plan","compute_final_score","LINE alerts","Quick/Full AI Scan","Watch Closely zone","scan pool selector","scan cache diagnostics","Trade Plan Center","trade plan status checker","Watchlist UI polish","Portfolio Center","position status checker","smart position alerts"]}
