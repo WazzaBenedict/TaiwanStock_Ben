@@ -2205,13 +2205,87 @@ async def api_tw_data_health():
 
 @app.get("/api/health/full")
 async def api_health_full():
-    us=await _check_us_data_health(); tw=await _check_tw_data_health()
-    return {"status":"ok","version":"12.0.2","frontend_expected":"12.0.2",
-            "time":datetime.now().isoformat(),"backend":{"title":"V12 Global Trading Intelligence","version":"12.0.2"},
-            "line":{"configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),"enabled":ENABLE_LINE_ALERTS},
-            "cache":{"us_quote_ttl":US_LITE_TTL,"us_history_ttl":US_FULL_TTL,"us_market_context_ttl":US_CTX_TTL,
-                     "tw_full_cache_seconds":300,"tw_lite_cache_seconds":30},
-            "data_health":{"us":us,"tw":tw}}
+    """
+    V12.0.2 safe full health endpoint.
+    This endpoint must NEVER return 500 because the frontend status panel depends on it.
+    Any failing sub-check is reported as partial/fail inside JSON instead of raising.
+    """
+    def _json_safe(v):
+        try:
+            if isinstance(v, dict):
+                return {str(k): _json_safe(val) for k, val in v.items()}
+            if isinstance(v, (list, tuple, set)):
+                return [_json_safe(x) for x in v]
+            if isinstance(v, (np.integer,)):
+                return int(v)
+            if isinstance(v, (np.floating,)):
+                f = float(v)
+                return None if np.isnan(f) or np.isinf(f) else f
+            if isinstance(v, float):
+                return None if np.isnan(v) or np.isinf(v) else v
+            if isinstance(v, (datetime,)):
+                return v.isoformat()
+            return v
+        except Exception:
+            return str(v)
+
+    errors = []
+    us = {"market": "us", "overall": "unknown", "checks": {}, "updated_at": datetime.now().isoformat()}
+    tw = {"market": "tw", "overall": "unknown", "checks": {}, "updated_at": datetime.now().isoformat()}
+
+    try:
+        us = await asyncio.wait_for(_check_us_data_health(), timeout=18)
+    except Exception as e:
+        errors.append({"scope": "us_data_health", "error": str(e)[:300]})
+        us = {
+            "market": "us",
+            "overall": "fail",
+            "checks": {
+                "endpoint": {"status": "fail", "error": str(e)[:180]}
+            },
+            "updated_at": datetime.now().isoformat()
+        }
+
+    try:
+        tw = await asyncio.wait_for(_check_tw_data_health(), timeout=18)
+    except Exception as e:
+        errors.append({"scope": "tw_data_health", "error": str(e)[:300]})
+        tw = {
+            "market": "tw",
+            "overall": "fail",
+            "checks": {
+                "endpoint": {"status": "fail", "error": str(e)[:180]}
+            },
+            "updated_at": datetime.now().isoformat()
+        }
+
+    payload = {
+        "status": "ok" if not errors else "partial",
+        "version": "12.0.2",
+        "frontend_expected": "12.0.2",
+        "time": datetime.now().isoformat(),
+        "backend": {
+            "title": "V12 Global Trading Intelligence",
+            "version": "12.0.2"
+        },
+        "line": {
+            "configured": bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
+            "enabled": ENABLE_LINE_ALERTS
+        },
+        "cache": {
+            "us_quote_ttl": globals().get("US_LITE_TTL", 30),
+            "us_history_ttl": globals().get("US_FULL_TTL", 600),
+            "us_market_context_ttl": globals().get("US_CTX_TTL", 180),
+            "tw_full_cache_seconds": 300,
+            "tw_lite_cache_seconds": 30
+        },
+        "data_health": {
+            "us": us,
+            "tw": tw
+        },
+        "errors": errors
+    }
+    return _json_safe(payload)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HEALTH
