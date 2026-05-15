@@ -2340,12 +2340,12 @@ async def api_health_full():
 
     payload = {
         "status": "ok" if not errors else "partial",
-        "version": "12.2.1",
-        "frontend_expected": "12.2.1",
+        "version": "12.3.0",
+        "frontend_expected": "12.3.0",
         "time": datetime.now().isoformat(),
         "backend": {
             "title": "V12.3 Portfolio & Smart Alert Mode",
-            "version": "12.2.1"
+            "version": "12.3.0"
         },
         "line": {
             "configured": bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
@@ -2455,7 +2455,7 @@ async def api_trade_plan_check(
 @app.get("/api/debug/trade-plans")
 def api_debug_trade_plans():
     return {
-        "version": "12.2.1",
+        "version": "12.3.0",
         "storage": "Firestore frontend: users/{uid}/trade_plans/tw and users/{uid}/trade_plans/us",
         "checker": "/api/trade-plan/check",
         "statuses": ["WAITING_ENTRY","ENTERABLE_NOW","ABOVE_ENTRY_ZONE","NEAR_TARGET","NEAR_STOP","STOP_BROKEN","TARGET_REACHED","INVALIDATED","NO_PRICE"],
