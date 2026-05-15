@@ -1,7 +1,7 @@
 """
-V12 Global Trading Intelligence - AI Picker Pro
+V12.1 AI Picker Reliability & Scan Experience
 架構：TW Engine / US Engine / Shared Engine（三層分離）
-版本：12.0.2
+版本：12.1.0
 """
 import os, re, asyncio, json, time
 from datetime import datetime, timedelta
@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="V12 Global Trading Intelligence", version="12.0.2")
+app = FastAPI(title="V12.1 AI Picker Reliability & Scan Experience", version="12.1.0")
 _raw = os.getenv("ALLOWED_ORIGINS",
     "http://localhost:5500,http://127.0.0.1:5500,"
     "https://taiwanstock-ben.web.app,https://taiwanstock-ben.firebaseapp.com")
@@ -367,6 +367,8 @@ def classify_scan_category(signal, entry_status, trade_valid, overheat_flags,
         return "PULLBACK"
     if entry_status=="WAIT_BREAKOUT" or (not trade_valid and technical_score>=65):
         return "BREAKOUT_WATCH"
+    if final_score>=65 and technical_score>=65 and risk_score>=50:
+        return "WATCH_CLOSELY"
     if final_score>=55 and technical_score>=55:
         return "NEAR_MISS"
     return "AVOID"
@@ -651,7 +653,7 @@ def get_stock_name(sid: str, api_name: str | None=None) -> str:
 # TW LEARNING / WEIGHTS
 # ══════════════════════════════════════════════════════════════════════════════
 TW_DEFAULT_WEIGHTS={"technical":0.35,"fundamental":0.25,"chip":0.25,"news":0.15,
-    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.0.2","last_reason":"預設權重"}
+    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.1.0","last_reason":"預設權重"}
 TW_WEIGHT_LIMITS={"technical":(0.20,0.45),"fundamental":(0.10,0.35),"chip":(0.10,0.40),"news":(0.05,0.25)}
 
 def _rjf(path,default):
@@ -1684,6 +1686,71 @@ US_CORE_POOL      = ["AAPL","MSFT","NVDA","AMZN","META","GOOGL","TSLA","AMD","AV
 US_GROWTH_POOL    = ["PLTR","SOFI","RIVN","HOOD","COIN","MSTR","ASTS","RKLB","IONQ","SOUN"]
 US_SEMI_POOL      = ["NVDA","AMD","AVGO","SMCI","MU","QCOM","MRVL","AMAT","LRCX","KLAC"]
 US_ETF_POOL       = ["SPY","QQQ","SOXX","IWM","ARKK","TQQQ","SMH"]
+US_SCAN_CACHE: dict[str, tuple[dict, float]] = {}
+TW_SCAN_CACHE: dict[str, tuple[dict, float]] = {}
+SCAN_CACHE_TTL = 300
+
+def _scan_cache_get(cache: dict, key: str, ttl: int = SCAN_CACHE_TTL):
+    hit = cache.get(key)
+    if not hit: return None
+    payload, ts = hit
+    if time.time() - ts < ttl:
+        data = dict(payload)
+        data["cache_status"] = "fresh"
+        data["cache_age_seconds"] = round(time.time() - ts, 1)
+        return data
+    return None
+
+def _scan_cache_set(cache: dict, key: str, payload: dict):
+    payload = dict(payload)
+    payload["cache_status"] = "fresh"
+    payload["cache_saved_at"] = datetime.now().isoformat()
+    cache[key] = (payload, time.time())
+    return payload
+
+def _unique_symbols(seq):
+    out=[]
+    for x in seq or []:
+        s=str(x).strip().upper()
+        if s and s not in out: out.append(s)
+    return out
+
+def select_us_scan_pool(pool: str = "all", symbols: str = "", limit: int = 50) -> list[str]:
+    pool=(pool or "all").lower().replace("_","-")
+    custom=_unique_symbols(re.split(r"[,\s]+", symbols or ""))
+    if pool in ("watchlist","my-watchlist","custom") and custom:
+        return custom[:limit]
+    if pool in ("mega","mega-cap","core"):
+        base=US_CORE_POOL
+    elif pool in ("ai","semi","semiconductor","ai-semiconductor"):
+        base=US_SEMI_POOL
+    elif pool in ("growth","high-beta","highbeta"):
+        base=US_GROWTH_POOL
+    elif pool in ("etf","etfs"):
+        base=US_ETF_POOL
+    else:
+        base=US_CORE_POOL + US_GROWTH_POOL + US_SEMI_POOL + US_ETF_POOL
+    return list(dict.fromkeys(base))[:limit]
+
+def select_tw_scan_pool(pool: str = "all", symbols: str = "", limit: int = 50) -> list[str]:
+    pool=(pool or "all").lower().replace("_","-")
+    custom=[]
+    for x in re.split(r"[,\s]+", symbols or ""):
+        if re.match(r"^\d{4,6}$", x or "") and x not in custom: custom.append(x)
+    if pool in ("watchlist","my-watchlist","custom") and custom:
+        return custom[:limit]
+    if pool in ("finance","financial"):
+        base=["2881","2882","2891","2886","2884","2885","2892","2801","2812","5880"]
+    elif pool in ("electronics","tech","ai"):
+        base=["2330","2317","2454","2308","2382","2357","2379","3034","2303","2327","2345","2360","3005"]
+    elif pool in ("hot","popular"):
+        base=["2357","3034","2485","2891","3481","6147","2342","5351","2344","6173","2313","3706"]
+    else:
+        base=TW_SCAN_POOL
+    return list(dict.fromkeys(base))[:limit]
+
+def scan_mode_label(mode: str, pool: str, count: int) -> str:
+    return f"{(mode or 'full').upper()} · {pool or 'all'} · {count} symbols"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TW Additional helpers (scan market sentiment)
@@ -1883,47 +1950,45 @@ async def api_market_sentiment():
 # ══════════════════════════════════════════════════════════════════════════════
 # API — TW AI Scan
 # ══════════════════════════════════════════════════════════════════════════════
-@app.get("/api/scan/ai")
-async def tw_ai_scan(min_score:int=Query(65,ge=0,le=100),max_stocks:int=Query(50,ge=5,le=80)):
-    """V12.0.2 TW AI scan — stable 6-zone output with diagnostics."""
-    t0=time.time(); pool=list(dict.fromkeys(TW_SCAN_POOL))[:max_stocks]
+async def _tw_scan_core(min_score:int=65,max_stocks:int=50,mode:str="full",pool_name:str="all",symbols:str="",use_cache:bool=True):
+    """V12.1 TW AI scan core — quick/full/watchlist pools + 6-zone output."""
+    pool=select_tw_scan_pool(pool_name, symbols, max_stocks)
+    cache_key=f"tw:{mode}:{pool_name}:{','.join(pool)}:{min_score}:{max_stocks}"
+    if use_cache:
+        hit=_scan_cache_get(TW_SCAN_CACHE, cache_key)
+        if hit: return hit
+    t0=time.time()
     try: macro=await asyncio.wait_for(fetch_macro_context(),timeout=6)
     except Exception as e: macro={"error":str(e)}
     market_score_tw=max(0,min(100,60+(macro.get("macro_adj",0)*2)))
-    enterable=[];pullback=[];breakout_watch=[];risk_watch=[];avoid=[];near_miss=[];errors=[]
-    attempted=0; classified=0
+    enterable=[];watch_closely=[];pullback=[];breakout_watch=[];risk_watch=[];avoid=[];near_miss=[];errors=[]
+    attempted=0; classified=0; current_symbol=None
     for sid in pool:
-        attempted += 1
+        current_symbol=sid; attempted += 1
         try:
             r=await _analyze_stock_lite(sid,macro); ai=r.get("ai_signal",{}) or {}
-            conf=ai.get("confidence") or 0
-            final=ai.get("final_score") or 0
-            cat=ai.get("scan_category","AVOID")
-            item={"stock_id":sid,"stock_name":r.get("stock_name") or get_stock_name(sid),"market":"tw",
-                  "signal":ai.get("signal","WATCH"),"confidence":conf,
-                  "trade_status":ai.get("trade_status","WATCH"),
-                  "entry_status":ai.get("entry_status","NO_DATA"),
-                  "entry_status_text":ai.get("entry_status_text","—"),
-                  "can_enter":ai.get("can_enter",False),"trade_valid":ai.get("trade_valid",False),
-                  "strategy_type":ai.get("strategy_type",""),
-                  "technical_score":ai.get("technical_score"),"final_score":final,
-                  "market_score":ai.get("market_score",market_score_tw),"risk_score":ai.get("risk_score",50),
-                  "rr_score":ai.get("rr_score",0),
-                  "overheat_flags":ai.get("overheat_flags",[]),"false_breakout_flags":ai.get("false_breakout_flags",[]),
-                  "price":r.get("price"),"change_pct":r.get("change_pct"),
-                  "entry_price":ai.get("entry_price"),"entry_zone_low":ai.get("entry_zone_low"),
-                  "entry_zone_high":ai.get("entry_zone_high"),
-                  "target_price":ai.get("target_price"),"stop_loss":ai.get("stop_loss"),
-                  "risk_reward_ratio":ai.get("risk_reward_ratio"),
-                  "recent_support":ai.get("recent_support"),"recent_resistance":ai.get("recent_resistance"),
-                  "reasons":ai.get("entry_reason",[]) or ai.get("reasons",[]),"risk_reason":ai.get("risk_reason",[]),
-                  "summary":ai.get("summary","")}
-            # min_score should not hide all diagnostics. It only blocks ENTERABLE.
+            conf=ai.get("confidence") or 0; final=ai.get("final_score") or 0; cat=ai.get("scan_category","AVOID")
+            item={"stock_id":sid,"symbol":sid,"stock_name":r.get("stock_name") or get_stock_name(sid),"name":r.get("stock_name") or get_stock_name(sid),"market":"tw",
+                  "signal":ai.get("signal","WATCH"),"confidence":conf,"trade_status":ai.get("trade_status","WATCH"),
+                  "entry_status":ai.get("entry_status","NO_DATA"),"entry_status_text":ai.get("entry_status_text","—"),
+                  "can_enter":ai.get("can_enter",False),"trade_valid":ai.get("trade_valid",False),"strategy_type":ai.get("strategy_type",""),
+                  "technical_score":ai.get("technical_score"),"final_score":final,"market_score":ai.get("market_score",market_score_tw),"risk_score":ai.get("risk_score",50),
+                  "rr_score":ai.get("rr_score",0),"overheat_flags":ai.get("overheat_flags",[]),"false_breakout_flags":ai.get("false_breakout_flags",[]),
+                  "price":r.get("price"),"change_pct":r.get("change_pct"),"entry_price":ai.get("entry_price"),"entry_zone_low":ai.get("entry_zone_low"),
+                  "entry_zone_high":ai.get("entry_zone_high"),"target_price":ai.get("target_price"),"stop_loss":ai.get("stop_loss"),"risk_reward_ratio":ai.get("risk_reward_ratio"),
+                  "recent_support":ai.get("recent_support"),"recent_resistance":ai.get("recent_resistance"),"reasons":ai.get("entry_reason",[]) or ai.get("reasons",[]),
+                  "risk_reason":ai.get("risk_reason",[]),"summary":ai.get("summary","")}
             if conf < min_score:
                 item.setdefault("risk_reason",[]).append(f"Confidence {conf}/100 below scan threshold {min_score}")
-                if final >= 55 or (item.get("technical_score") or 0) >= 55: cat="NEAR_MISS"
+                if final>=65 and (item.get("technical_score") or 0)>=65 and (item.get("risk_score") or 0)>=50:
+                    cat="WATCH_CLOSELY"
+                elif final>=55 or (item.get("technical_score") or 0)>=55: cat="NEAR_MISS"
                 else: cat="AVOID"
+            elif cat=="NEAR_MISS" and final>=65 and (item.get("technical_score") or 0)>=65 and (item.get("risk_score") or 0)>=50:
+                cat="WATCH_CLOSELY"
+            item["scan_category"]=cat
             if cat=="ENTERABLE": enterable.append(item)
+            elif cat=="WATCH_CLOSELY": watch_closely.append(item)
             elif cat=="PULLBACK": pullback.append(item)
             elif cat=="BREAKOUT_WATCH": breakout_watch.append(item)
             elif cat=="RISK_WATCH": risk_watch.append(item)
@@ -1931,25 +1996,39 @@ async def tw_ai_scan(min_score:int=Query(65,ge=0,le=100),max_stocks:int=Query(50
             else: avoid.append(item)
             classified += 1
         except Exception as e:
-            errors.append({"stock_id":sid,"error":str(e)[:160]})
+            errors.append({"stock_id":sid,"symbol":sid,"error":str(e)[:160]})
     def sort_e(x): return (-(x.get("final_score") or 0),-(x.get("risk_reward_ratio") or 0),-(x.get("risk_score") or 0),-(x.get("confidence") or 0))
     def sort_p(x): return (-(x.get("technical_score") or 0),-(x.get("confidence") or 0),-(x.get("final_score") or 0))
-    enterable.sort(key=sort_e); pullback.sort(key=sort_p); breakout_watch.sort(key=sort_p)
-    risk_watch.sort(key=sort_p); near_miss.sort(key=sort_p); avoid.sort(key=sort_p)
-    found=len(enterable)+len(pullback)+len(breakout_watch)+len(risk_watch)+len(near_miss)
+    for arr in (enterable,watch_closely,pullback,breakout_watch,risk_watch,near_miss,avoid): arr.sort(key=sort_e if arr is enterable else sort_p)
+    found=len(enterable)+len(watch_closely)+len(pullback)+len(breakout_watch)+len(risk_watch)+len(near_miss)
     msg="目前沒有符合可進場條件的股票，建議等待更好的進場點。" if not enterable else f"發現 {len(enterable)} 檔可進場候選！"
     dur=round(time.time()-t0,1)
-    return{"market":"tw","updated_at":datetime.now().isoformat(),
-           "scanned":len(pool),"attempted":attempted,"classified":classified,"failed":len(errors),"found":found,
-           "market_score":market_score_tw,"duration_seconds":dur,
+    payload={"market":"tw","scan_mode":mode,"pool":pool_name,"pool_size":len(pool),"updated_at":datetime.now().isoformat(),
+           "scanned":len(pool),"attempted":attempted,"classified":classified,"failed":len(errors),"found":found,"current_symbol":current_symbol,
+           "market_score":market_score_tw,"duration_seconds":dur,"scan_label":scan_mode_label(mode,pool_name,len(pool)),
            "summary":{"scanned":len(pool),"attempted":attempted,"classified":classified,"failed":len(errors),
-                      "enterable_count":len(enterable),"pullback_count":len(pullback),
-                      "breakout_watch_count":len(breakout_watch),"risk_watch_count":len(risk_watch),
-                      "avoid_count":len(avoid),"near_miss_count":len(near_miss),"found":found,
-                      "market_score":market_score_tw,"message":msg},
-           "enterable":enterable,"pullback":pullback,"breakout_watch":breakout_watch,
-           "risk_watch":risk_watch,"avoid":avoid,"near_miss":near_miss,
-           "errors":errors,"error_count":len(errors),"duration_seconds":dur}
+                      "enterable_count":len(enterable),"watch_closely_count":len(watch_closely),"pullback_count":len(pullback),
+                      "breakout_watch_count":len(breakout_watch),"risk_watch_count":len(risk_watch),"avoid_count":len(avoid),"near_miss_count":len(near_miss),"found":found,
+                      "market_score":market_score_tw,"message":msg,"mode":mode,"pool":pool_name},
+           "enterable":enterable,"watch_closely":watch_closely,"pullback":pullback,"breakout_watch":breakout_watch,
+           "risk_watch":risk_watch,"avoid":avoid,"near_miss":near_miss,"errors":errors,"error_count":len(errors)}
+    return _scan_cache_set(TW_SCAN_CACHE, cache_key, payload)
+
+@app.get("/api/scan/ai")
+async def tw_ai_scan(min_score:int=Query(65,ge=0,le=100),max_stocks:int=Query(50,ge=5,le=80),pool:str="all",symbols:str="",mode:str="full"):
+    return await _tw_scan_core(min_score,max_stocks,mode,pool,symbols,True)
+
+@app.get("/api/tw/scan/quick")
+async def tw_scan_quick(pool:str="all",symbols:str="",min_score:int=Query(60,ge=0,le=100),max_stocks:int=Query(20,ge=5,le=40)):
+    return await _tw_scan_core(min_score,max_stocks,"quick",pool,symbols,True)
+
+@app.get("/api/tw/scan/full")
+async def tw_scan_full(pool:str="all",symbols:str="",min_score:int=Query(65,ge=0,le=100),max_stocks:int=Query(50,ge=10,le=80)):
+    return await _tw_scan_core(min_score,max_stocks,"full",pool,symbols,True)
+
+@app.get("/api/tw/scan/watchlist")
+async def tw_scan_watchlist(symbols:str="",min_score:int=Query(60,ge=0,le=100),max_stocks:int=Query(50,ge=1,le=100)):
+    return await _tw_scan_core(min_score,max_stocks,"watchlist","watchlist",symbols,False)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # API — LINE
@@ -2060,97 +2139,97 @@ async def us_profile(symbol:str):
     master_info=get_us_master().get(symbol.upper(),{})
     return{"symbol":symbol.upper(),"name":master_info.get("name",symbol),"profile":profile}
 
-@app.get("/api/us/scan")
-async def us_ai_scan(min_score:int=Query(60,ge=0,le=100),max_stocks:int=Query(50,ge=5,le=80)):
-    """V12.0.2 US AI scan — always returns a valid 6-zone payload.
-    Important: min_score is a display/quality threshold, NOT a hard pre-filter.
-    Previously low-confidence candidates were skipped before classification,
-    which caused every zone to be empty and the frontend showed undefined fields.
-    """
+async def _us_scan_core(min_score:int=60,max_stocks:int=50,mode:str="full",pool_name:str="all",symbols:str="",use_cache:bool=True):
+    """V12.1 US AI scan core — pool selector + quick/full/watchlist + watch closely."""
     t0=time.time()
-    pool=list(dict.fromkeys(US_CORE_POOL+US_GROWTH_POOL+US_SEMI_POOL+US_ETF_POOL))[:max_stocks]
+    pool=select_us_scan_pool(pool_name, symbols, max_stocks)
+    cache_key=f"us:{mode}:{pool_name}:{','.join(pool)}:{min_score}:{max_stocks}"
+    if use_cache:
+        hit=_scan_cache_get(US_SCAN_CACHE, cache_key)
+        if hit: return hit
     try:
         market_ctx=await asyncio.wait_for(fetch_us_market_context(),timeout=8)
     except Exception as e:
         market_ctx={"market_score":50,"sentiment":"Unknown","error":str(e)}
     market_score=market_ctx.get("market_score",50)
-    enterable=[];pullback=[];breakout_watch=[];risk_watch=[];avoid=[];near_miss=[];errors=[]
-    attempted=0; classified=0
-
+    enterable=[];watch_closely=[];pullback=[];breakout_watch=[];risk_watch=[];avoid=[];near_miss=[];errors=[]
+    attempted=0; classified=0; current_symbol=None
     for sym in pool:
-        attempted += 1
+        current_symbol=sym; attempted += 1
         try:
             r=await _fetch_us_full(sym)
             if r.get("error"):
-                errors.append({"symbol":sym,"error":str(r.get("error"))})
-                continue
-            ai=r.get("ai_signal",{}) or {}
-            conf=ai.get("confidence") or 0
-            final=ai.get("final_score") or 0
-            cat=ai.get("scan_category","AVOID")
-            item={"symbol":sym,"name":r.get("name",sym),"market":"us",
-                  "price":r.get("price"),"change_pct":r.get("change_pct"),
-                  "signal":ai.get("signal","WATCH"),"confidence":conf,
-                  "trade_status":ai.get("trade_status","WATCH"),
-                  "entry_status":ai.get("entry_status","NO_DATA"),
-                  "entry_status_text":ai.get("entry_status_text","—"),
-                  "can_enter":ai.get("can_enter",False),"trade_valid":ai.get("trade_valid",False),
-                  "strategy_type":ai.get("strategy_type",""),
-                  "technical_score":ai.get("technical_score"),"final_score":final,
-                  "market_score":ai.get("market_score",market_score),"risk_score":ai.get("risk_score",50),
-                  "rr_score":ai.get("rr_score",0),
-                  "overheat_flags":ai.get("overheat_flags",[]),"false_breakout_flags":ai.get("false_breakout_flags",[]),
-                  "entry_price":ai.get("entry_price"),"entry_zone_low":ai.get("entry_zone_low"),
-                  "entry_zone_high":ai.get("entry_zone_high"),
-                  "target_price":ai.get("target_price"),"stop_loss":ai.get("stop_loss"),
-                  "risk_reward_ratio":ai.get("risk_reward_ratio"),
-                  "recent_support":ai.get("recent_support"),"recent_resistance":ai.get("recent_resistance"),
-                  "reasons":ai.get("entry_reason",[]) or ai.get("reasons",[]),
-                  "risk_reason":ai.get("risk_reason",[]),
-                  "summary":ai.get("summary","")}
-            # Do not discard low-confidence items. Only block them from ENTERABLE.
+                errors.append({"symbol":sym,"error":str(r.get("error"))}); continue
+            ai=r.get("ai_signal",{}) or {}; conf=ai.get("confidence") or 0; final=ai.get("final_score") or 0; cat=ai.get("scan_category","AVOID")
+            item={"symbol":sym,"name":r.get("name",sym),"market":"us","price":r.get("price"),"change_pct":r.get("change_pct"),
+                  "signal":ai.get("signal","WATCH"),"confidence":conf,"trade_status":ai.get("trade_status","WATCH"),
+                  "entry_status":ai.get("entry_status","NO_DATA"),"entry_status_text":ai.get("entry_status_text","—"),"can_enter":ai.get("can_enter",False),"trade_valid":ai.get("trade_valid",False),
+                  "strategy_type":ai.get("strategy_type",""),"technical_score":ai.get("technical_score"),"final_score":final,"market_score":ai.get("market_score",market_score),
+                  "risk_score":ai.get("risk_score",50),"rr_score":ai.get("rr_score",0),"overheat_flags":ai.get("overheat_flags",[]),"false_breakout_flags":ai.get("false_breakout_flags",[]),
+                  "entry_price":ai.get("entry_price"),"entry_zone_low":ai.get("entry_zone_low"),"entry_zone_high":ai.get("entry_zone_high"),"target_price":ai.get("target_price"),
+                  "stop_loss":ai.get("stop_loss"),"risk_reward_ratio":ai.get("risk_reward_ratio"),"recent_support":ai.get("recent_support"),"recent_resistance":ai.get("recent_resistance"),
+                  "reasons":ai.get("entry_reason",[]) or ai.get("reasons",[]),"risk_reason":ai.get("risk_reason",[]),"summary":ai.get("summary","")}
             if conf < min_score:
                 item.setdefault("risk_reason",[]).append(f"Confidence {conf}/100 below scan threshold {min_score}")
-                if final >= 55 or (item.get("technical_score") or 0) >= 55:
-                    cat="NEAR_MISS"
-                else:
-                    cat="AVOID"
-            if cat=="ENTERABLE":
-                enterable.append(item)
-            elif cat=="PULLBACK":
-                pullback.append(item)
-            elif cat=="BREAKOUT_WATCH":
-                breakout_watch.append(item)
-            elif cat=="RISK_WATCH":
-                risk_watch.append(item)
-            elif cat=="NEAR_MISS":
-                near_miss.append(item)
-            else:
-                avoid.append(item)
+                if final>=65 and (item.get("technical_score") or 0)>=65 and (item.get("risk_score") or 0)>=50:
+                    cat="WATCH_CLOSELY"
+                elif final>=55 or (item.get("technical_score") or 0)>=55: cat="NEAR_MISS"
+                else: cat="AVOID"
+            elif cat=="NEAR_MISS" and final>=65 and (item.get("technical_score") or 0)>=65 and (item.get("risk_score") or 0)>=50:
+                cat="WATCH_CLOSELY"
+            item["scan_category"]=cat
+            if cat=="ENTERABLE": enterable.append(item)
+            elif cat=="WATCH_CLOSELY": watch_closely.append(item)
+            elif cat=="PULLBACK": pullback.append(item)
+            elif cat=="BREAKOUT_WATCH": breakout_watch.append(item)
+            elif cat=="RISK_WATCH": risk_watch.append(item)
+            elif cat=="NEAR_MISS": near_miss.append(item)
+            else: avoid.append(item)
             classified += 1
         except Exception as e:
-            errors.append({"symbol":sym,"error":str(e)})
-
+            errors.append({"symbol":sym,"error":str(e)[:160]})
     def sort_e(x): return (-(x.get("final_score") or 0),-(x.get("risk_reward_ratio") or 0),-(x.get("confidence") or 0))
     def sort_p(x): return (-(x.get("technical_score") or 0),-(x.get("confidence") or 0),-(x.get("final_score") or 0))
-    enterable.sort(key=sort_e); pullback.sort(key=sort_p); breakout_watch.sort(key=sort_p)
-    risk_watch.sort(key=sort_p); near_miss.sort(key=sort_p); avoid.sort(key=sort_p)
-
-    found=len(enterable)+len(pullback)+len(breakout_watch)+len(risk_watch)+len(near_miss)
-    msg="No stocks meet entry criteria currently. Patience is key." if not enterable else f"Found {len(enterable)} enterable candidates!"
+    for arr in (enterable,watch_closely,pullback,breakout_watch,risk_watch,near_miss,avoid): arr.sort(key=sort_e if arr is enterable else sort_p)
+    found=len(enterable)+len(watch_closely)+len(pullback)+len(breakout_watch)+len(risk_watch)+len(near_miss)
+    msg="No stocks meet entry criteria currently. Watch Closely / Near Miss candidates are shown below." if not enterable else f"Found {len(enterable)} enterable candidates!"
     duration=round(time.time()-t0,1)
-    return {"market":"us","updated_at":datetime.now().isoformat(),
-            "scanned":len(pool),"attempted":attempted,"classified":classified,"failed":len(errors),"found":found,
-            "market_score":market_score,"duration_seconds":duration,
+    payload={"market":"us","scan_mode":mode,"pool":pool_name,"pool_size":len(pool),"updated_at":datetime.now().isoformat(),
+            "scanned":len(pool),"attempted":attempted,"classified":classified,"failed":len(errors),"found":found,"current_symbol":current_symbol,
+            "market_score":market_score,"duration_seconds":duration,"scan_label":scan_mode_label(mode,pool_name,len(pool)),
             "summary":{"scanned":len(pool),"attempted":attempted,"classified":classified,"failed":len(errors),
-                       "enterable_count":len(enterable),"pullback_count":len(pullback),
-                       "breakout_watch_count":len(breakout_watch),"risk_watch_count":len(risk_watch),
-                       "avoid_count":len(avoid),"near_miss_count":len(near_miss),
-                       "found":found,"market_score":market_score,
-                       "sentiment":market_ctx.get("sentiment",""),"message":msg},
-            "enterable":enterable,"pullback":pullback,"breakout_watch":breakout_watch,
-            "risk_watch":risk_watch,"avoid":avoid,"near_miss":near_miss,
-            "errors":errors,"error_count":len(errors),"duration_seconds":duration}
+                       "enterable_count":len(enterable),"watch_closely_count":len(watch_closely),"pullback_count":len(pullback),
+                       "breakout_watch_count":len(breakout_watch),"risk_watch_count":len(risk_watch),"avoid_count":len(avoid),"near_miss_count":len(near_miss),
+                       "found":found,"market_score":market_score,"sentiment":market_ctx.get("sentiment",""),"message":msg,"mode":mode,"pool":pool_name},
+            "enterable":enterable,"watch_closely":watch_closely,"pullback":pullback,"breakout_watch":breakout_watch,
+            "risk_watch":risk_watch,"avoid":avoid,"near_miss":near_miss,"errors":errors,"error_count":len(errors)}
+    return _scan_cache_set(US_SCAN_CACHE, cache_key, payload)
+
+@app.get("/api/us/scan")
+async def us_ai_scan(min_score:int=Query(60,ge=0,le=100),max_stocks:int=Query(50,ge=5,le=80),pool:str="all",symbols:str="",mode:str="full"):
+    return await _us_scan_core(min_score,max_stocks,mode,pool,symbols,True)
+
+@app.get("/api/us/scan/quick")
+async def us_scan_quick(pool:str="all",symbols:str="",min_score:int=Query(55,ge=0,le=100),max_stocks:int=Query(20,ge=5,le=40)):
+    return await _us_scan_core(min_score,max_stocks,"quick",pool,symbols,True)
+
+@app.get("/api/us/scan/full")
+async def us_scan_full(pool:str="all",symbols:str="",min_score:int=Query(60,ge=0,le=100),max_stocks:int=Query(50,ge=10,le=80)):
+    return await _us_scan_core(min_score,max_stocks,"full",pool,symbols,True)
+
+@app.get("/api/us/scan/watchlist")
+async def us_scan_watchlist(symbols:str="",min_score:int=Query(55,ge=0,le=100),max_stocks:int=Query(50,ge=1,le=100)):
+    return await _us_scan_core(min_score,max_stocks,"watchlist","watchlist",symbols,False)
+
+@app.get("/api/debug/scan-status")
+def api_scan_status():
+    now=time.time()
+    def stat(cache):
+        out=[]
+        for k,(payload,ts) in list(cache.items())[-12:]:
+            out.append({"key":k,"age_seconds":round(now-ts,1),"market":payload.get("market"),"mode":payload.get("scan_mode"),"pool":payload.get("pool"),"classified":payload.get("classified"),"failed":payload.get("failed")})
+        return out
+    return {"version":"12.1.0","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # API — DATA HEALTH / DIAGNOSTICS
@@ -2261,12 +2340,12 @@ async def api_health_full():
 
     payload = {
         "status": "ok" if not errors else "partial",
-        "version": "12.0.2",
-        "frontend_expected": "12.0.2",
+        "version": "12.1.0",
+        "frontend_expected": "12.1.0",
         "time": datetime.now().isoformat(),
         "backend": {
-            "title": "V12 Global Trading Intelligence",
-            "version": "12.0.2"
+            "title": "V12.1 AI Picker Reliability",
+            "version": "12.1.0"
         },
         "line": {
             "configured": bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
@@ -2292,12 +2371,12 @@ async def api_health_full():
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/health")
 def health():
-    return{"status":"ok","version":"12.0.2","frontend_expected":"12.0.2","time":datetime.now().isoformat(),
+    return{"status":"ok","version":"12.1.0","frontend_expected":"12.1.0","time":datetime.now().isoformat(),
            "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
            "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
            "price_sources":"Yahoo Finance → TWSE Official → FinMind",
            "us_master_count":len(_us_master),"tw_master_count":len(STOCK_MASTER),
-           "features":["V12 Global Trading Intelligence","AI Picker Pro",
+           "features":["V12.1 AI Picker Reliability","AI Picker Pro",
                        "TW Engine + US Engine + Shared Engine",
                        "6-zone scan output","US Market Context","Symbol Master 200+",
-                       "validate_trade_plan","compute_final_score","LINE alerts"]}
+                       "validate_trade_plan","compute_final_score","LINE alerts","Quick/Full AI Scan","Watch Closely zone","scan pool selector","scan cache diagnostics"]}

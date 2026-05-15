@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>V12.0.2 AI Picker Pro</title>
+<title>V12.0.1 AI Picker Reliability</title>
 <script src="config.js"></script>
 <!-- Firebase compat SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -295,6 +295,19 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .conclusion.bull{background:rgba(232,56,79,.12);color:var(--up)}.conclusion.bear{background:rgba(0,184,107,.1);color:var(--down)}.conclusion.neu{background:rgba(100,116,139,.15);color:var(--muted)}
 .mtf-val{font-family:var(--mono);font-size:14px;font-weight:700}
 .bull-txt{color:var(--up)}.bear-txt{color:var(--down)}.neu-txt{color:var(--muted)}
+
+/* ── V12.1 Scan Experience ─────────────────────────────────────── */
+.scan-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0 10px}
+.scan-select{background:#0d1728;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:7px 10px;font-family:var(--mono);font-size:12px;outline:none}
+.scan-progress{height:6px;background:#172946;border-radius:4px;overflow:hidden;margin:8px 0 10px}
+.scan-progress span{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--cyan),var(--purple));border-radius:4px;transition:width .4s}
+.scan-kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:8px 0 10px}
+@media(max-width:800px){.scan-kpi-row{grid-template-columns:repeat(2,1fr)}}
+.scan-kpi{background:#172946;border:1px solid rgba(29,49,80,.6);border-radius:8px;padding:7px 9px;font-family:var(--mono)}
+.scan-kpi .k{font-size:10px;color:var(--muted);margin-bottom:2px}.scan-kpi .v{font-size:13px;font-weight:800;color:var(--text)}
+.scan-mode-pill{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:99px;background:rgba(0,212,255,.10);color:var(--cyan);border:1px solid rgba(0,212,255,.22)}
+.sz-close{background:rgba(34,197,94,.08);color:#22c55e;border:1px solid rgba(34,197,94,.25)}
+
 </style>
 </head>
 <body>
@@ -303,7 +316,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 <div id="loginOverlay">
   <div class="login-card">
     <div class="logo" style="justify-content:center;margin-bottom:14px;font-size:16px"><span class="live-dot"></span>V12 Global Trading Intelligence</div>
-    <div class="login-title">AI Picker Pro</div>
+    <div class="login-title">AI Picker Reliability</div>
     <div class="login-sub">Multi-Market Stock Analysis</div>
     <div class="login-desc">請使用 Google 登入後開始使用個人化台股 / 美股監測工具</div>
     <div class="login-features">
@@ -320,7 +333,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       使用 Google 帳號登入
     </button>
     <div id="loginError"></div>
-    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.0.2 Global Trading Intelligence · AI Picker Pro</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.1 AI Picker Reliability · Scan Experience</div>
   </div>
 </div>
 
@@ -329,7 +342,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="logo">
     <span class="live-dot"></span>
     <span>AI<span style="color:var(--up)">PICKER</span></span>
-    <span class="ver">V12.0.2</span>
+    <span class="ver">V12.1.0</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="mkt-switcher">
@@ -349,7 +362,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
     </div>
     <div class="version-warn" id="versionWarn"></div>
     <div class="health-grid" id="healthGrid">
-      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.0.2</b></div>
+      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.1.0</b></div>
       <div class="health-chip"><span>Backend</span><b id="hBackend">—</b></div>
       <div class="health-chip"><span>Firestore</span><b id="hFirestore">待登入</b></div>
       <div class="health-chip"><span>Yahoo</span><b id="hYahoo">—</b></div>
@@ -436,7 +449,16 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
     <span id="aiScanSummary" style="font-size:11px;color:var(--muted);font-weight:400"></span>
     <button class="ghost sm" id="btnAiScanAgain" style="margin-left:auto">重新掃描</button>
   </div>
+  <div class="scan-toolbar">
+    <select class="scan-select" id="twScanMode"><option value="quick">Quick Scan</option><option value="full">Full Scan</option><option value="watchlist">Watchlist Scan</option></select>
+    <select class="scan-select" id="twScanPool"><option value="all">All</option><option value="electronics">電子權值股</option><option value="finance">金融股</option><option value="hot">熱門股</option><option value="watchlist">我的自選股</option></select>
+    <button class="ghost sm" id="btnTwQuickScan">Quick</button><button class="ghost sm" id="btnTwFullScan">Full</button>
+    <span class="scan-mode-pill" id="twScanCache">cache: —</span>
+  </div>
+  <div class="scan-progress"><span id="twScanProgress"></span></div>
+  <div class="scan-kpi-row" id="twScanKpis" style="display:none"></div>
   <div id="aiZoneEnterable"></div>
+  <div id="aiZoneWatchClose"></div>
   <div id="aiZonePullback"></div>
   <div id="aiZoneBreakout"></div>
   <div id="aiZoneNearMiss"></div>
@@ -723,7 +745,16 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
     <span id="usAiScanSummary" style="font-size:11px;color:var(--muted);font-weight:400"></span>
     <button class="ghost sm" id="btnUsScanAgain" style="margin-left:auto">Re-scan</button>
   </div>
+  <div class="scan-toolbar">
+    <select class="scan-select" id="usScanMode"><option value="quick">Quick Scan</option><option value="full">Full Scan</option><option value="watchlist">Watchlist Scan</option></select>
+    <select class="scan-select" id="usScanPool"><option value="all">All</option><option value="mega">Mega Cap</option><option value="semi">AI / Semiconductor</option><option value="growth">High Beta Growth</option><option value="etf">ETF</option><option value="watchlist">My Watchlist</option></select>
+    <button class="ghost sm" id="btnUsQuickScan">Quick</button><button class="ghost sm" id="btnUsFullScan">Full</button>
+    <span class="scan-mode-pill" id="usScanCache">cache: —</span>
+  </div>
+  <div class="scan-progress"><span id="usScanProgress"></span></div>
+  <div class="scan-kpi-row" id="usScanKpis" style="display:none"></div>
   <div id="usZoneEnterable"></div>
+  <div id="usZoneWatchClose"></div>
   <div id="usZonePullback"></div>
   <div id="usZoneBreakout"></div>
   <div id="usZoneNearMiss"></div>
@@ -839,12 +870,12 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 <div class="footer">
   ⚠️ 本工具僅供技術分析學習參考，不構成任何投資建議。台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
   資料來源：TWSE MIS · Yahoo Finance · TWSE Official · FinMind · Google News RSS（均為免費公開）<br>
-  V12.0.2 Global Trading Intelligence · AI Picker Pro
+  V12.1 AI Picker Reliability · Scan Experience
 </div>
 
 <script>
 /* ══════════════════════════════════════════════════════════════════
-   V12.0.2 Global Trading Intelligence — AI Picker Pro
+   V12.1 AI Picker Reliability — Scan Experience
    Complete frontend JavaScript
    ══════════════════════════════════════════════════════════════════ */
 
@@ -852,7 +883,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="12.0.2";
+var FRONTEND_VERSION="12.1.0";
 var API = window.API_BASE_URL || "https://taiwanstock-ben-1.onrender.com";
 var FB_CFG = window.FIREBASE_CONFIG || {};
 
@@ -1286,23 +1317,34 @@ async function scanAlerts(silent) {
 }
 
 // ── TW AI Scan ─────────────────────────────────────────────────────
-async function aiScan() {
+async function aiScan(forceMode, forcePool) {
   if(!currentUser) return;
   var box=$I("aiScanTradeBox"); if(box)box.style.display="block";
-  var sum=$I("aiScanSummary"); if(sum)sum.textContent="AI 選股掃描中（約 30~120 秒）…";
-  ["aiZoneEnterable","aiZonePullback","aiZoneBreakout","aiZoneNearMiss","aiZoneRiskWatch"].forEach(function(id){var el=$I(id);if(el)el.innerHTML="";});
-  var btn=$I("btnAiScan"),btn2=$I("btnAiScanAgain");
-  if(btn)btn.disabled=true; if(btn2)btn2.disabled=true;
+  var sum=$I("aiScanSummary");
+  var mode=forceMode || (($I("twScanMode")||{}).value||"full");
+  var pool=forcePool || (($I("twScanPool")||{}).value||"all");
+  var endpoint=(mode==="quick")?"/api/tw/scan/quick":(mode==="watchlist")?"/api/tw/scan/watchlist":"/api/tw/scan/full";
+  var max=(mode==="quick")?20:50;
+  var symbols=(pool==="watchlist")?WL.map(function(x){return x.stock_id||x;}).join(","):"";
+  if(sum)sum.textContent=(mode==="quick"?"Quick Scan":"Full Scan")+" 掃描中…";
+  ["aiZoneEnterable","aiZoneWatchClose","aiZonePullback","aiZoneBreakout","aiZoneNearMiss","aiZoneRiskWatch"].forEach(function(id){var el=$I(id);if(el)el.innerHTML="";});
+  updateScanProgress("tw",8);
+  var fake=beginFakeProgress("tw", mode==="quick"?12000:70000);
+  var btn=$I("btnAiScan"),btn2=$I("btnAiScanAgain"); if(btn)btn.disabled=true; if(btn2)btn2.disabled=true;
   if(box)setTimeout(function(){box.scrollIntoView({behavior:"smooth",block:"start"});},200);
   try {
-    var r=await apiFetch(API+"/api/scan/ai?min_score=65&max_stocks=50",{},120000);
-    var d=await r.json();
-    var s=d.summary||{};
-    if(sum)sum.textContent="掃描 "+safeVal(d.scanned,0)+" 檔 | 分類 "+safeVal(d.classified,0)+" | 失敗 "+safeVal(d.failed||d.error_count,0)+" | "+safeVal(d.duration_seconds,"—")+"s | 市場 "+safeVal(s.market_score??d.market_score,"—")+"/100"+(s.message?" — "+s.message:"");
-    renderTWScan(d);
-  } catch(e) { if(sum)sum.textContent="掃描失敗："+e.message; }
-  finally { if(btn)btn.disabled=false; if(btn2)btn2.disabled=false; }
+    var url=API+endpoint+"?min_score=60&max_stocks="+max+"&pool="+encodeURIComponent(pool)+"&symbols="+encodeURIComponent(symbols);
+    var r=await apiFetch(url,{},mode==="quick"?45000:120000); var d=await r.json(); d=normalizeScanPayload(d);
+    var s=d.summary||{}; if(sum)sum.textContent=(d.scan_label||"")+" | 掃描 "+safeVal(d.scanned,0)+" 檔 | 分類 "+safeVal(d.classified,0)+" | 失敗 "+safeVal(d.failed||d.error_count,0)+" | "+safeVal(d.duration_seconds,"—")+"s | 市場 "+safeVal(s.market_score??d.market_score,"—")+"/100"+(s.message?" — "+s.message:"");
+    renderScanKpis("tw",d); setTxt("twScanCache","cache: "+(d.cache_status||"fresh")); updateScanProgress("tw",100); renderTWScan(d);
+  } catch(e) { if(sum)sum.textContent="掃描失敗："+e.message; updateScanProgress("tw",0); }
+  finally { clearInterval(fake); if(btn)btn.disabled=false; if(btn2)btn2.disabled=false; }
 }
+
+function normalizeScanPayload(d){d=d||{};var s=d.summary||{};["enterable","watch_closely","pullback","breakout_watch","near_miss","risk_watch","avoid"].forEach(function(k){d[k]=Array.isArray(d[k])?d[k]:[];});var total=d.enterable.length+d.watch_closely.length+d.pullback.length+d.breakout_watch.length+d.near_miss.length+d.risk_watch.length+d.avoid.length;d.scanned=d.scanned??s.scanned??d.attempted??total;d.classified=d.classified??s.classified??total;d.failed=d.failed??s.failed??d.error_count??0;d.duration_seconds=d.duration_seconds??s.duration_seconds??0;d.market_score=d.market_score??s.market_score??"—";d.summary=d.summary||{};d.summary.market_score=d.summary.market_score??d.market_score;return d;}
+function updateScanProgress(prefix,pct){var el=$I(prefix+"ScanProgress");if(el)el.style.width=Math.max(0,Math.min(100,pct||0))+"%";}
+function beginFakeProgress(prefix,ms){var start=Date.now();return setInterval(function(){var p=Math.min(92,8+(Date.now()-start)/ms*84);updateScanProgress(prefix,p);},500);}
+function renderScanKpis(prefix,d){var el=$I(prefix+"ScanKpis");if(!el)return;var s=d.summary||{};el.style.display="grid";var items=[['Mode',d.scan_mode||s.mode||'—'],['Pool',d.pool||s.pool||'—'],['Scanned',d.scanned||0],['Classified',d.classified||0],['Failed',d.failed||0],['Market',safeVal(s.market_score??d.market_score,'—')+'/100']];el.innerHTML=items.map(function(x){return '<div class="scan-kpi"><div class="k">'+x[0]+'</div><div class="v">'+x[1]+'</div></div>';}).join('');}
 
 function renderTWScan(data) {
   function zone(elId, lbl, labelCss, items, emptyMsg) {
@@ -1311,7 +1353,9 @@ function renderTWScan(data) {
     el.innerHTML='<div class="scan-zone-lbl '+labelCss+'">'+lbl+' <span class="d-badge" style="font-size:10px">'+items.length+'</span></div><div class="scan-grid" style="margin-top:8px;margin-bottom:12px">'+items.map(twScanCard).join("")+'</div>';
     el.querySelectorAll("[data-load]").forEach(function(el2){el2.addEventListener("click",function(){loadStock(el2.dataset.load);});});
   }
+  data=normalizeScanPayload(data);
   zone("aiZoneEnterable","✅ 可進場候選 ENTERABLE","sz-enterable",data.enterable,"目前沒有符合可進場條件的股票，建議等待更好的進場點。");
+  zone("aiZoneWatchClose","👀 準備觀察 WATCH CLOSELY","sz-close",data.watch_closely,"目前沒有準備觀察候選。");
   zone("aiZonePullback","⏳ 等回檔觀察 PULLBACK","sz-pullback",data.pullback,"—");
   zone("aiZoneBreakout","🔭 突破觀察 BREAKOUT WATCH","sz-breakout",data.breakout_watch,"—");
   zone("aiZoneNearMiss","💫 差一點候選 NEAR MISS","sz-near",data.near_miss,"—");
@@ -1880,43 +1924,45 @@ async function fetchUSSuggest(q) {
 }
 function usDoSearch(){var inp=$I("usSymbol");var sym=inp?inp.value.trim().toUpperCase():"";if(/^[A-Z.\-]{1,12}$/.test(sym))usLoadStock(sym);else if(sym)alert("Please enter a valid US symbol (letters only)");}
 
-async function usAiScan() {
+async function usAiScan(forceMode, forcePool) {
   if(!currentUser)return;
   var box=$I("usAiScanBox");if(box)box.style.display="block";
-  var sum=$I("usAiScanSummary");if(sum)sum.textContent="Scanning… (~30-120 sec)";
-  ["usZoneEnterable","usZonePullback","usZoneBreakout","usZoneNearMiss","usZoneRisk"].forEach(function(id){var el=$I(id);if(el)el.innerHTML="";});
+  var sum=$I("usAiScanSummary");
+  var mode=forceMode || (($I("usScanMode")||{}).value||"full");
+  var pool=forcePool || (($I("usScanPool")||{}).value||"all");
+  var endpoint=(mode==="quick")?"/api/us/scan/quick":(mode==="watchlist")?"/api/us/scan/watchlist":"/api/us/scan/full";
+  var max=(mode==="quick")?20:50;
+  var symbols=(pool==="watchlist")?US_WL.map(function(x){return x.symbol||x;}).join(","):"";
+  if(sum)sum.textContent=(mode==="quick"?"Quick Scan":"Full Scan")+" scanning…";
+  ["usZoneEnterable","usZoneWatchClose","usZonePullback","usZoneBreakout","usZoneNearMiss","usZoneRisk"].forEach(function(id){var el=$I(id);if(el)el.innerHTML="";});
+  updateScanProgress("us",8); var fake=beginFakeProgress("us",mode==="quick"?12000:80000);
   var btn=$I("btnUsScan"),btn2=$I("btnUsScanAgain");if(btn)btn.disabled=true;if(btn2)btn2.disabled=true;
   if(box)setTimeout(function(){box.scrollIntoView({behavior:"smooth",block:"start"});},200);
   try {
-    var r=await apiFetch(API+"/api/us/scan?min_score=0&max_stocks=50",{},120000);
+    var url=API+endpoint+"?min_score=0&max_stocks="+max+"&pool="+encodeURIComponent(pool)+"&symbols="+encodeURIComponent(symbols);
+    var r=await apiFetch(url,{},mode==="quick"?45000:120000);
     if(!r.ok){throw new Error("US scan API failed: HTTP "+r.status);}
-    var d=await r.json();
-    if(!d || (!Array.isArray(d.enterable) && !Array.isArray(d.pullback) && !Array.isArray(d.near_miss) && !d.summary)){
-      console.warn("Unexpected US scan payload", d);
-      throw new Error("US scan payload is not V12 format. Please confirm Render backend is deployed to V12.0.2.");
-    }
-    d=normalizeUSScanPayload(d);
+    var d=await r.json(); d=normalizeUSScanPayload(d);
     var s=d.summary||{};
-    if(sum)sum.textContent="Scanned "+safeVal(d.scanned,0)+" stocks | Classified "+safeVal(d.classified,0)+" | Failed "+safeVal(d.failed||d.error_count,0)+" | "+safeVal(d.duration_seconds,"—")+"s | Market "+safeVal(s.market_score??d.market_score,"—")+"/100"+(s.message?" — "+s.message:"");
-    renderUSScan(d);
+    if(sum)sum.textContent=(d.scan_label||"")+" | Scanned "+safeVal(d.scanned,0)+" | Classified "+safeVal(d.classified,0)+" | Failed "+safeVal(d.failed||d.error_count,0)+" | "+safeVal(d.duration_seconds,"—")+"s | Market "+safeVal(s.market_score??d.market_score,"—")+"/100"+(s.message?" — "+s.message:"");
+    renderScanKpis("us",d); setTxtUS("usScanCache","cache: "+(d.cache_status||"fresh")); updateScanProgress("us",100); renderUSScan(d);
   } catch(e){
-    console.error("US AI scan failed", e);
-    if(sum)sum.textContent="Scan failed: "+(e.message||e);
-    var risk=$I("usZoneRisk");
-    if(risk)risk.innerHTML='<div class="scan-zone-lbl sz-risk">⚠️ US Scan Error</div><div class="empty" style="padding:8px;font-size:11px">'+escapeHTML(String(e.message||e))+'</div>';
+    console.error("US AI scan failed", e); if(sum)sum.textContent="Scan failed: "+(e.message||e); updateScanProgress("us",0);
+    var risk=$I("usZoneRisk"); if(risk)risk.innerHTML='<div class="scan-zone-lbl sz-risk">⚠️ US Scan Error</div><div class="empty" style="padding:8px;font-size:11px">'+escapeHTML(String(e.message||e))+'</div>';
   }
-  finally{if(btn)btn.disabled=false;if(btn2)btn2.disabled=false;}
+  finally{clearInterval(fake);if(btn)btn.disabled=false;if(btn2)btn2.disabled=false;}
 }
 
 function normalizeUSScanPayload(d){
   d=d||{};var s=d.summary||{};
   d.enterable=Array.isArray(d.enterable)?d.enterable:[];
+  d.watch_closely=Array.isArray(d.watch_closely)?d.watch_closely:[];
   d.pullback=Array.isArray(d.pullback)?d.pullback:[];
   d.breakout_watch=Array.isArray(d.breakout_watch)?d.breakout_watch:[];
   d.risk_watch=Array.isArray(d.risk_watch)?d.risk_watch:[];
   d.avoid=Array.isArray(d.avoid)?d.avoid:[];
   d.near_miss=Array.isArray(d.near_miss)?d.near_miss:[];
-  var total=d.enterable.length+d.pullback.length+d.breakout_watch.length+d.risk_watch.length+d.avoid.length+d.near_miss.length;
+  var total=d.enterable.length+d.watch_closely.length+d.pullback.length+d.breakout_watch.length+d.risk_watch.length+d.avoid.length+d.near_miss.length;
   d.scanned=d.scanned??s.scanned??s.attempted??d.attempted??(total+(d.error_count||0));
   d.classified=d.classified??s.classified??total;
   d.failed=d.failed??s.failed??d.error_count??0;
@@ -1940,6 +1986,7 @@ function renderUSScan(data) {
     el.querySelectorAll("[data-us-load]").forEach(function(el2){el2.addEventListener("click",function(){usLoadStock(el2.dataset.usLoad);});});
   }
   zone("usZoneEnterable","✅ Enterable Candidates","sz-us-enter",data.enterable,"No stocks meet entry criteria. Patience is key.");
+  zone("usZoneWatchClose","👀 Watch Closely","sz-close",data.watch_closely,"No watch-closely candidates yet.");
   zone("usZonePullback","⏳ Watch / Wait Pullback","sz-us-pull",data.pullback,"目前沒有等回檔候選。");
   zone("usZoneBreakout","🔭 Breakout Watch","sz-breakout",data.breakout_watch,"目前沒有突破觀察候選。");
   zone("usZoneNearMiss","💫 Near Miss","sz-near",data.near_miss,"目前沒有差一點候選；若可進場為 0，代表條件仍距離較遠或資料暫不足。");
@@ -2028,6 +2075,8 @@ function bindAllButtons() {
   safeBind("btnScan","click",function(){scanAlerts(false);});
   safeBind("btnScan2","click",function(){scanAlerts(false);});
   safeBind("btnAiScan","click",aiScan);safeBind("btnAiScanAgain","click",aiScan);
+  safeBind("btnTwQuickScan","click",function(){aiScan("quick");});
+  safeBind("btnTwFullScan","click",function(){aiScan("full");});
   safeBind("btnToggleWl","click",toggleWatchlistExpanded);
   // TW quick nav
   safeBind("qnAiScan","click",function(){aiScan();});
@@ -2061,6 +2110,8 @@ function bindAllButtons() {
   safeBind("btnUsRefresh","click",function(){usWlLeft=30;refreshUSWL();});
   safeBind("btnUsScan","click",usAiScan);
   safeBind("btnUsScanAgain","click",usAiScan);
+  safeBind("btnUsQuickScan","click",function(){usAiScan("quick");});
+  safeBind("btnUsFullScan","click",function(){usAiScan("full");});
   safeBind("btnUsCtx","click",loadUSMarketContext);
   safeBind("btnHealthRefresh","click",loadSystemHealth);
   initUSSuggest();
