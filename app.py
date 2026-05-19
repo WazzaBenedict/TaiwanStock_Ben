@@ -1,18 +1,18 @@
 """
-V12.3.1 Portfolio & Smart Alert Mode
+V12.6 Trade Journal · AI Backtest · Report Center
 架構：TW Engine / US Engine / Shared Engine（三層分離）
-版本：12.2.1
+版本：12.6.0
 """
 import os, re, asyncio, json, time
 from datetime import datetime, timedelta
 from pathlib import Path
 import xml.etree.ElementTree as ET
 import httpx, numpy as np, pandas as pd
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="V12.3.1 Portfolio & Smart Alert Mode", version="12.3.1")
+app = FastAPI(title="V12.6 Trade Journal · AI Backtest · Report Center", version="12.6.0")
 _raw = os.getenv("ALLOWED_ORIGINS",
     "http://localhost:5500,http://127.0.0.1:5500,"
     "https://taiwanstock-ben.web.app,https://taiwanstock-ben.firebaseapp.com")
@@ -653,7 +653,7 @@ def get_stock_name(sid: str, api_name: str | None=None) -> str:
 # TW LEARNING / WEIGHTS
 # ══════════════════════════════════════════════════════════════════════════════
 TW_DEFAULT_WEIGHTS={"technical":0.35,"fundamental":0.25,"chip":0.25,"news":0.15,
-    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.3.1","last_reason":"預設權重"}
+    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.6.0","last_reason":"預設權重"}
 TW_WEIGHT_LIMITS={"technical":(0.20,0.45),"fundamental":(0.10,0.35),"chip":(0.10,0.40),"news":(0.05,0.25)}
 
 def _rjf(path,default):
@@ -2251,7 +2251,7 @@ def api_scan_status():
         for k,(payload,ts) in list(cache.items())[-12:]:
             out.append({"key":k,"age_seconds":round(now-ts,1),"market":payload.get("market"),"mode":payload.get("scan_mode"),"pool":payload.get("pool"),"classified":payload.get("classified"),"failed":payload.get("failed")})
         return out
-    return {"version":"12.3.1","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
+    return {"version":"12.6.0","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # API — DATA HEALTH / DIAGNOSTICS
@@ -2362,12 +2362,12 @@ async def api_health_full():
 
     payload = {
         "status": "ok" if not errors else "partial",
-        "version": "12.3.1",
+        "version": "12.6.0",
         "frontend_expected": "12.3.1",
         "time": datetime.now().isoformat(),
         "backend": {
-            "title": "V12.3.1 Portfolio & Smart Alert Mode",
-            "version": "12.3.1"
+            "title": "V12.6 Trade Journal · AI Backtest · Report Center",
+            "version": "12.6.0"
         },
         "line": {
             "configured": bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
@@ -2477,7 +2477,7 @@ async def api_trade_plan_check(
 @app.get("/api/debug/trade-plans")
 def api_debug_trade_plans():
     return {
-        "version": "12.3.1",
+        "version": "12.6.0",
         "storage": "Firestore frontend: users/{uid}/trade_plans/tw and users/{uid}/trade_plans/us",
         "checker": "/api/trade-plan/check",
         "statuses": ["WAITING_ENTRY","ENTERABLE_NOW","ABOVE_ENTRY_ZONE","NEAR_TARGET","NEAR_STOP","STOP_BROKEN","TARGET_REACHED","INVALIDATED","NO_PRICE"],
@@ -2581,11 +2581,163 @@ async def api_position_check(
 @app.get("/api/debug/positions")
 def api_debug_positions():
     return {
-        "version": "12.3.1",
+        "version": "12.6.0",
         "storage": "Firestore frontend: users/{uid}/positions/tw and users/{uid}/positions/us",
         "checker": "/api/position/check",
         "statuses": ["HOLDING_NORMAL","NEAR_TARGET","TARGET_REACHED","NEAR_STOP","STOP_BROKEN","RISK_UP","REVIEW_REQUIRED","NO_PRICE"],
         "note": "Backend does not persist personal positions; authenticated frontend saves them in each user's Firestore.",
+        "time": datetime.now().isoformat(),
+    }
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# V12.4–V12.6 TRADE JOURNAL / AI BACKTEST / REPORT CENTER
+# ══════════════════════════════════════════════════════════════════════════════
+def _safe_float(v, default=None):
+    try:
+        if v is None or v == "":
+            return default
+        x = float(v)
+        if np.isnan(x) or np.isinf(x):
+            return default
+        return x
+    except Exception:
+        return default
+
+def _parse_dt(v):
+    if not v:
+        return None
+    try:
+        return datetime.fromisoformat(str(v).replace("Z", "+00:00"))
+    except Exception:
+        try:
+            return datetime.strptime(str(v)[:10], "%Y-%m-%d")
+        except Exception:
+            return None
+
+def _calc_trade_result(t: dict) -> dict:
+    entry = _safe_float(t.get("entry_price") or t.get("avg_price") or t.get("buy_price"))
+    exitp = _safe_float(t.get("exit_price") or t.get("sell_price"))
+    shares = _safe_float(t.get("shares"), 1) or 1
+    stop = _safe_float(t.get("stop_loss"))
+    target = _safe_float(t.get("target_price"))
+    pnl = pct = r_mult = None
+    hit_target = False
+    hit_stop = False
+    if entry is not None and exitp is not None:
+        pnl = round((exitp - entry) * shares, 2)
+        pct = round((exitp - entry) / entry * 100, 2) if entry else None
+        hit_target = bool(target is not None and exitp >= target)
+        hit_stop = bool(stop is not None and exitp <= stop)
+        risk_per_share = (entry - stop) if stop is not None else None
+        if risk_per_share and risk_per_share > 0:
+            r_mult = round((exitp - entry) / risk_per_share, 2)
+    entry_dt = _parse_dt(t.get("entry_date") or t.get("created_at"))
+    exit_dt = _parse_dt(t.get("exit_date") or t.get("closed_at"))
+    hold_days = None
+    if entry_dt and exit_dt:
+        hold_days = max(0, (exit_dt.date() - entry_dt.date()).days)
+    result = dict(t)
+    result.update({
+        "pnl": pnl,
+        "return_pct": pct,
+        "r_multiple": r_mult,
+        "hit_target": hit_target,
+        "hit_stop": hit_stop,
+        "hold_days": hold_days,
+        "win": bool(pnl is not None and pnl > 0),
+    })
+    return result
+
+def _summarize_trades(trades: list[dict]) -> dict:
+    rows = [_calc_trade_result(t) for t in (trades or [])]
+    closed = [r for r in rows if r.get("pnl") is not None]
+    total = len(closed)
+    wins = [r for r in closed if (r.get("pnl") or 0) > 0]
+    losses = [r for r in closed if (r.get("pnl") or 0) <= 0]
+    total_pnl = round(sum((r.get("pnl") or 0) for r in closed), 2)
+    avg_ret = round(sum((r.get("return_pct") or 0) for r in closed) / total, 2) if total else 0
+    avg_r = round(sum((r.get("r_multiple") or 0) for r in closed if r.get("r_multiple") is not None) / max(1, len([r for r in closed if r.get("r_multiple") is not None])), 2) if total else 0
+    by_strategy = {}
+    for r in closed:
+        k = r.get("strategy_type") or r.get("strategy") or "Unclassified"
+        d = by_strategy.setdefault(k, {"trades": 0, "wins": 0, "pnl": 0.0, "avg_r": []})
+        d["trades"] += 1
+        d["wins"] += 1 if (r.get("pnl") or 0) > 0 else 0
+        d["pnl"] += (r.get("pnl") or 0)
+        if r.get("r_multiple") is not None:
+            d["avg_r"].append(r.get("r_multiple"))
+    strategy_stats = []
+    for k, d in by_strategy.items():
+        strategy_stats.append({
+            "strategy_type": k,
+            "trades": d["trades"],
+            "win_rate": round(d["wins"] / d["trades"] * 100, 1) if d["trades"] else 0,
+            "pnl": round(d["pnl"], 2),
+            "avg_r": round(sum(d["avg_r"]) / len(d["avg_r"]), 2) if d["avg_r"] else None,
+        })
+    best = max(closed, key=lambda r: r.get("pnl") or 0, default=None)
+    worst = min(closed, key=lambda r: r.get("pnl") or 0, default=None)
+    return {
+        "total_trades": total,
+        "wins": len(wins),
+        "losses": len(losses),
+        "win_rate": round(len(wins) / total * 100, 1) if total else 0,
+        "total_pnl": total_pnl,
+        "avg_return_pct": avg_ret,
+        "avg_r_multiple": avg_r,
+        "best_trade": best,
+        "worst_trade": worst,
+        "strategy_stats": sorted(strategy_stats, key=lambda x: x.get("pnl", 0), reverse=True),
+        "review": _build_review_text(total, len(wins), total_pnl, avg_r, strategy_stats),
+        "trades": rows,
+    }
+
+def _build_review_text(total, wins, pnl, avg_r, strategy_stats):
+    if not total:
+        return "目前尚無已結束交易。先累積交易日誌，系統才能分析策略勝率與 R 倍數。"
+    wr = round(wins / total * 100, 1)
+    best = strategy_stats[0]["strategy_type"] if strategy_stats else "—"
+    tone = "表現良好" if pnl > 0 and avg_r >= 1 else ("需要改善風控" if pnl < 0 else "持平觀察")
+    return f"目前共 {total} 筆已結束交易，勝率 {wr}%，總損益 {pnl}，平均 R {avg_r}。整體狀態：{tone}。目前表現較佳策略：{best}。"
+
+@app.post("/api/performance/summary")
+def api_performance_summary(payload: dict = Body(default={})):  # frontend sends Firestore journal rows
+    trades = payload.get("trades") or payload.get("journal") or []
+    return {"version": "12.6.0", "market": payload.get("market", "all"), "summary": _summarize_trades(trades), "time": datetime.now().isoformat()}
+
+@app.post("/api/trade-journal/review")
+def api_trade_journal_review(payload: dict = Body(default={})):
+    trades = payload.get("trades") or []
+    summary = _summarize_trades(trades)
+    return {"version": "12.6.0", "review": summary.get("review"), "summary": summary, "time": datetime.now().isoformat()}
+
+@app.post("/api/report/summary")
+def api_report_summary(payload: dict = Body(default={})):
+    trades = payload.get("trades") or []
+    summary = _summarize_trades(trades)
+    lines = [
+        "AIPICKER 交易績效摘要",
+        f"期間：{payload.get('period', 'All')}",
+        f"總交易數：{summary['total_trades']}",
+        f"勝率：{summary['win_rate']}%",
+        f"總損益：{summary['total_pnl']}",
+        f"平均報酬：{summary['avg_return_pct']}%",
+        f"平均 R：{summary['avg_r_multiple']}",
+        "",
+        summary.get("review") or "",
+    ]
+    return {"version": "12.6.0", "report_text": "\n".join(lines), "summary": summary, "time": datetime.now().isoformat()}
+
+@app.get("/api/debug/trade-journal")
+def api_debug_trade_journal():
+    return {
+        "version": "12.6.0",
+        "storage": "Firestore frontend: users/{uid}/trade_journal/tw and users/{uid}/trade_journal/us",
+        "endpoints": ["/api/performance/summary", "/api/trade-journal/review", "/api/report/summary"],
+        "features": ["close position to journal", "R multiple", "strategy performance", "CSV export", "text report"],
+        "note": "Backend does not persist personal trade journal; authenticated frontend saves it in each user's Firestore.",
         "time": datetime.now().isoformat(),
     }
 
@@ -2594,12 +2746,12 @@ def api_debug_positions():
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/health")
 def health():
-    return{"status":"ok","version":"12.3.1","frontend_expected":"12.3.1","time":datetime.now().isoformat(),
+    return{"status":"ok","version":"12.6.0","frontend_expected":"12.6.0","time":datetime.now().isoformat(),
            "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
            "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
            "price_sources":"Yahoo Finance → TWSE Official → FinMind",
            "us_master_count":len(_us_master),"tw_master_count":len(STOCK_MASTER),
-           "features":["V12.3.1 Portfolio & Smart Alert Mode","AI Picker Pro",
+           "features":["V12.6 Trade Journal · AI Backtest · Report Center","AI Picker Pro",
                        "TW Engine + US Engine + Shared Engine",
                        "6-zone scan output","US Market Context","Symbol Master 200+",
-                       "validate_trade_plan","compute_final_score","LINE alerts","Quick/Full AI Scan","Watch Closely zone","scan pool selector","scan cache diagnostics","Trade Plan Center","trade plan status checker","Watchlist UI polish","Portfolio Center","position status checker","smart position alerts"]}
+                       "validate_trade_plan","compute_final_score","LINE alerts","Quick/Full AI Scan","Watch Closely zone","scan pool selector","scan cache diagnostics","Trade Plan Center","trade plan status checker","Watchlist UI polish","Portfolio Center","position status checker","smart position alerts","Trade Journal","Performance Review","AI Backtest Learning","Report Center","CSV export"]}
