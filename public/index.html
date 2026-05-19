@@ -355,7 +355,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .sz-close{background:rgba(34,197,94,.08);color:#22c55e;border:1px solid rgba(34,197,94,.25)}
 
 
-/* ── Toast / compact helpers (V12.3.0) ───────────────────────────── */
+/* ── Toast / compact helpers (V12.3.1) ───────────────────────────── */
 .toast{position:fixed;right:18px;bottom:18px;z-index:300;background:#0d1728;border:1px solid var(--line);border-left:3px solid var(--cyan);color:var(--text);border-radius:10px;padding:10px 14px;font-family:var(--mono);font-size:12px;box-shadow:0 8px 28px rgba(0,0,0,.45);opacity:0;transform:translateY(10px);pointer-events:none;transition:.18s}
 .toast.show{opacity:1;transform:translateY(0)}
 .toast.ok{border-left-color:var(--down)}.toast.warn{border-left-color:var(--yellow)}.toast.err{border-left-color:var(--up)}
@@ -387,7 +387,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       使用 Google 帳號登入
     </button>
     <div id="loginError"></div>
-    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.3 Portfolio & Smart Alert Mode</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.3.1 Portfolio & Smart Alert Mode</div>
   </div>
 </div>
 
@@ -396,7 +396,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="logo">
     <span class="live-dot"></span>
     <span>AI<span style="color:var(--up)">PICKER</span></span>
-    <span class="ver">V12.3.0</span>
+    <span class="ver">V12.3.1</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="mkt-switcher">
@@ -416,7 +416,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
     </div>
     <div class="version-warn" id="versionWarn"></div>
     <div class="health-grid" id="healthGrid">
-      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.3.0</b></div>
+      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.3.1</b></div>
       <div class="health-chip"><span>Backend</span><b id="hBackend">—</b></div>
       <div class="health-chip"><span>Firestore</span><b id="hFirestore">待登入</b></div>
       <div class="health-chip"><span>Yahoo</span><b id="hYahoo">—</b></div>
@@ -983,12 +983,12 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 <div class="footer">
   ⚠️ 本工具僅供技術分析學習參考，不構成任何投資建議。台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
   資料來源：TWSE MIS · Yahoo Finance · TWSE Official · FinMind · Google News RSS（均為免費公開）<br>
-  V12.3 Portfolio & Smart Alert Mode
+  V12.3.1 Portfolio & Smart Alert Mode
 </div>
 
 <script>
 /* ══════════════════════════════════════════════════════════════════
-   V12.3 Portfolio & Smart Alert Mode
+   V12.3.1 Portfolio & Smart Alert Mode
    Complete frontend JavaScript
    ══════════════════════════════════════════════════════════════════ */
 
@@ -996,7 +996,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="12.3.0";
+var FRONTEND_VERSION="12.3.1";
 var API = window.API_BASE_URL || "https://taiwanstock-ben-1.onrender.com";
 var FB_CFG = window.FIREBASE_CONFIG || {};
 
@@ -1553,6 +1553,21 @@ async function doSearch() {
   } catch(e) { if(wakeT)clearTimeout(wakeT); showErr("查詢失敗："+e.message); }
 }
 
+
+function normalizeTwIndicators(d){
+  // V12.3.1: backend now returns indicators directly; this fallback keeps old cached responses usable.
+  var ind=(d&&d.indicators)||{};
+  var cd=(d&&Array.isArray(d.chart_data))?d.chart_data:[];
+  var last=cd.length?cd[cd.length-1]:{};
+  function pick(){for(var i=0;i<arguments.length;i++){var v=arguments[i]; if(v!==undefined&&v!==null&&v!==""&&!Number.isNaN(Number(v)))return v;} return null;}
+  return {
+    ma5:pick(ind.ma5,last.ma5), ma20:pick(ind.ma20,last.ma20), ma60:pick(ind.ma60,last.ma60),
+    rsi:pick(ind.rsi,last.rsi), macd:pick(ind.macd,last.macd), signal:pick(ind.signal,ind.signal_line,last.signal_line,last.signal),
+    hist:pick(ind.hist,last.hist), bb_upper:pick(ind.bb_upper,last.bb_upper), bb_lower:pick(ind.bb_lower,last.bb_lower),
+    atr:pick(ind.atr,last.atr), adx:pick(ind.adx,last.adx)
+  };
+}
+
 function renderStockLite(d) {
   var dash=$I("dash");if(dash)dash.style.display="block";
   var ai=d.ai_signal||{},rt=d.realtime_quote||{};
@@ -1580,15 +1595,20 @@ function renderStock(d) {
   var rtEl=$I("rtInfo");if(rtEl)rtEl.innerHTML=rt&&rt.price!=null?'<span class="pill pill-ok">⚡ '+(rt.source||"TWSE MIS")+'</span>':'<span class="pill pill-warn">休市，顯示日線</span>';
   var vaEl=$I("volAlert");if(vaEl)vaEl.innerHTML=vol.alert?'<span class="pill pill-warn">⚠️ 成交量異常放大（'+vol.ratio+'x）</span>':'<span class="pill pill-ok">成交量正常（'+(vol.ratio||1)+'x）</span>';
   var ra=$I("rsiAlert");if(ra)ra.innerHTML=d.rsi_alert?'<span class="pill '+((d.rsi_alert||"").includes("過熱")?"pill-hot":"pill-warn")+'">'+d.rsi_alert+'</span>':"";
-  var ind=d.indicators||{};
+  var ind=normalizeTwIndicators(d);
   setTxt("dMa5",f(ind.ma5));setTxt("dMa20",f(ind.ma20));setTxt("dMa60",f(ind.ma60));
   setTxt("dRsi",f(ind.rsi));addCls("dRsi",ind.rsi>50?"up":"down");
   setTxt("dMacd",f(ind.macd,4));setTxt("dSig",f(ind.signal,4));setTxt("dHist",f(ind.hist,4));
   addCls("dHist",ind.hist>0?"up":"down");addCls("dMacd",ind.macd>ind.signal?"up":"down");
   setTxt("dBbU",f(ind.bb_upper));setTxt("dBbL",f(ind.bb_lower));
-  var sc=d.score||{};setTxt("dScore",sc.score||0);addCls("dScore",sc.score>=4?"up":sc.score<=2?"down":"flat");
-  var dots=$I("scoreDots");if(dots){dots.innerHTML="";for(var i=0;i<5;i++){var dt=document.createElement("div");dt.className="dot"+(i<(sc.score||0)?" on":"");dots.appendChild(dt);}}
-  var srEl=$I("scoreReasons");if(srEl)srEl.innerHTML=(sc.reasons||[]).map(function(r){return'<div class="reason">'+r+'</div>';}).join("");
+  var sc=d.score||{};
+  var scoreVal=(sc.score!==undefined&&sc.score!==null)?Number(sc.score):Math.round(((ai&&ai.technical_score)||0)/20);
+  if(!Number.isFinite(scoreVal))scoreVal=0; scoreVal=Math.max(0,Math.min(5,scoreVal));
+  setTxt("dScore",scoreVal);
+  addCls("dScore",scoreVal>=4?"up":scoreVal<=2?"down":"flat");
+  var dots=$I("scoreDots");if(dots){dots.innerHTML="";for(var i=0;i<5;i++){var dt=document.createElement("div");dt.className="dot"+(i<scoreVal?" on":"");dots.appendChild(dt);}}
+  var scoreReasons=(sc.reasons&&sc.reasons.length)?sc.reasons:((ai&&ai.technical_breakdown)?["技術分 "+(ai.technical_score||0)+"/100"]:[]);
+  var srEl=$I("scoreReasons");if(srEl)srEl.innerHTML=scoreReasons.map(function(r){return'<div class="reason">'+r+'</div>';}).join("");
   var bt=d.backtest||{};setTxt("dWr",(bt.winrate||0)+"%");addCls("dWr",bt.winrate>=60?"up":bt.winrate<45?"down":"flat");
   setTxt("dWrSub",bt.trials?"近一年回測結果":"樣本不足");setTxt("dTrials",bt.trials||0);setTxt("dWins",bt.wins||0);
   renderAI(ai);
@@ -2147,7 +2167,7 @@ function usScanCard(r) {
 
 
 
-// ── Trade Plan Center (V12.3.0 polish) ─────────────────────────────
+// ── Trade Plan Center (V12.3.1 polish) ─────────────────────────────
 function planKey(p){return (p.market||'tw')+":"+(p.symbol||p.stock_id||'');}
 function normalizePlanMarket(m){return (m==='us')?'us':'tw';}
 async function loadTradePlans(){

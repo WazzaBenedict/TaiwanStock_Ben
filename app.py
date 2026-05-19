@@ -1,5 +1,5 @@
 """
-V12.3 Portfolio & Smart Alert Mode
+V12.3.1 Portfolio & Smart Alert Mode
 架構：TW Engine / US Engine / Shared Engine（三層分離）
 版本：12.2.1
 """
@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="V12.3 Portfolio & Smart Alert Mode", version="12.3.0")
+app = FastAPI(title="V12.3.1 Portfolio & Smart Alert Mode", version="12.3.1")
 _raw = os.getenv("ALLOWED_ORIGINS",
     "http://localhost:5500,http://127.0.0.1:5500,"
     "https://taiwanstock-ben.web.app,https://taiwanstock-ben.firebaseapp.com")
@@ -653,7 +653,7 @@ def get_stock_name(sid: str, api_name: str | None=None) -> str:
 # TW LEARNING / WEIGHTS
 # ══════════════════════════════════════════════════════════════════════════════
 TW_DEFAULT_WEIGHTS={"technical":0.35,"fundamental":0.25,"chip":0.25,"news":0.15,
-    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.3.0","last_reason":"預設權重"}
+    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.3.1","last_reason":"預設權重"}
 TW_WEIGHT_LIMITS={"technical":(0.20,0.45),"fundamental":(0.10,0.35),"chip":(0.10,0.40),"news":(0.05,0.25)}
 
 def _rjf(path,default):
@@ -1123,6 +1123,7 @@ async def _analyze_stock_core(stock_id:str) -> dict:
             return{"stock_id":stock_id,"stock_name":sname,"last_date":"N/A","data_source":"none",
                    "data_warning":"歷史股價資料暫時無法取得，僅顯示即時報價。",
                    "price":{"close":rtp,"mode":"realtime" if rtp else "unavailable"},
+                   "indicators":{},"score":{"score":0,"technical_score":0,"reasons":["歷史資料不足，無法計算技術指標"]},
                    "ai_signal":_empty_ai("WATCH","歷史資料不足"),"chart_data":[],"news":[]}
         df=compute_all_indicators(df); latest=df.iloc[-1]
         prev=df.iloc[-2] if len(df)>1 else latest
@@ -1143,6 +1144,25 @@ async def _analyze_stock_core(stock_id:str) -> dict:
                 "ma5":_f(row.get("MA5")),"ma20":_f(row.get("MA20")),"ma60":_f(row.get("MA60")),
                 "rsi":_f(row.get("RSI")),"macd":_f(row.get("MACD"),4),"signal_line":_f(row.get("Signal"),4),
                 "hist":_f(row.get("Hist"),4),"bb_upper":_f(row.get("BB_upper")),"bb_lower":_f(row.get("BB_lower"))})
+        # V12.3.1: expose latest indicators directly for frontend indicator panel.
+        # Older versions only embedded these in chart_data, so the technical indicator block showed dashes.
+        latest_indicators={
+            "ma5":_f(latest.get("MA5")),"ma20":_f(latest.get("MA20")),"ma60":_f(latest.get("MA60")),
+            "rsi":_f(latest.get("RSI")),"macd":_f(latest.get("MACD"),4),"signal":_f(latest.get("Signal"),4),
+            "hist":_f(latest.get("Hist"),4),"bb_upper":_f(latest.get("BB_upper")),"bb_lower":_f(latest.get("BB_lower")),
+            "atr":_f(latest.get("ATR")),"adx":_f(latest.get("ADX"))
+        }
+        ts_for_panel=compute_technical_score(latest,cp,vi.get("ratio",1.0),chgp,df)
+        tech100=int(ts_for_panel.get("technical_score") or 0)
+        score5=max(0,min(5,round(tech100/20)))
+        bd=ts_for_panel.get("breakdown",{}) or {}
+        panel_reasons=[]
+        if latest_indicators.get("ma5") is not None and latest_indicators.get("ma20") is not None:
+            panel_reasons.append("MA5 > MA20 短線偏多" if latest_indicators["ma5"]>latest_indicators["ma20"] else "MA5 未站上 MA20，短線需觀察")
+        if latest_indicators.get("rsi") is not None:
+            panel_reasons.append(f"RSI {latest_indicators['rsi']}")
+        if latest_indicators.get("macd") is not None and latest_indicators.get("signal") is not None:
+            panel_reasons.append("MACD 強於 Signal" if latest_indicators["macd"]>latest_indicators["signal"] else "MACD 尚未轉強")
         result={"stock_id":stock_id,"stock_name":sname,"last_date":latest["日期"].strftime("%Y-%m-%d"),
                 "data_source":dsrc,
                 "price":{"close":_f(cp),"daily_close":_f(latest["收盤價"]),
@@ -1152,10 +1172,12 @@ async def _analyze_stock_core(stock_id:str) -> dict:
                          "change":_f(rt.get("change"),2) if rt and rt.get("change") is not None else _f(chg,2),
                          "change_pct":_f(rt.get("change_pct"),2) if rt and rt.get("change_pct") is not None else _f(chgp,2),
                          "mode":"realtime" if rt and rt.get("price") is not None else "daily"},
+                "indicators":latest_indicators,
+                "score":{"score":score5,"technical_score":tech100,"breakdown":bd,"reasons":panel_reasons},
                 "volume":vi,"ai_signal":ai,"realtime_quote":rt,"news":[],"chart_data":chart_data}
         _tw_full_cache[stock_id]=(result,now); return result
     except Exception as e:
-        return{"stock_id":stock_id,"stock_name":sname,"error":str(e),"chart_data":[],"ai_signal":_empty_ai("WATCH",str(e))}
+        return{"stock_id":stock_id,"stock_name":sname,"error":str(e),"chart_data":[],"indicators":{},"score":{"score":0,"technical_score":0,"reasons":[str(e)]},"ai_signal":_empty_ai("WATCH",str(e))}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # US ENGINE — 美股資料
@@ -2229,7 +2251,7 @@ def api_scan_status():
         for k,(payload,ts) in list(cache.items())[-12:]:
             out.append({"key":k,"age_seconds":round(now-ts,1),"market":payload.get("market"),"mode":payload.get("scan_mode"),"pool":payload.get("pool"),"classified":payload.get("classified"),"failed":payload.get("failed")})
         return out
-    return {"version":"12.3.0","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
+    return {"version":"12.3.1","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # API — DATA HEALTH / DIAGNOSTICS
@@ -2340,12 +2362,12 @@ async def api_health_full():
 
     payload = {
         "status": "ok" if not errors else "partial",
-        "version": "12.3.0",
-        "frontend_expected": "12.3.0",
+        "version": "12.3.1",
+        "frontend_expected": "12.3.1",
         "time": datetime.now().isoformat(),
         "backend": {
-            "title": "V12.3 Portfolio & Smart Alert Mode",
-            "version": "12.3.0"
+            "title": "V12.3.1 Portfolio & Smart Alert Mode",
+            "version": "12.3.1"
         },
         "line": {
             "configured": bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
@@ -2455,7 +2477,7 @@ async def api_trade_plan_check(
 @app.get("/api/debug/trade-plans")
 def api_debug_trade_plans():
     return {
-        "version": "12.3.0",
+        "version": "12.3.1",
         "storage": "Firestore frontend: users/{uid}/trade_plans/tw and users/{uid}/trade_plans/us",
         "checker": "/api/trade-plan/check",
         "statuses": ["WAITING_ENTRY","ENTERABLE_NOW","ABOVE_ENTRY_ZONE","NEAR_TARGET","NEAR_STOP","STOP_BROKEN","TARGET_REACHED","INVALIDATED","NO_PRICE"],
@@ -2559,7 +2581,7 @@ async def api_position_check(
 @app.get("/api/debug/positions")
 def api_debug_positions():
     return {
-        "version": "12.3.0",
+        "version": "12.3.1",
         "storage": "Firestore frontend: users/{uid}/positions/tw and users/{uid}/positions/us",
         "checker": "/api/position/check",
         "statuses": ["HOLDING_NORMAL","NEAR_TARGET","TARGET_REACHED","NEAR_STOP","STOP_BROKEN","RISK_UP","REVIEW_REQUIRED","NO_PRICE"],
@@ -2572,12 +2594,12 @@ def api_debug_positions():
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/health")
 def health():
-    return{"status":"ok","version":"12.3.0","frontend_expected":"12.3.0","time":datetime.now().isoformat(),
+    return{"status":"ok","version":"12.3.1","frontend_expected":"12.3.1","time":datetime.now().isoformat(),
            "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
            "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
            "price_sources":"Yahoo Finance → TWSE Official → FinMind",
            "us_master_count":len(_us_master),"tw_master_count":len(STOCK_MASTER),
-           "features":["V12.3 Portfolio & Smart Alert Mode","AI Picker Pro",
+           "features":["V12.3.1 Portfolio & Smart Alert Mode","AI Picker Pro",
                        "TW Engine + US Engine + Shared Engine",
                        "6-zone scan output","US Market Context","Symbol Master 200+",
                        "validate_trade_plan","compute_final_score","LINE alerts","Quick/Full AI Scan","Watch Closely zone","scan pool selector","scan cache diagnostics","Trade Plan Center","trade plan status checker","Watchlist UI polish","Portfolio Center","position status checker","smart position alerts"]}
