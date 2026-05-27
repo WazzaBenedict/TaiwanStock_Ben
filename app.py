@@ -1,9 +1,9 @@
 """
-V12.8 Real AI Learning Engine
+V12.8.1 Real AI Learning + Diversity Reality Fix
 架構：TW Engine / US Engine / Shared Engine（三層分離）
-版本：12.8.0
+版本：12.8.1
 """
-import os, re, asyncio, json, time
+import os, re, asyncio, json, time, hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
 import xml.etree.ElementTree as ET
@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="V12.8 Real AI Learning Engine", version="12.8.0")
+app = FastAPI(title="V12.8.1 Real AI Learning + Diversity Reality Fix", version="12.8.1")
 _raw = os.getenv("ALLOWED_ORIGINS",
     "http://localhost:5500,http://127.0.0.1:5500,"
     "https://taiwanstock-ben.web.app,https://taiwanstock-ben.firebaseapp.com")
@@ -653,7 +653,7 @@ def get_stock_name(sid: str, api_name: str | None=None) -> str:
 # TW LEARNING / WEIGHTS
 # ══════════════════════════════════════════════════════════════════════════════
 TW_DEFAULT_WEIGHTS={"technical":0.35,"fundamental":0.25,"chip":0.25,"news":0.15,
-    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.8.0","last_reason":"預設權重"}
+    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.8.1","last_reason":"預設權重"}
 TW_WEIGHT_LIMITS={"technical":(0.20,0.45),"fundamental":(0.10,0.35),"chip":(0.10,0.40),"news":(0.05,0.25)}
 
 def _rjf(path,default):
@@ -1711,7 +1711,10 @@ US_ETF_POOL       = ["SPY","QQQ","SOXX","IWM","ARKK","TQQQ","SMH"]
 US_FRESH_POOL     = [
     "CRM","NOW","SNOW","DDOG","NET","PANW","CRWD","SHOP","UBER","ABNB",
     "CELH","ELF","ENPH","FSLR","NVO","LLY","VRTX","ISRG","DECK","CAVA",
-    "APP","DUOL","MELI","SE","MDB","ZS","OKTA","HIMS","TOST","ROKU"
+    "APP","DUOL","MELI","SE","MDB","ZS","OKTA","HIMS","TOST","ROKU",
+    "TEAM","BILL","GTLB","PATH","U","AFRM","UPST","BROS","WING","SHAK",
+    "ONON","RBLX","TTD","FIVN","DOCU","PAYC","PINS","DASH","RCL","CCL",
+    "XLE","XLF","XLK","XLY","XBI","IBB","ARKG","BOTZ","SKYY","HACK"
 ]
 US_GROUP_MAP = {
     "mega": set(US_CORE_POOL),
@@ -1721,10 +1724,16 @@ US_GROUP_MAP = {
     "fresh": set(US_FRESH_POOL),
 }
 TW_DISCOVERY_POOL = [
+    # Electronics / AI server / PCB / cooling / semiconductor equipment
     "2485","2313","3706","3035","3017","3324","3529","4967","6191","6446",
-    "6121","6274","8150","3013","4919","3014","5388","4763","6442","6593",
-    "8436","4743","2610","5608","2605","1305","1717","1802","9945","9921",
-    "006208","00878","00713","00919","00929"
+    "6121","6274","8150","3013","4919","3014","5388","6239","6271","6182",
+    "2404","3015","8210","2356","2376","2395","2353","2352","2301","2324",
+    # Shipping / cyclicals / traditional industries
+    "2603","2609","2615","2610","5608","2605","1305","1717","1802","9945","9921",
+    # Biotech / consumer / financial / ETF
+    "4147","4743","8436","6442","6593","2881","2886","2891","006208","00878","00713","00919","00929",
+    # Small/mid turnover candidates
+    "3260","5483","5351","6147","2342","2344","6173","8086","6274","8358"
 ]
 TW_GROUP_MAP = {
     "electronics": {"2330","2317","2454","2308","2382","2357","2379","3034","2303","2327","2345","2360","3005"},
@@ -1761,46 +1770,98 @@ def _unique_symbols(seq):
         if s and s not in out: out.append(s)
     return out
 
+
+def _rotate_list(seq, seed: int = 0, limit: int | None = None):
+    """Deterministic rotation used to avoid the same scan pool ordering forever."""
+    arr=_unique_symbols(seq)
+    if not arr: return []
+    k=seed % len(arr)
+    out=arr[k:]+arr[:k]
+    return out[:limit] if limit else out
+
+def _scan_seed(hours: int = 6) -> int:
+    try: return int(time.time() // (hours*3600))
+    except Exception: return 0
+
+_VALID_DIVERSITY_MODES={
+    "balanced","fresh-discovery","sector-rotation","strict","watchlist-priority",
+    "fresh","new","sector","trade","watchlist"
+}
+
+def _sanitize_diversity_mode(mode: str | None):
+    raw=str(mode or "").strip()
+    low=raw.lower().replace("_","-")
+    warning=""
+    bad_tokens=("pointerevent","object ","undefined","null","none","nan")
+    if (not low) or any(t in low for t in bad_tokens):
+        return "balanced", "invalid diversity_mode fallback"
+    aliases={
+        "fresh":"fresh-discovery", "new":"fresh-discovery", "discovery":"fresh-discovery", "新機會探索":"fresh-discovery",
+        "sector":"sector-rotation", "sector-rotation":"sector-rotation", "產業輪動":"sector-rotation",
+        "trade":"strict", "嚴格交易":"strict", "嚴格交易模式":"strict",
+        "watchlist":"watchlist-priority", "自選股優先":"watchlist-priority",
+        "balanced":"balanced", "平衡模式":"balanced"
+    }
+    clean=aliases.get(low, low)
+    if clean not in {"balanced","fresh-discovery","sector-rotation","strict","watchlist-priority"}:
+        clean="balanced"; warning="unsupported diversity_mode fallback"
+    return clean, warning
+
+def _sanitize_scan_mode(mode: str | None):
+    raw=str(mode or "").strip().lower().replace("_","-")
+    if (not raw) or "pointerevent" in raw or raw in ("undefined","null","none","nan"):
+        return "full", "invalid scan mode fallback"
+    if raw not in ("quick","full","watchlist"):
+        return "full", "unsupported scan mode fallback"
+    return raw, ""
+
+def _history_hash(history_symbols: str = "") -> str:
+    return hashlib.md5((history_symbols or "").encode("utf-8","ignore")).hexdigest()[:10]
+
 def select_us_scan_pool(pool: str = "all", symbols: str = "", limit: int = 50) -> list[str]:
     pool=(pool or "all").lower().replace("_","-")
     custom=_unique_symbols(re.split(r"[,\s]+", symbols or ""))
+    seed=_scan_seed(6)
     if pool in ("watchlist","my-watchlist","custom") and custom:
         return custom[:limit]
     if pool in ("mega","mega-cap","core"):
         base=US_CORE_POOL
     elif pool in ("ai","semi","semiconductor","ai-semiconductor"):
-        base=US_SEMI_POOL
+        base=US_SEMI_POOL + _rotate_list(US_FRESH_POOL, seed, 8)
     elif pool in ("growth","high-beta","highbeta"):
-        base=US_GROWTH_POOL
+        base=US_GROWTH_POOL + _rotate_list(US_FRESH_POOL, seed+2, 12)
     elif pool in ("etf","etfs"):
-        base=US_ETF_POOL
+        base=US_ETF_POOL + _rotate_list(US_FRESH_POOL, seed+3, 8)
     elif pool in ("fresh","discovery","fresh-discovery"):
-        base=US_FRESH_POOL
-    elif pool in ("diversified","balanced","all-diverse"):
-        base=US_CORE_POOL[:4] + US_SEMI_POOL[:5] + US_GROWTH_POOL[:6] + US_ETF_POOL[:3] + US_FRESH_POOL
+        base=_rotate_list(US_FRESH_POOL + US_GROWTH_POOL + US_SEMI_POOL, seed, limit)
+    elif pool in ("diversified","balanced","all-diverse","all"):
+        base=(US_CORE_POOL[:4] + _rotate_list(US_SEMI_POOL, seed, 6) + _rotate_list(US_GROWTH_POOL, seed+1, 8) +
+              _rotate_list(US_ETF_POOL, seed+2, 4) + _rotate_list(US_FRESH_POOL, seed+3, max(12, limit)))
     else:
-        base=US_CORE_POOL + US_GROWTH_POOL + US_SEMI_POOL + US_ETF_POOL + US_FRESH_POOL
+        base=(US_CORE_POOL[:5] + _rotate_list(US_GROWTH_POOL, seed, 8) + _rotate_list(US_SEMI_POOL, seed+1, 8) +
+              _rotate_list(US_ETF_POOL, seed+2, 4) + _rotate_list(US_FRESH_POOL, seed+3, max(15, limit)))
     return list(dict.fromkeys(base))[:limit]
 
 def select_tw_scan_pool(pool: str = "all", symbols: str = "", limit: int = 50) -> list[str]:
     pool=(pool or "all").lower().replace("_","-")
+    seed=_scan_seed(6)
     custom=[]
     for x in re.split(r"[,\s]+", symbols or ""):
         if re.match(r"^\d{4,6}$", x or "") and x not in custom: custom.append(x)
     if pool in ("watchlist","my-watchlist","custom") and custom:
         return custom[:limit]
     if pool in ("finance","financial"):
-        base=["2881","2882","2891","2886","2884","2885","2892","2801","2812","5880"]
+        base=["2881","2882","2891","2886","2884","2885","2892","2801","2812","5880"] + _rotate_list(TW_DISCOVERY_POOL, seed, 8)
     elif pool in ("electronics","tech","ai"):
-        base=["2330","2317","2454","2308","2382","2357","2379","3034","2303","2327","2345","2360","3005"]
+        base=["2330","2317","2454","2308","2382","2357","2379","3034","2303","2327","2345","2360","3005"] + _rotate_list(TW_DISCOVERY_POOL, seed, 12)
     elif pool in ("hot","popular"):
-        base=["2357","3034","2485","2891","3481","6147","2342","5351","2344","6173","2313","3706"]
+        base=["2357","3034","2485","2891","3481","6147","2342","5351","2344","6173","2313","3706"] + _rotate_list(TW_DISCOVERY_POOL, seed+1, 12)
     elif pool in ("fresh","discovery","fresh-discovery"):
-        base=TW_DISCOVERY_POOL
-    elif pool in ("diversified","balanced","all-diverse"):
-        base=TW_SCAN_POOL[:25] + TW_DISCOVERY_POOL
+        base=_rotate_list(TW_DISCOVERY_POOL + TW_SCAN_POOL[25:], seed, limit)
+    elif pool in ("diversified","balanced","all-diverse","all"):
+        base=(TW_SCAN_POOL[:18] + _rotate_list(TW_DISCOVERY_POOL, seed, max(24, limit//2)) + _rotate_list(TW_SCAN_POOL[18:], seed+3, max(18, limit//3)))
     else:
-        base=TW_SCAN_POOL + TW_DISCOVERY_POOL
+        base=(TW_SCAN_POOL[:20] + _rotate_list(TW_DISCOVERY_POOL, seed, max(24, limit//2)) + _rotate_list(TW_SCAN_POOL[20:], seed+2, max(20, limit//3)))
     return list(dict.fromkeys(base))[:limit]
 
 def scan_mode_label(mode: str, pool: str, count: int) -> str:
@@ -1818,14 +1879,17 @@ def _diversity_group(market: str, sym: str) -> str:
     return "other"
 
 def _novelty_score(sym: str, recent: set[str]) -> int:
+    # Set-based history cannot know exact age, so use a conservative penalty.
+    # Fresh candidates keep score 100; recently seen candidates stay selectable but ranked lower.
     return 35 if str(sym or "").upper() in recent else 100
 
 def _repeat_penalty(sym: str, recent: set[str], current_category: str, previous_category: str = "") -> int:
     s = str(sym or "").upper()
     if s not in recent: return 0
-    # Do not punish a real improvement to enterable too much.
-    if current_category == "ENTERABLE": return 5
-    return 18
+    # Do not punish true upgrades into ENTERABLE too much.
+    if str(current_category or "").upper() == "ENTERABLE": return 3
+    # V12.8.1: stronger repeat penalty so recent symbols stop dominating Watch/Fresh lists.
+    return 20
 
 def _sector_quota_score(group: str, counts: dict, diversity_mode: str) -> int:
     if diversity_mode in ("strict", "嚴格交易模式"):
@@ -1845,7 +1909,7 @@ def _strategy_diversity_score(strategy: str, counts: dict, diversity_mode: str) 
     return 25
 
 def _apply_diversity_to_items(items: list[dict], market: str, recent_symbols: set[str], diversity_mode: str = "balanced") -> list[dict]:
-    mode = (diversity_mode or "balanced").lower().replace("_", "-")
+    mode, _warn = _sanitize_diversity_mode(diversity_mode)
     group_counts, strat_counts = {}, {}
     out=[]
     for it in items:
@@ -1867,7 +1931,7 @@ def _apply_diversity_to_items(items: list[dict], market: str, recent_symbols: se
         elif mode in ("watchlist-priority", "watchlist", "自選股優先"):
             score = base*0.70 + novelty*0.10 + sector_score*0.10 + strat_score*0.10 - penalty
         else:
-            score = base*0.60 + novelty*0.15 + sector_score*0.10 + strat_score*0.10 + (100-penalty)*0.05 - penalty
+            score = base*0.55 + novelty*0.20 + sector_score*0.10 + strat_score*0.10 + (100-penalty)*0.05 - penalty
         it = dict(it)
         it["diversity_group"] = group
         it["novelty_score"] = round(novelty)
@@ -1891,40 +1955,78 @@ def _apply_diversity_to_items(items: list[dict], market: str, recent_symbols: se
 
 def _rebuild_diversified_payload(payload: dict, market: str, recent_symbols: set[str], diversity_mode: str = "balanced") -> dict:
     payload = dict(payload or {})
+    mode, mode_warning = _sanitize_diversity_mode(diversity_mode)
     zones = ["enterable","watch_closely","pullback","breakout_watch","near_miss","risk_watch","avoid"]
     all_items=[]
     for z in zones:
         for item in payload.get(z, []) or []:
             item=dict(item); item["original_zone"]=z; all_items.append(item)
-    all_items = _apply_diversity_to_items(all_items, market, recent_symbols, diversity_mode)
-    # Keep strict ENTERABLE safety untouched, but rerank by diversified score inside each zone.
+    all_items = _apply_diversity_to_items(all_items, market, recent_symbols, mode)
+
     by_zone={z:[] for z in zones}
     fresh=[]
     for it in all_items:
-        z=it.get("original_zone") or it.get("scan_category", "avoid").lower()
-        z=z.lower()
+        z=(it.get("original_zone") or it.get("scan_category", "avoid")).lower()
         if z not in by_zone: z="avoid"
         by_zone[z].append(it)
-        if (it.get("novelty_score",0)>=80 and (it.get("technical_score") or 0)>=55 and (it.get("risk_score") or 50)>=45 and z not in ("enterable","avoid","risk_watch")):
+
+        # Fresh Discovery is an exploration zone, not a buy zone. Do not require trade_valid or RR >= 1.5.
+        sig=str(it.get("signal") or "WATCH").upper()
+        if (sig != "AVOID" and z != "enterable" and
+            (it.get("technical_score") or 0) >= 50 and
+            (it.get("final_score") or it.get("confidence") or 0) >= 50 and
+            (it.get("risk_score") or 50) >= 45 and
+            (it.get("novelty_score") or 0) >= 35):
             fresh.append(it)
+
     for z in by_zone:
         by_zone[z].sort(key=lambda x: (-(x.get("diversified_score") or 0), -(x.get("final_score") or 0), -(x.get("confidence") or 0)))
-    # Fresh discovery emphasizes non-repeated candidates.
-    fresh.sort(key=lambda x: (-(x.get("diversified_score") or 0), -(x.get("novelty_score") or 0), -(x.get("technical_score") or 0)))
+    fresh.sort(key=lambda x: (-(x.get("novelty_score") or 0), -(x.get("diversified_score") or 0), -(x.get("technical_score") or 0)))
+
+    # If all candidates were recently seen, still show exploration candidates with a clear repeat note instead of returning zero.
+    if not fresh:
+        fallback=[it for it in all_items if str(it.get("signal") or "WATCH").upper()!="AVOID" and (it.get("technical_score") or 0)>=45 and (it.get("risk_score") or 50)>=40 and (it.get("original_zone") or "")!="enterable"]
+        fallback.sort(key=lambda x: (-(x.get("diversified_score") or 0), -(x.get("technical_score") or 0)))
+        fresh=fallback[:8]
+        for it in fresh:
+            it["repeat_note"] = (it.get("repeat_note") or "") + " · 目前沒有全新候選，因此列為探索備選，非買入建議。"
+
     for z,v in by_zone.items(): payload[z]=v
     payload["fresh_discovery"] = fresh[:10]
-    payload["diversity_mode"] = diversity_mode
+    payload["diversity_mode"] = mode
+    if mode_warning:
+        payload["mode_warning"] = mode_warning
+
+    top10=[]
+    for z in ["enterable","watch_closely","fresh_discovery","pullback","breakout_watch","near_miss"]:
+        top10 += payload.get(z, []) or []
+    top10=top10[:10]
+    top10_overlap = round(sum(1 for it in top10 if (it.get("symbol") or it.get("stock_id") or "").upper() in recent_symbols) / max(1, len(top10)), 2)
+    sectors={it.get("diversity_group") for it in top10 if it.get("diversity_group")}
+    strategies={str(it.get("strategy_type") or "unknown").lower() for it in top10}
+    fresh_count=len(payload["fresh_discovery"])
     payload["diversity_summary"] = {
-        "mode": diversity_mode,
+        "mode": mode,
+        "mode_warning": mode_warning,
         "recent_symbols_count": len(recent_symbols),
-        "fresh_discovery_count": len(payload["fresh_discovery"]),
+        "fresh_discovery_count": fresh_count,
+        "fresh_candidate_count": fresh_count,
         "new_candidate_count": sum(1 for it in all_items if (it.get("novelty_score") or 0)>=80),
         "repeated_candidate_count": sum(1 for it in all_items if (it.get("repeat_penalty") or 0)>0),
+        "top10_overlap_rate": top10_overlap,
+        "sector_spread_count": len(sectors),
+        "strategy_spread_count": len(strategies),
     }
     s=payload.get("summary") or {}
-    s["fresh_discovery_count"] = len(payload["fresh_discovery"])
-    s["diversity_mode"] = diversity_mode
-    s["message"] = (s.get("message") or "") + f" · Diversity: {diversity_mode}, Fresh: {len(payload['fresh_discovery'])}"
+    s["fresh_discovery_count"] = fresh_count
+    s["fresh_candidate_count"] = fresh_count
+    s["diversity_mode"] = mode
+    s["mode"] = mode
+    s["mode_warning"] = mode_warning
+    s["top10_overlap_rate"] = top10_overlap
+    s["sector_spread_count"] = len(sectors)
+    s["strategy_spread_count"] = len(strategies)
+    s["message"] = (s.get("message") or "") + f" · Diversity: {mode}, Fresh: {fresh_count}, Overlap: {int(top10_overlap*100)}%"
     payload["summary"] = s
     return payload
 
@@ -2127,9 +2229,11 @@ async def api_market_sentiment():
 # API — TW AI Scan
 # ══════════════════════════════════════════════════════════════════════════════
 async def _tw_scan_core(min_score:int=65,max_stocks:int=50,mode:str="full",pool_name:str="all",symbols:str="",use_cache:bool=True,diversity_mode:str="balanced",history_symbols:str=""):
-    """V12.1 TW AI scan core — quick/full/watchlist pools + 6-zone output."""
+    """V12.8.1 TW AI scan core — real diversity fix + safe mode parsing."""
+    mode, mode_warn = _sanitize_scan_mode(mode)
+    diversity_mode, div_warn = _sanitize_diversity_mode(diversity_mode)
     pool=select_tw_scan_pool(pool_name, symbols, max_stocks)
-    cache_key=f"tw:{mode}:{pool_name}:{','.join(pool)}:{min_score}:{max_stocks}:{diversity_mode}:{history_symbols[:80]}"
+    cache_key=f"tw:{mode}:{pool_name}:{','.join(pool)}:{min_score}:{max_stocks}:{diversity_mode}:{_history_hash(history_symbols)}"
     if use_cache:
         hit=_scan_cache_get(TW_SCAN_CACHE, cache_key)
         if hit: return hit
@@ -2428,15 +2532,15 @@ def _suggest_learning_weights(payload: dict) -> dict:
 
 @app.post("/api/learning/summary")
 def api_learning_summary_v128(payload: dict = Body(default={})):
-    return {"version": "12.8.0", "summary": _learning_summary(payload), "time": datetime.now().isoformat()}
+    return {"version": "12.8.1", "summary": _learning_summary(payload), "time": datetime.now().isoformat()}
 
 @app.post("/api/learning/calibrate")
 def api_learning_calibrate_v128(payload: dict = Body(default={})):
-    return {"version": "12.8.0", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
+    return {"version": "12.8.1", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
 
 @app.post("/api/learning/suggest-weights")
 def api_learning_suggest_weights_v128(payload: dict = Body(default={})):
-    return {"version": "12.8.0", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
+    return {"version": "12.8.1", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
 
 @app.post("/api/learning/apply-weights")
 def api_learning_apply_weights_v128(payload: dict = Body(default={})):
@@ -2445,20 +2549,20 @@ def api_learning_apply_weights_v128(payload: dict = Body(default={})):
     # Only TW backend has server-side scoring weights in this single-file app.
     if market == "tw":
         saved = save_ai_weights(weights)
-        return {"version": "12.8.0", "applied": True, "market": market, "weights": saved, "time": datetime.now().isoformat()}
-    return {"version": "12.8.0", "applied": False, "market": market, "weights": weights,
+        return {"version": "12.8.1", "applied": True, "market": market, "weights": saved, "time": datetime.now().isoformat()}
+    return {"version": "12.8.1", "applied": False, "market": market, "weights": weights,
             "message": "US personal weights are stored per user in Firestore by the frontend.", "time": datetime.now().isoformat()}
 
 @app.get("/api/learning/status")
 def api_learning_status_v128():
     h = load_signal_history()
-    return {"version": "12.8.0", "server_tw_signal_history": _lst(h),
+    return {"version": "12.8.1", "server_tw_signal_history": _lst(h),
             "note": "V12.8 personal learning events are stored in each user's Firestore and sent to /api/learning/summary or /api/learning/calibrate for calculation.",
             "time": datetime.now().isoformat()}
 
 @app.get("/api/debug/learning")
 def api_debug_learning_v128():
-    return {"version": "12.8.0", "engine": "Real AI Learning Engine",
+    return {"version": "12.8.1", "engine": "Real AI Learning Engine",
             "frontend_firestore_paths": ["users/{uid}/ai_learning_events/tw", "users/{uid}/ai_learning_events/us", "users/{uid}/ai_weight_versions/tw", "users/{uid}/ai_weight_versions/us", "users/{uid}/ai_learning_summary/tw", "users/{uid}/ai_learning_summary/us"],
             "apis": ["POST /api/learning/summary", "POST /api/learning/calibrate", "POST /api/learning/suggest-weights", "POST /api/learning/apply-weights", "GET /api/learning/status"],
             "time": datetime.now().isoformat()}
@@ -2502,10 +2606,12 @@ async def us_profile(symbol:str):
     return{"symbol":symbol.upper(),"name":master_info.get("name",symbol),"profile":profile}
 
 async def _us_scan_core(min_score:int=60,max_stocks:int=50,mode:str="full",pool_name:str="all",symbols:str="",use_cache:bool=True,diversity_mode:str="balanced",history_symbols:str=""):
-    """V12.1 US AI scan core — pool selector + quick/full/watchlist + watch closely."""
+    """V12.8.1 US AI scan core — real diversity fix + safe mode parsing."""
     t0=time.time()
+    mode, mode_warn = _sanitize_scan_mode(mode)
+    diversity_mode, div_warn = _sanitize_diversity_mode(diversity_mode)
     pool=select_us_scan_pool(pool_name, symbols, max_stocks)
-    cache_key=f"us:{mode}:{pool_name}:{','.join(pool)}:{min_score}:{max_stocks}:{diversity_mode}:{history_symbols[:80]}"
+    cache_key=f"us:{mode}:{pool_name}:{','.join(pool)}:{min_score}:{max_stocks}:{diversity_mode}:{_history_hash(history_symbols)}"
     if use_cache:
         hit=_scan_cache_get(US_SCAN_CACHE, cache_key)
         if hit: return hit
@@ -2565,6 +2671,8 @@ async def _us_scan_core(min_score:int=60,max_stocks:int=50,mode:str="full",pool_
                        "found":found,"market_score":market_score,"sentiment":market_ctx.get("sentiment",""),"message":msg,"mode":mode,"pool":pool_name},
             "enterable":enterable,"watch_closely":watch_closely,"pullback":pullback,"breakout_watch":breakout_watch,
             "risk_watch":risk_watch,"avoid":avoid,"near_miss":near_miss,"errors":errors,"error_count":len(errors)}
+    if mode_warn or div_warn:
+        payload["mode_warning"] = "; ".join([x for x in [mode_warn, div_warn] if x])
     payload=_rebuild_diversified_payload(payload,"us",_parse_history_symbols(history_symbols),diversity_mode)
     return _scan_cache_set(US_SCAN_CACHE, cache_key, payload)
 
@@ -2590,7 +2698,7 @@ async def us_scan_diversified(pool:str="diversified",symbols:str="",min_score:in
 
 @app.get("/api/debug/recommendation-history")
 def api_debug_recommendation_history():
-    return {"version":"12.8.0","note":"Per-user recommendation history is stored client-side/localStorage or Firestore by the frontend. Backend diversified scan accepts history_symbols to apply novelty/repeat penalties.","fields":["symbol/stock_id","market","scan_category","shown_at","diversity_group","diversified_score"]}
+    return {"version":"12.8.1","note":"Per-user recommendation history is stored client-side/localStorage or Firestore by the frontend. Backend diversified scan accepts history_symbols to apply novelty/repeat penalties.","fields":["symbol/stock_id","market","scan_category","shown_at","diversity_group","diversified_score"]}
 
 @app.get("/api/debug/scan-status")
 def api_scan_status():
@@ -2600,7 +2708,7 @@ def api_scan_status():
         for k,(payload,ts) in list(cache.items())[-12:]:
             out.append({"key":k,"age_seconds":round(now-ts,1),"market":payload.get("market"),"mode":payload.get("scan_mode"),"pool":payload.get("pool"),"classified":payload.get("classified"),"failed":payload.get("failed")})
         return out
-    return {"version":"12.8.0","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
+    return {"version":"12.8.1","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # API — DATA HEALTH / DIAGNOSTICS
@@ -2711,12 +2819,12 @@ async def api_health_full():
 
     payload = {
         "status": "ok" if not errors else "partial",
-        "version": "12.8.0",
-        "frontend_expected": "12.8.0",
+        "version": "12.8.1",
+        "frontend_expected": "12.8.1",
         "time": datetime.now().isoformat(),
         "backend": {
-            "title": "V12.8 Real AI Learning Engine",
-            "version": "12.8.0"
+            "title": "V12.8.1 Real AI Learning + Diversity Reality Fix",
+            "version": "12.8.1"
         },
         "line": {
             "configured": bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
@@ -2826,7 +2934,7 @@ async def api_trade_plan_check(
 @app.get("/api/debug/trade-plans")
 def api_debug_trade_plans():
     return {
-        "version": "12.8.0",
+        "version": "12.8.1",
         "storage": "Firestore frontend: users/{uid}/trade_plans/tw and users/{uid}/trade_plans/us",
         "checker": "/api/trade-plan/check",
         "statuses": ["WAITING_ENTRY","ENTERABLE_NOW","ABOVE_ENTRY_ZONE","NEAR_TARGET","NEAR_STOP","STOP_BROKEN","TARGET_REACHED","INVALIDATED","NO_PRICE"],
@@ -2930,7 +3038,7 @@ async def api_position_check(
 @app.get("/api/debug/positions")
 def api_debug_positions():
     return {
-        "version": "12.8.0",
+        "version": "12.8.1",
         "storage": "Firestore frontend: users/{uid}/positions/tw and users/{uid}/positions/us",
         "checker": "/api/position/check",
         "statuses": ["HOLDING_NORMAL","NEAR_TARGET","TARGET_REACHED","NEAR_STOP","STOP_BROKEN","RISK_UP","REVIEW_REQUIRED","NO_PRICE"],
@@ -3054,13 +3162,13 @@ def _build_review_text(total, wins, pnl, avg_r, strategy_stats):
 @app.post("/api/performance/summary")
 def api_performance_summary(payload: dict = Body(default={})):  # frontend sends Firestore journal rows
     trades = payload.get("trades") or payload.get("journal") or []
-    return {"version": "12.8.0", "market": payload.get("market", "all"), "summary": _summarize_trades(trades), "time": datetime.now().isoformat()}
+    return {"version": "12.8.1", "market": payload.get("market", "all"), "summary": _summarize_trades(trades), "time": datetime.now().isoformat()}
 
 @app.post("/api/trade-journal/review")
 def api_trade_journal_review(payload: dict = Body(default={})):
     trades = payload.get("trades") or []
     summary = _summarize_trades(trades)
-    return {"version": "12.8.0", "review": summary.get("review"), "summary": summary, "time": datetime.now().isoformat()}
+    return {"version": "12.8.1", "review": summary.get("review"), "summary": summary, "time": datetime.now().isoformat()}
 
 @app.post("/api/report/summary")
 def api_report_summary(payload: dict = Body(default={})):
@@ -3077,12 +3185,12 @@ def api_report_summary(payload: dict = Body(default={})):
         "",
         summary.get("review") or "",
     ]
-    return {"version": "12.8.0", "report_text": "\n".join(lines), "summary": summary, "time": datetime.now().isoformat()}
+    return {"version": "12.8.1", "report_text": "\n".join(lines), "summary": summary, "time": datetime.now().isoformat()}
 
 @app.get("/api/debug/trade-journal")
 def api_debug_trade_journal():
     return {
-        "version": "12.8.0",
+        "version": "12.8.1",
         "storage": "Firestore frontend: users/{uid}/trade_journal/tw and users/{uid}/trade_journal/us",
         "endpoints": ["/api/performance/summary", "/api/trade-journal/review", "/api/report/summary"],
         "features": ["close position to journal", "R multiple", "strategy performance", "CSV export", "text report"],
@@ -3095,12 +3203,12 @@ def api_debug_trade_journal():
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/health")
 def health():
-    return{"status":"ok","version":"12.8.0","frontend_expected":"12.8.0","time":datetime.now().isoformat(),
+    return{"status":"ok","version":"12.8.1","frontend_expected":"12.8.1","time":datetime.now().isoformat(),
            "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
            "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
            "price_sources":"Yahoo Finance → TWSE Official → FinMind",
            "us_master_count":len(_us_master),"tw_master_count":len(STOCK_MASTER),
-           "features":["V12.8 Real AI Learning Engine","AI Picker Pro",
+           "features":["V12.8.1 Real AI Learning + Diversity Reality Fix","AI Picker Pro",
                        "TW Engine + US Engine + Shared Engine",
                        "6-zone scan output","US Market Context","Symbol Master 200+",
                        "validate_trade_plan","compute_final_score","LINE alerts","Quick/Full AI Scan","Watch Closely zone","scan pool selector","scan cache diagnostics","Trade Plan Center","trade plan status checker","Watchlist UI polish","Portfolio Center","position status checker","smart position alerts","Trade Journal","Performance Review","AI Backtest Learning","Report Center","CSV export","AI Discovery Diversity","Fresh Discovery","repeat_penalty","novelty_score","sector_quota"]}

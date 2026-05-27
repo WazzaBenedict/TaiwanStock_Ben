@@ -373,7 +373,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .strategy-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;margin-top:10px}.strategy-table th,.strategy-table td{border-bottom:1px solid rgba(148,163,184,.15);padding:7px;text-align:left}.strategy-table th{color:var(--muted)}
 @media(max-width:900px){.journal-summary-grid,.report-summary-grid{grid-template-columns:repeat(2,1fr)}.journal-grid{grid-template-columns:1fr}.journal-metrics{grid-template-columns:repeat(2,auto)}}
 
-/* ── Toast / compact helpers (V12.8.0) ───────────────────────────── */
+/* ── Toast / compact helpers (V12.8.1) ───────────────────────────── */
 .toast{position:fixed;right:18px;bottom:18px;z-index:300;background:#0d1728;border:1px solid var(--line);border-left:3px solid var(--cyan);color:var(--text);border-radius:10px;padding:10px 14px;font-family:var(--mono);font-size:12px;box-shadow:0 8px 28px rgba(0,0,0,.45);opacity:0;transform:translateY(10px);pointer-events:none;transition:.18s}
 .toast.show{opacity:1;transform:translateY(0)}
 .toast.ok{border-left-color:var(--down)}.toast.warn{border-left-color:var(--yellow)}.toast.err{border-left-color:var(--up)}
@@ -405,7 +405,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       使用 Google 帳號登入
     </button>
     <div id="loginError"></div>
-    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.8 Real AI Learning Engine</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.8.1 Real AI Learning + Diversity Reality Fix</div>
   </div>
 </div>
 
@@ -414,7 +414,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="logo">
     <span class="live-dot"></span>
     <span>AI<span style="color:var(--up)">PICKER</span></span>
-    <span class="ver">V12.8.0</span>
+    <span class="ver">V12.8.1</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="mkt-switcher">
@@ -434,7 +434,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
     </div>
     <div class="version-warn" id="versionWarn"></div>
     <div class="health-grid" id="healthGrid">
-      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.8.0</b></div>
+      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.8.1</b></div>
       <div class="health-chip"><span>Backend</span><b id="hBackend">—</b></div>
       <div class="health-chip"><span>Firestore</span><b id="hFirestore">待登入</b></div>
       <div class="health-chip"><span>Yahoo</span><b id="hYahoo">—</b></div>
@@ -1062,12 +1062,12 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 <div class="footer">
   ⚠️ 本工具僅供技術分析學習參考，不構成任何投資建議。台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
   資料來源：TWSE MIS · Yahoo Finance · TWSE Official · FinMind · Google News RSS（均為免費公開）<br>
-  V12.8 Real AI Learning Engine
+  V12.8.1 Real AI Learning + Diversity Reality Fix
 </div>
 
 <script>
 /* ══════════════════════════════════════════════════════════════════
-   V12.8 Real AI Learning Engine
+   V12.8.1 Real AI Learning + Diversity Reality Fix
    Complete frontend JavaScript
    ══════════════════════════════════════════════════════════════════ */
 
@@ -1075,7 +1075,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="12.8.0";
+var FRONTEND_VERSION="12.8.1";
 var API = window.API_BASE_URL || "https://taiwanstock-ben-1.onrender.com";
 var FB_CFG = window.FIREBASE_CONFIG || {};
 
@@ -1543,14 +1543,20 @@ function saveRecommendationHistory(market,data){
   }catch(e){console.warn("saveRecommendationHistory failed",e);}
 }
 
+function isDomEvent(x){return !!(x && typeof x==="object" && (x.type||x.target||x.currentTarget||x.pointerId!==undefined) && (x.preventDefault||x.stopPropagation||x.isTrusted!==undefined));}
+function cleanScanMode(v){if(isDomEvent(v))return "";var s=String(v||"").trim().toLowerCase().replace(/_/g,"-");if(!s||s==="undefined"||s==="null"||s.indexOf("pointerevent")>=0||s.indexOf("object ")>=0)return "";return s;}
+function cleanDiversityMode(v){var s=cleanScanMode(v);var ok={"balanced":1,"fresh-discovery":1,"sector-rotation":1,"strict":1,"watchlist-priority":1};return ok[s]?s:"balanced";}
+function displayModeName(v){v=cleanDiversityMode(v);return {"balanced":"balanced","fresh-discovery":"fresh-discovery","sector-rotation":"sector-rotation","strict":"strict","watchlist-priority":"watchlist-priority"}[v]||"balanced";}
+
 // ── TW AI Scan ─────────────────────────────────────────────────────
 async function aiScan(forceMode, forcePool) {
+  if(isDomEvent(forceMode)){forceMode=null;forcePool=null;}
   if(!currentUser) return;
   var box=$I("aiScanTradeBox"); if(box)box.style.display="block";
   var sum=$I("aiScanSummary");
-  var mode=forceMode || (($I("twScanMode")||{}).value||"full");
-  var pool=forcePool || (($I("twScanPool")||{}).value||"all");
-  var diversityMode=(($I("twDiversityMode")||{}).value||"balanced");
+  var mode=cleanScanMode(forceMode) || (($I("twScanMode")||{}).value||"full");
+  var pool=(isDomEvent(forcePool)?"":forcePool) || (($I("twScanPool")||{}).value||"all");
+  var diversityMode=cleanDiversityMode(($I("twDiversityMode")||{}).value||"balanced");
   var endpoint="/api/tw/scan/diversified";
   var max=(mode==="quick")?20:60;
   var symbols=(pool==="watchlist")?WL.map(function(x){return x.stock_id||x;}).join(","):"";
@@ -1573,7 +1579,7 @@ async function aiScan(forceMode, forcePool) {
 function normalizeScanPayload(d){d=d||{};var s=d.summary||{};["enterable","watch_closely","fresh_discovery","pullback","breakout_watch","near_miss","risk_watch","avoid"].forEach(function(k){d[k]=Array.isArray(d[k])?d[k]:[];});var total=d.enterable.length+d.watch_closely.length+d.fresh_discovery.length+d.pullback.length+d.breakout_watch.length+d.near_miss.length+d.risk_watch.length+d.avoid.length;d.scanned=d.scanned??s.scanned??d.attempted??total;d.classified=d.classified??s.classified??total;d.failed=d.failed??s.failed??d.error_count??0;d.duration_seconds=d.duration_seconds??s.duration_seconds??0;d.market_score=d.market_score??s.market_score??"—";d.summary=d.summary||{};d.summary.market_score=d.summary.market_score??d.market_score;return d;}
 function updateScanProgress(prefix,pct){var el=$I(prefix+"ScanProgress");if(el)el.style.width=Math.max(0,Math.min(100,pct||0))+"%";}
 function beginFakeProgress(prefix,ms){var start=Date.now();return setInterval(function(){var p=Math.min(92,8+(Date.now()-start)/ms*84);updateScanProgress(prefix,p);},500);}
-function renderScanKpis(prefix,d){var el=$I(prefix+"ScanKpis");if(!el)return;var s=d.summary||{};el.style.display="grid";var items=[['Mode',d.diversity_mode||d.scan_mode||s.mode||'—'],['Pool',d.pool||s.pool||'—'],['Scanned',d.scanned||0],['Fresh',(d.fresh_discovery||[]).length],['Failed',d.failed||0],['Market',safeVal(s.market_score??d.market_score,'—')+'/100']];el.innerHTML=items.map(function(x){return '<div class="scan-kpi"><div class="k">'+x[0]+'</div><div class="v">'+x[1]+'</div></div>';}).join('');}
+function renderScanKpis(prefix,d){var el=$I(prefix+"ScanKpis");if(!el)return;var s=d.summary||{},ds=d.diversity_summary||{};el.style.display="grid";var mode=displayModeName(d.diversity_mode||s.diversity_mode||s.mode||'balanced');var overlap=(s.top10_overlap_rate??ds.top10_overlap_rate);if(typeof overlap==='number')overlap=Math.round(overlap*100)+'%';var items=[['Mode',mode],['Pool',d.pool||s.pool||'—'],['Scanned',d.scanned||0],['Fresh',(s.fresh_candidate_count??ds.fresh_candidate_count??(d.fresh_discovery||[]).length)],['Overlap',safeVal(overlap,'—')],['Sector',safeVal(s.sector_spread_count??ds.sector_spread_count,'—')],['Strategy',safeVal(s.strategy_spread_count??ds.strategy_spread_count,'—')],['Failed',d.failed||0],['Market',safeVal(s.market_score??d.market_score,'—')+'/100']];el.innerHTML=items.map(function(x){return '<div class="scan-kpi"><div class="k">'+x[0]+'</div><div class="v">'+escapeHTML(String(x[1]))+'</div></div>';}).join('');}
 
 function renderTWScan(data) {
   function zone(elId, lbl, labelCss, items, emptyMsg) {
@@ -1661,7 +1667,7 @@ async function doSearch() {
 
 
 function normalizeTwIndicators(d){
-  // V12.8.0: backend now returns indicators directly; this fallback keeps old cached responses usable.
+  // V12.8.1: backend now returns indicators directly; this fallback keeps old cached responses usable.
   var ind=(d&&d.indicators)||{};
   var cd=(d&&Array.isArray(d.chart_data))?d.chart_data:[];
   var last=cd.length?cd[cd.length-1]:{};
@@ -1916,7 +1922,7 @@ async function runBt() {
   finally{if(loading)loading.style.display="none";}
 }
 
-// ── V12.8 Real AI Learning Engine ───────────────────────────────────
+// ── V12.8.1 Real AI Learning + Diversity Reality Fix ───────────────────────────────────
 var LAST_LEARNING_SUMMARY=null, LAST_SUGGESTED_WEIGHTS=null;
 function getLearningMarket(){var el=$I('learnMarket');return (el&&el.value)||currentMarket||'tw';}
 function baseWeightsForMarket(m){return m==='us'?{technical:0.40,market_context:0.25,fundamental:0.15,risk:0.15,news:0.05}:{technical:0.35,fundamental:0.25,chip:0.25,news:0.15};}
@@ -2185,12 +2191,13 @@ async function fetchUSSuggest(q) {
 function usDoSearch(){var inp=$I("usSymbol");var sym=inp?inp.value.trim().toUpperCase():"";if(/^[A-Z.\-]{1,12}$/.test(sym))usLoadStock(sym);else if(sym)alert("Please enter a valid US symbol (letters only)");}
 
 async function usAiScan(forceMode, forcePool) {
+  if(isDomEvent(forceMode)){forceMode=null;forcePool=null;}
   if(!currentUser)return;
   var box=$I("usAiScanBox");if(box)box.style.display="block";
   var sum=$I("usAiScanSummary");
-  var mode=forceMode || (($I("usScanMode")||{}).value||"full");
-  var pool=forcePool || (($I("usScanPool")||{}).value||"all");
-  var diversityMode=(($I("usDiversityMode")||{}).value||"balanced");
+  var mode=cleanScanMode(forceMode) || (($I("usScanMode")||{}).value||"full");
+  var pool=(isDomEvent(forcePool)?"":forcePool) || (($I("usScanPool")||{}).value||"all");
+  var diversityMode=cleanDiversityMode(($I("usDiversityMode")||{}).value||"balanced");
   var endpoint="/api/us/scan/diversified";
   var max=(mode==="quick")?20:60;
   var symbols=(pool==="watchlist")?US_WL.map(function(x){return x.symbol||x;}).join(","):"";
@@ -2286,7 +2293,7 @@ function usScanCard(r) {
 
 
 
-// ── Trade Plan Center (V12.8.0 polish) ─────────────────────────────
+// ── Trade Plan Center (V12.8.1 polish) ─────────────────────────────
 function planKey(p){return (p.market||'tw')+":"+(p.symbol||p.stock_id||'');}
 function normalizePlanMarket(m){return (m==='us')?'us':'tw';}
 async function loadTradePlans(){
@@ -2503,7 +2510,7 @@ function renderJournal(){
   var sb=$I('strategyStatsBox');if(sb){sb.innerHTML=sum.strategy_stats.length?'<table class="strategy-table"><thead><tr><th>策略</th><th>交易</th><th>勝率</th><th>損益</th><th>平均 R</th></tr></thead><tbody>'+sum.strategy_stats.map(function(s){return'<tr><td>'+esc(s.strategy_type)+'</td><td>'+s.trades+'</td><td>'+s.win_rate+'%</td><td>'+s.pnl+'</td><td>'+(s.avg_r==null?'—':s.avg_r)+'</td></tr>';}).join('')+'</tbody></table>':'<div class="empty">尚無策略統計</div>';}
   generateReportText(false);
 }
-function generateReportText(show){var s=journalSummary();var best=s.strategy_stats[0]?s.strategy_stats[0].strategy_type:'—';var txt='AIPICKER V12.8 交易績效報告\n生成時間：'+new Date().toLocaleString('zh-TW')+'\n\n總交易數：'+s.total+'\n勝率：'+s.win_rate+'%\n總損益：'+s.total_pnl+'\n平均報酬：'+s.avg_return_pct+'%\n平均 R：'+s.avg_r_multiple+'\n最佳策略：'+best+'\n\nAI 回顧：'+(s.total?'目前已累積交易樣本，可開始觀察哪些 strategy_type 較適合你。若平均 R 低於 1，建議檢查是否太早出場或 RR 不足。':'目前尚無已結束交易，先從持倉管理結束交易後累積樣本。');setTxt('reportText',txt);if(show)toast('報告已產生','ok');return txt;}
+function generateReportText(show){var s=journalSummary();var best=s.strategy_stats[0]?s.strategy_stats[0].strategy_type:'—';var txt='AIPICKER V12.8.1 交易績效報告\n生成時間：'+new Date().toLocaleString('zh-TW')+'\n\n總交易數：'+s.total+'\n勝率：'+s.win_rate+'%\n總損益：'+s.total_pnl+'\n平均報酬：'+s.avg_return_pct+'%\n平均 R：'+s.avg_r_multiple+'\n最佳策略：'+best+'\n\nAI 回顧：'+(s.total?'目前已累積交易樣本，可開始觀察哪些 strategy_type 較適合你。若平均 R 低於 1，建議檢查是否太早出場或 RR 不足。':'目前尚無已結束交易，先從持倉管理結束交易後累積樣本。');setTxt('reportText',txt);if(show)toast('報告已產生','ok');return txt;}
 function exportJournalCsv(){var rows=journalSummary().rows;if(!rows.length){toast('沒有日誌可匯出','warn');return;}var cols=['market','symbol','name','entry_price','exit_price','shares','pnl','return_pct','r_multiple','strategy_type','exit_reason','exit_date'];var csv=[cols.join(',')].concat(rows.map(function(r){r=calcTrade(r);return cols.map(function(c){return '"'+String(r[c]==null?'':r[c]).replace(/"/g,'""')+'"';}).join(',');})).join('\n');var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='aipicker_trade_journal_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href);}
 async function copyReport(){var txt=generateReportText(false);try{await navigator.clipboard.writeText(txt);toast('報告已複製','ok');}catch(e){prompt('複製以下報告',txt);}}
 
@@ -2563,7 +2570,7 @@ function bindAllButtons() {
   safeBind("btnRefresh","click",function(){if(!currentUser)return;isRefreshWL=false;wlLeft=30;refreshWL();});
   safeBind("btnScan","click",function(){scanAlerts(false);});
   safeBind("btnScan2","click",function(){scanAlerts(false);});
-  safeBind("btnAiScan","click",aiScan);safeBind("btnAiScanAgain","click",aiScan);
+  safeBind("btnAiScan","click",function(){aiScan();});safeBind("btnAiScanAgain","click",function(){aiScan();});
   safeBind("btnTwQuickScan","click",function(){aiScan("quick");});
   safeBind("btnTwFullScan","click",function(){aiScan("full");});
   safeBind("btnToggleWl","click",toggleWatchlistExpanded);
@@ -2600,8 +2607,8 @@ function bindAllButtons() {
   safeBind("btnUsSearch","click",usDoSearch);
   safeBind("btnUsAdd","click",addUSWL);
   safeBind("btnUsRefresh","click",function(){usWlLeft=30;refreshUSWL();});
-  safeBind("btnUsScan","click",usAiScan);
-  safeBind("btnUsScanAgain","click",usAiScan);
+  safeBind("btnUsScan","click",function(){usAiScan();});
+  safeBind("btnUsScanAgain","click",function(){usAiScan();});
   safeBind("btnUsQuickScan","click",function(){usAiScan("quick");});
   safeBind("btnUsFullScan","click",function(){usAiScan("full");});
   safeBind("btnUsCtx","click",loadUSMarketContext);
