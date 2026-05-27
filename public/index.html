@@ -169,6 +169,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .sz-risk{background:rgba(232,56,79,.08);color:var(--up);border:1px solid rgba(232,56,79,.2)}
 .sz-avoid{background:rgba(100,116,139,.1);color:var(--muted);border:1px solid var(--line)}
 .sz-near{background:rgba(0,212,255,.08);color:var(--cyan);border:1px solid rgba(0,212,255,.2)}
+.sz-fresh{background:rgba(16,185,129,.10);color:#34d399;border:1px solid rgba(16,185,129,.25)}
 .sz-us-enter{background:rgba(34,197,94,.12);color:var(--us-up);border:1px solid rgba(34,197,94,.3)}
 .sz-us-pull{background:rgba(251,191,36,.1);color:var(--yellow);border:1px solid rgba(251,191,36,.25)}
 .scan-meta{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;margin-top:6px;font-family:var(--mono);font-size:11px}
@@ -372,7 +373,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .strategy-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;margin-top:10px}.strategy-table th,.strategy-table td{border-bottom:1px solid rgba(148,163,184,.15);padding:7px;text-align:left}.strategy-table th{color:var(--muted)}
 @media(max-width:900px){.journal-summary-grid,.report-summary-grid{grid-template-columns:repeat(2,1fr)}.journal-grid{grid-template-columns:1fr}.journal-metrics{grid-template-columns:repeat(2,auto)}}
 
-/* ── Toast / compact helpers (V12.6.0) ───────────────────────────── */
+/* ── Toast / compact helpers (V12.7.0) ───────────────────────────── */
 .toast{position:fixed;right:18px;bottom:18px;z-index:300;background:#0d1728;border:1px solid var(--line);border-left:3px solid var(--cyan);color:var(--text);border-radius:10px;padding:10px 14px;font-family:var(--mono);font-size:12px;box-shadow:0 8px 28px rgba(0,0,0,.45);opacity:0;transform:translateY(10px);pointer-events:none;transition:.18s}
 .toast.show{opacity:1;transform:translateY(0)}
 .toast.ok{border-left-color:var(--down)}.toast.warn{border-left-color:var(--yellow)}.toast.err{border-left-color:var(--up)}
@@ -404,7 +405,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       使用 Google 帳號登入
     </button>
     <div id="loginError"></div>
-    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.6 Trade Journal · AI Backtest · Report Center</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.7 AI Discovery & Diversity Engine</div>
   </div>
 </div>
 
@@ -413,7 +414,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="logo">
     <span class="live-dot"></span>
     <span>AI<span style="color:var(--up)">PICKER</span></span>
-    <span class="ver">V12.6.0</span>
+    <span class="ver">V12.7.0</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="mkt-switcher">
@@ -433,7 +434,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
     </div>
     <div class="version-warn" id="versionWarn"></div>
     <div class="health-grid" id="healthGrid">
-      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.6.0</b></div>
+      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.7.0</b></div>
       <div class="health-chip"><span>Backend</span><b id="hBackend">—</b></div>
       <div class="health-chip"><span>Firestore</span><b id="hFirestore">待登入</b></div>
       <div class="health-chip"><span>Yahoo</span><b id="hYahoo">—</b></div>
@@ -525,7 +526,8 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   </div>
   <div class="scan-toolbar">
     <select class="scan-select" id="twScanMode"><option value="quick">Quick Scan</option><option value="full">Full Scan</option><option value="watchlist">Watchlist Scan</option></select>
-    <select class="scan-select" id="twScanPool"><option value="all">All</option><option value="electronics">電子權值股</option><option value="finance">金融股</option><option value="hot">熱門股</option><option value="watchlist">我的自選股</option></select>
+    <select class="scan-select" id="twScanPool"><option value="all">All</option><option value="diversified">題材輪動池</option><option value="fresh">新機會池</option><option value="electronics">電子權值股</option><option value="finance">金融股</option><option value="hot">熱門股</option><option value="watchlist">我的自選股</option></select>
+    <select class="scan-select" id="twDiversityMode"><option value="balanced">平衡模式</option><option value="fresh-discovery">新機會探索</option><option value="sector-rotation">產業輪動</option><option value="strict">嚴格交易</option><option value="watchlist-priority">自選股優先</option></select>
     <button class="ghost sm" id="btnTwQuickScan">Quick</button><button class="ghost sm" id="btnTwFullScan">Full</button>
     <span class="scan-mode-pill" id="twScanCache">cache: —</span>
   </div>
@@ -533,6 +535,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="scan-kpi-row" id="twScanKpis" style="display:none"></div>
   <div id="aiZoneEnterable"></div>
   <div id="aiZoneWatchClose"></div>
+  <div id="aiZoneFreshDiscovery"></div>
   <div id="aiZonePullback"></div>
   <div id="aiZoneBreakout"></div>
   <div id="aiZoneNearMiss"></div>
@@ -818,7 +821,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       </div>
     </div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px">
-      V12.4–V12.6 一次整合：結束持倉會移入交易日誌；系統計算勝率、R 倍數、策略型態表現，並可產出文字報告與 CSV。資料儲存在 Firestore：users/{uid}/trade_journal/tw / us。
+      V12.4–V12.7 一次整合：結束持倉會移入交易日誌；系統計算勝率、R 倍數、策略型態表現，並可產出文字報告與 CSV。資料儲存在 Firestore：users/{uid}/trade_journal/tw / us。
     </div>
     <div class="journal-summary-grid" id="journalSummaryGrid"></div>
     <div class="quick-nav" style="margin-bottom:8px">
@@ -913,7 +916,8 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   </div>
   <div class="scan-toolbar">
     <select class="scan-select" id="usScanMode"><option value="quick">Quick Scan</option><option value="full">Full Scan</option><option value="watchlist">Watchlist Scan</option></select>
-    <select class="scan-select" id="usScanPool"><option value="all">All</option><option value="mega">Mega Cap</option><option value="semi">AI / Semiconductor</option><option value="growth">High Beta Growth</option><option value="etf">ETF</option><option value="watchlist">My Watchlist</option></select>
+    <select class="scan-select" id="usScanPool"><option value="all">All</option><option value="diversified">Diversified</option><option value="fresh">Fresh Discovery</option><option value="mega">Mega Cap</option><option value="semi">AI / Semiconductor</option><option value="growth">High Beta Growth</option><option value="etf">ETF</option><option value="watchlist">My Watchlist</option></select>
+    <select class="scan-select" id="usDiversityMode"><option value="balanced">Balanced</option><option value="fresh-discovery">Fresh Discovery</option><option value="sector-rotation">Sector Rotation</option><option value="strict">Strict Trade</option><option value="watchlist-priority">Watchlist First</option></select>
     <button class="ghost sm" id="btnUsQuickScan">Quick</button><button class="ghost sm" id="btnUsFullScan">Full</button>
     <span class="scan-mode-pill" id="usScanCache">cache: —</span>
   </div>
@@ -921,6 +925,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="scan-kpi-row" id="usScanKpis" style="display:none"></div>
   <div id="usZoneEnterable"></div>
   <div id="usZoneWatchClose"></div>
+  <div id="usZoneFreshDiscovery"></div>
   <div id="usZonePullback"></div>
   <div id="usZoneBreakout"></div>
   <div id="usZoneNearMiss"></div>
@@ -1037,12 +1042,12 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 <div class="footer">
   ⚠️ 本工具僅供技術分析學習參考，不構成任何投資建議。台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
   資料來源：TWSE MIS · Yahoo Finance · TWSE Official · FinMind · Google News RSS（均為免費公開）<br>
-  V12.6 Trade Journal · AI Backtest · Report Center
+  V12.7 AI Discovery & Diversity Engine
 </div>
 
 <script>
 /* ══════════════════════════════════════════════════════════════════
-   V12.6 Trade Journal · AI Backtest · Report Center
+   V12.7 AI Discovery & Diversity Engine
    Complete frontend JavaScript
    ══════════════════════════════════════════════════════════════════ */
 
@@ -1050,7 +1055,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="12.6.0";
+var FRONTEND_VERSION="12.7.0";
 var API = window.API_BASE_URL || "https://taiwanstock-ben-1.onrender.com";
 var FB_CFG = window.FIREBASE_CONFIG || {};
 
@@ -1500,6 +1505,21 @@ async function scanAlerts(silent) {
   } catch(e) {if(wakeT)clearTimeout(wakeT);if(!silent&&el){el.className="scan-result fail";el.textContent="❌ "+(e.message||"掃描失敗");el.style.display="block";}return null;}
 }
 
+
+// ── Recommendation History / Diversity helpers ─────────────────────
+function recHistKey(market){return "rec_history_"+market+"_"+(currentUser?currentUser.uid:"guest");}
+function getRecommendationHistory(market){try{return JSON.parse(localStorage.getItem(recHistKey(market))||"[]");}catch(e){return [];}}
+function getRecommendationHistorySymbols(market){var cutoff=Date.now()-7*24*60*60*1000;return getRecommendationHistory(market).filter(function(x){return (x.ts||0)>=cutoff;}).map(function(x){return String(x.symbol||x.stock_id||"").toUpperCase();}).filter(Boolean).slice(0,120);}
+function saveRecommendationHistory(market,data){
+  try{
+    var old=getRecommendationHistory(market);var now=Date.now();var zones=["enterable","watch_closely","fresh_discovery","pullback","breakout_watch","near_miss","risk_watch"];
+    var add=[];zones.forEach(function(z){(data[z]||[]).slice(0,12).forEach(function(it){add.push({market:market,symbol:String(it.symbol||it.stock_id||"").toUpperCase(),category:z,final_score:it.final_score,diversified_score:it.diversified_score,diversity_group:it.diversity_group,ts:now});});});
+    var merged=add.concat(old).filter(function(x){return x.symbol && (now-(x.ts||0))<14*24*60*60*1000;});
+    var seen={};merged=merged.filter(function(x){var key=x.symbol+":"+x.category+":"+Math.floor((x.ts||0)/(12*60*60*1000));if(seen[key])return false;seen[key]=1;return true;}).slice(0,300);
+    localStorage.setItem(recHistKey(market),JSON.stringify(merged));
+  }catch(e){console.warn("saveRecommendationHistory failed",e);}
+}
+
 // ── TW AI Scan ─────────────────────────────────────────────────────
 async function aiScan(forceMode, forcePool) {
   if(!currentUser) return;
@@ -1507,28 +1527,30 @@ async function aiScan(forceMode, forcePool) {
   var sum=$I("aiScanSummary");
   var mode=forceMode || (($I("twScanMode")||{}).value||"full");
   var pool=forcePool || (($I("twScanPool")||{}).value||"all");
-  var endpoint=(mode==="quick")?"/api/tw/scan/quick":(mode==="watchlist")?"/api/tw/scan/watchlist":"/api/tw/scan/full";
-  var max=(mode==="quick")?20:50;
+  var diversityMode=(($I("twDiversityMode")||{}).value||"balanced");
+  var endpoint="/api/tw/scan/diversified";
+  var max=(mode==="quick")?20:60;
   var symbols=(pool==="watchlist")?WL.map(function(x){return x.stock_id||x;}).join(","):"";
   if(sum)sum.textContent=(mode==="quick"?"Quick Scan":"Full Scan")+" 掃描中…";
-  ["aiZoneEnterable","aiZoneWatchClose","aiZonePullback","aiZoneBreakout","aiZoneNearMiss","aiZoneRiskWatch"].forEach(function(id){var el=$I(id);if(el)el.innerHTML="";});
+  ["aiZoneEnterable","aiZoneWatchClose","aiZoneFreshDiscovery","aiZonePullback","aiZoneBreakout","aiZoneNearMiss","aiZoneRiskWatch"].forEach(function(id){var el=$I(id);if(el)el.innerHTML="";});
   updateScanProgress("tw",8);
   var fake=beginFakeProgress("tw", mode==="quick"?12000:70000);
   var btn=$I("btnAiScan"),btn2=$I("btnAiScanAgain"); if(btn)btn.disabled=true; if(btn2)btn2.disabled=true;
   if(box)setTimeout(function(){box.scrollIntoView({behavior:"smooth",block:"start"});},200);
   try {
-    var url=API+endpoint+"?min_score=60&max_stocks="+max+"&pool="+encodeURIComponent(pool)+"&symbols="+encodeURIComponent(symbols);
+    var history=getRecommendationHistorySymbols("tw").join(",");
+    var url=API+endpoint+"?min_score=55&max_stocks="+max+"&mode="+encodeURIComponent(mode)+"&pool="+encodeURIComponent(pool)+"&diversity_mode="+encodeURIComponent(diversityMode)+"&symbols="+encodeURIComponent(symbols)+"&history_symbols="+encodeURIComponent(history);
     var r=await apiFetch(url,{},mode==="quick"?45000:120000); var d=await r.json(); d=normalizeScanPayload(d);
     var s=d.summary||{}; if(sum)sum.textContent=(d.scan_label||"")+" | 掃描 "+safeVal(d.scanned,0)+" 檔 | 分類 "+safeVal(d.classified,0)+" | 失敗 "+safeVal(d.failed||d.error_count,0)+" | "+safeVal(d.duration_seconds,"—")+"s | 市場 "+safeVal(s.market_score??d.market_score,"—")+"/100"+(s.message?" — "+s.message:"");
-    renderScanKpis("tw",d); setTxt("twScanCache","cache: "+(d.cache_status||"fresh")); updateScanProgress("tw",100); renderTWScan(d);
+    renderScanKpis("tw",d); setTxt("twScanCache","cache: "+(d.cache_status||"fresh")+" · "+(d.diversity_mode||diversityMode)); saveRecommendationHistory("tw",d); updateScanProgress("tw",100); renderTWScan(d);
   } catch(e) { if(sum)sum.textContent="掃描失敗："+e.message; updateScanProgress("tw",0); }
   finally { clearInterval(fake); if(btn)btn.disabled=false; if(btn2)btn2.disabled=false; }
 }
 
-function normalizeScanPayload(d){d=d||{};var s=d.summary||{};["enterable","watch_closely","pullback","breakout_watch","near_miss","risk_watch","avoid"].forEach(function(k){d[k]=Array.isArray(d[k])?d[k]:[];});var total=d.enterable.length+d.watch_closely.length+d.pullback.length+d.breakout_watch.length+d.near_miss.length+d.risk_watch.length+d.avoid.length;d.scanned=d.scanned??s.scanned??d.attempted??total;d.classified=d.classified??s.classified??total;d.failed=d.failed??s.failed??d.error_count??0;d.duration_seconds=d.duration_seconds??s.duration_seconds??0;d.market_score=d.market_score??s.market_score??"—";d.summary=d.summary||{};d.summary.market_score=d.summary.market_score??d.market_score;return d;}
+function normalizeScanPayload(d){d=d||{};var s=d.summary||{};["enterable","watch_closely","fresh_discovery","pullback","breakout_watch","near_miss","risk_watch","avoid"].forEach(function(k){d[k]=Array.isArray(d[k])?d[k]:[];});var total=d.enterable.length+d.watch_closely.length+d.fresh_discovery.length+d.pullback.length+d.breakout_watch.length+d.near_miss.length+d.risk_watch.length+d.avoid.length;d.scanned=d.scanned??s.scanned??d.attempted??total;d.classified=d.classified??s.classified??total;d.failed=d.failed??s.failed??d.error_count??0;d.duration_seconds=d.duration_seconds??s.duration_seconds??0;d.market_score=d.market_score??s.market_score??"—";d.summary=d.summary||{};d.summary.market_score=d.summary.market_score??d.market_score;return d;}
 function updateScanProgress(prefix,pct){var el=$I(prefix+"ScanProgress");if(el)el.style.width=Math.max(0,Math.min(100,pct||0))+"%";}
 function beginFakeProgress(prefix,ms){var start=Date.now();return setInterval(function(){var p=Math.min(92,8+(Date.now()-start)/ms*84);updateScanProgress(prefix,p);},500);}
-function renderScanKpis(prefix,d){var el=$I(prefix+"ScanKpis");if(!el)return;var s=d.summary||{};el.style.display="grid";var items=[['Mode',d.scan_mode||s.mode||'—'],['Pool',d.pool||s.pool||'—'],['Scanned',d.scanned||0],['Classified',d.classified||0],['Failed',d.failed||0],['Market',safeVal(s.market_score??d.market_score,'—')+'/100']];el.innerHTML=items.map(function(x){return '<div class="scan-kpi"><div class="k">'+x[0]+'</div><div class="v">'+x[1]+'</div></div>';}).join('');}
+function renderScanKpis(prefix,d){var el=$I(prefix+"ScanKpis");if(!el)return;var s=d.summary||{};el.style.display="grid";var items=[['Mode',d.diversity_mode||d.scan_mode||s.mode||'—'],['Pool',d.pool||s.pool||'—'],['Scanned',d.scanned||0],['Fresh',(d.fresh_discovery||[]).length],['Failed',d.failed||0],['Market',safeVal(s.market_score??d.market_score,'—')+'/100']];el.innerHTML=items.map(function(x){return '<div class="scan-kpi"><div class="k">'+x[0]+'</div><div class="v">'+x[1]+'</div></div>';}).join('');}
 
 function renderTWScan(data) {
   function zone(elId, lbl, labelCss, items, emptyMsg) {
@@ -1540,6 +1562,7 @@ function renderTWScan(data) {
   data=normalizeScanPayload(data);
   zone("aiZoneEnterable","✅ 可進場候選 ENTERABLE","sz-enterable",data.enterable,"目前沒有符合可進場條件的股票，建議等待更好的進場點。");
   zone("aiZoneWatchClose","👀 準備觀察 WATCH CLOSELY","sz-close",data.watch_closely,"目前沒有準備觀察候選。");
+  zone("aiZoneFreshDiscovery","🌱 新發現 FRESH DISCOVERY","sz-fresh",data.fresh_discovery,"近期沒有新的高品質探索候選。");
   zone("aiZonePullback","⏳ 等回檔觀察 PULLBACK","sz-pullback",data.pullback,"—");
   zone("aiZoneBreakout","🔭 突破觀察 BREAKOUT WATCH","sz-breakout",data.breakout_watch,"—");
   zone("aiZoneNearMiss","💫 差一點候選 NEAR MISS","sz-near",data.near_miss,"—");
@@ -1566,9 +1589,12 @@ function twScanCard(r) {
     '<div><span class="lbl">RR</span> <span class="val '+((rr||0)>=1.5?"up":"down")+'">'+(rr!=null?rr+"x":"—")+'</span></div>'+
     (ts!=null?'<div><span class="lbl">技術</span> <span class="val">'+ts+'</span></div>':'')+
     (fs!=null?'<div><span class="lbl">Final</span> <span class="val">'+fs+'</span></div>':'')+
+    (r.diversified_score!=null?'<div><span class="lbl">Diverse</span> <span class="val">'+r.diversified_score+'</span></div>':'')+
+    (r.novelty_score!=null?'<div><span class="lbl">Novel</span> <span class="val">'+r.novelty_score+'</span></div>':'')+
     '</div>'+
     ((r.reasons&&r.reasons.length)?'<div class="scan-reasons" style="color:var(--down)">✅ '+r.reasons.slice(0,2).join(" ／ ")+'</div>':'')+
     ((r.risk_reason&&r.risk_reason.length)?'<div class="scan-reasons">⚠️ '+r.risk_reason[0]+'</div>':'')+
+    (r.repeat_note?'<div class="scan-reasons">🔁 '+r.repeat_note+'</div>':'')+
     '</div>';
 }
 
@@ -1612,7 +1638,7 @@ async function doSearch() {
 
 
 function normalizeTwIndicators(d){
-  // V12.6.0: backend now returns indicators directly; this fallback keeps old cached responses usable.
+  // V12.7.0: backend now returns indicators directly; this fallback keeps old cached responses usable.
   var ind=(d&&d.indicators)||{};
   var cd=(d&&Array.isArray(d.chart_data))?d.chart_data:[];
   var last=cd.length?cd[cd.length-1]:{};
@@ -2135,22 +2161,24 @@ async function usAiScan(forceMode, forcePool) {
   var sum=$I("usAiScanSummary");
   var mode=forceMode || (($I("usScanMode")||{}).value||"full");
   var pool=forcePool || (($I("usScanPool")||{}).value||"all");
-  var endpoint=(mode==="quick")?"/api/us/scan/quick":(mode==="watchlist")?"/api/us/scan/watchlist":"/api/us/scan/full";
-  var max=(mode==="quick")?20:50;
+  var diversityMode=(($I("usDiversityMode")||{}).value||"balanced");
+  var endpoint="/api/us/scan/diversified";
+  var max=(mode==="quick")?20:60;
   var symbols=(pool==="watchlist")?US_WL.map(function(x){return x.symbol||x;}).join(","):"";
   if(sum)sum.textContent=(mode==="quick"?"Quick Scan":"Full Scan")+" scanning…";
-  ["usZoneEnterable","usZoneWatchClose","usZonePullback","usZoneBreakout","usZoneNearMiss","usZoneRisk"].forEach(function(id){var el=$I(id);if(el)el.innerHTML="";});
+  ["usZoneEnterable","usZoneWatchClose","usZoneFreshDiscovery","usZonePullback","usZoneBreakout","usZoneNearMiss","usZoneRisk"].forEach(function(id){var el=$I(id);if(el)el.innerHTML="";});
   updateScanProgress("us",8); var fake=beginFakeProgress("us",mode==="quick"?12000:80000);
   var btn=$I("btnUsScan"),btn2=$I("btnUsScanAgain");if(btn)btn.disabled=true;if(btn2)btn2.disabled=true;
   if(box)setTimeout(function(){box.scrollIntoView({behavior:"smooth",block:"start"});},200);
   try {
-    var url=API+endpoint+"?min_score=0&max_stocks="+max+"&pool="+encodeURIComponent(pool)+"&symbols="+encodeURIComponent(symbols);
+    var history=getRecommendationHistorySymbols("us").join(",");
+    var url=API+endpoint+"?min_score=0&max_stocks="+max+"&mode="+encodeURIComponent(mode)+"&pool="+encodeURIComponent(pool)+"&diversity_mode="+encodeURIComponent(diversityMode)+"&symbols="+encodeURIComponent(symbols)+"&history_symbols="+encodeURIComponent(history);
     var r=await apiFetch(url,{},mode==="quick"?45000:120000);
     if(!r.ok){throw new Error("US scan API failed: HTTP "+r.status);}
     var d=await r.json(); d=normalizeUSScanPayload(d);
     var s=d.summary||{};
     if(sum)sum.textContent=(d.scan_label||"")+" | Scanned "+safeVal(d.scanned,0)+" | Classified "+safeVal(d.classified,0)+" | Failed "+safeVal(d.failed||d.error_count,0)+" | "+safeVal(d.duration_seconds,"—")+"s | Market "+safeVal(s.market_score??d.market_score,"—")+"/100"+(s.message?" — "+s.message:"");
-    renderScanKpis("us",d); setTxtUS("usScanCache","cache: "+(d.cache_status||"fresh")); updateScanProgress("us",100); renderUSScan(d);
+    renderScanKpis("us",d); setTxtUS("usScanCache","cache: "+(d.cache_status||"fresh")+" · "+(d.diversity_mode||diversityMode)); saveRecommendationHistory("us",d); updateScanProgress("us",100); renderUSScan(d);
   } catch(e){
     console.error("US AI scan failed", e); if(sum)sum.textContent="Scan failed: "+(e.message||e); updateScanProgress("us",0);
     var risk=$I("usZoneRisk"); if(risk)risk.innerHTML='<div class="scan-zone-lbl sz-risk">⚠️ US Scan Error</div><div class="empty" style="padding:8px;font-size:11px">'+escapeHTML(String(e.message||e))+'</div>';
@@ -2162,12 +2190,13 @@ function normalizeUSScanPayload(d){
   d=d||{};var s=d.summary||{};
   d.enterable=Array.isArray(d.enterable)?d.enterable:[];
   d.watch_closely=Array.isArray(d.watch_closely)?d.watch_closely:[];
+  d.fresh_discovery=Array.isArray(d.fresh_discovery)?d.fresh_discovery:[];
   d.pullback=Array.isArray(d.pullback)?d.pullback:[];
   d.breakout_watch=Array.isArray(d.breakout_watch)?d.breakout_watch:[];
   d.risk_watch=Array.isArray(d.risk_watch)?d.risk_watch:[];
   d.avoid=Array.isArray(d.avoid)?d.avoid:[];
   d.near_miss=Array.isArray(d.near_miss)?d.near_miss:[];
-  var total=d.enterable.length+d.watch_closely.length+d.pullback.length+d.breakout_watch.length+d.risk_watch.length+d.avoid.length+d.near_miss.length;
+  var total=d.enterable.length+d.watch_closely.length+d.fresh_discovery.length+d.pullback.length+d.breakout_watch.length+d.risk_watch.length+d.avoid.length+d.near_miss.length;
   d.scanned=d.scanned??s.scanned??s.attempted??d.attempted??(total+(d.error_count||0));
   d.classified=d.classified??s.classified??total;
   d.failed=d.failed??s.failed??d.error_count??0;
@@ -2192,6 +2221,7 @@ function renderUSScan(data) {
   }
   zone("usZoneEnterable","✅ Enterable Candidates","sz-us-enter",data.enterable,"No stocks meet entry criteria. Patience is key.");
   zone("usZoneWatchClose","👀 Watch Closely","sz-close",data.watch_closely,"No watch-closely candidates yet.");
+  zone("usZoneFreshDiscovery","🌱 Fresh Discovery","sz-fresh",data.fresh_discovery,"No fresh high-quality discovery candidates yet.");
   zone("usZonePullback","⏳ Watch / Wait Pullback","sz-us-pull",data.pullback,"目前沒有等回檔候選。");
   zone("usZoneBreakout","🔭 Breakout Watch","sz-breakout",data.breakout_watch,"目前沒有突破觀察候選。");
   zone("usZoneNearMiss","💫 Near Miss","sz-near",data.near_miss,"目前沒有差一點候選；若可進場為 0，代表條件仍距離較遠或資料暫不足。");
@@ -2216,15 +2246,18 @@ function usScanCard(r) {
     '<div><span class="lbl">RR</span> <span class="'+((rr||0)>=1.5?"us-up":"us-down")+'">'+(rr!=null?rr+"x":"—")+'</span></div>'+
     (ts!=null?'<div><span class="lbl">Tech</span> <span class="val">'+ts+'</span></div>':'')+
     (ms!=null?'<div><span class="lbl">Mkt</span> <span class="val">'+ms+'</span></div>':'')+
+    (r.diversified_score!=null?'<div><span class="lbl">Diverse</span> <span class="val">'+r.diversified_score+'</span></div>':'')+
+    (r.novelty_score!=null?'<div><span class="lbl">Novel</span> <span class="val">'+r.novelty_score+'</span></div>':'')+
     '</div>'+
     ((r.reasons&&r.reasons.length)?'<div class="scan-reasons" style="color:#22c55e">✅ '+r.reasons.slice(0,2).join(" / ")+'</div>':'')+
     ((r.risk_reason&&r.risk_reason.length)?'<div class="scan-reasons">⚠️ '+r.risk_reason[0]+'</div>':'')+
+    (r.repeat_note?'<div class="scan-reasons">🔁 '+r.repeat_note+'</div>':'')+
     '</div>';
 }
 
 
 
-// ── Trade Plan Center (V12.6.0 polish) ─────────────────────────────
+// ── Trade Plan Center (V12.7.0 polish) ─────────────────────────────
 function planKey(p){return (p.market||'tw')+":"+(p.symbol||p.stock_id||'');}
 function normalizePlanMarket(m){return (m==='us')?'us':'tw';}
 async function loadTradePlans(){
@@ -2404,7 +2437,7 @@ function renderPositions(){
 function openPosition(mkt,id){switchMarket(mkt);if(mkt==='us')usLoadStock(id);else loadStock(id);showPage('p-trade');}
 
 
-// ── Trade Journal / Performance / Report Center (V12.6) ─────────────
+// ── Trade Journal / Performance / Report Center (V12.7) ─────────────
 function journalRefSafe(uid,mkt){return journalRef(uid,mkt);} 
 async function loadJournal(){
   JOURNAL={tw:[],us:[]}; if(!currentUser||!db)return JOURNAL;
@@ -2441,7 +2474,7 @@ function renderJournal(){
   var sb=$I('strategyStatsBox');if(sb){sb.innerHTML=sum.strategy_stats.length?'<table class="strategy-table"><thead><tr><th>策略</th><th>交易</th><th>勝率</th><th>損益</th><th>平均 R</th></tr></thead><tbody>'+sum.strategy_stats.map(function(s){return'<tr><td>'+esc(s.strategy_type)+'</td><td>'+s.trades+'</td><td>'+s.win_rate+'%</td><td>'+s.pnl+'</td><td>'+(s.avg_r==null?'—':s.avg_r)+'</td></tr>';}).join('')+'</tbody></table>':'<div class="empty">尚無策略統計</div>';}
   generateReportText(false);
 }
-function generateReportText(show){var s=journalSummary();var best=s.strategy_stats[0]?s.strategy_stats[0].strategy_type:'—';var txt='AIPICKER V12.6 交易績效報告\n生成時間：'+new Date().toLocaleString('zh-TW')+'\n\n總交易數：'+s.total+'\n勝率：'+s.win_rate+'%\n總損益：'+s.total_pnl+'\n平均報酬：'+s.avg_return_pct+'%\n平均 R：'+s.avg_r_multiple+'\n最佳策略：'+best+'\n\nAI 回顧：'+(s.total?'目前已累積交易樣本，可開始觀察哪些 strategy_type 較適合你。若平均 R 低於 1，建議檢查是否太早出場或 RR 不足。':'目前尚無已結束交易，先從持倉管理結束交易後累積樣本。');setTxt('reportText',txt);if(show)toast('報告已產生','ok');return txt;}
+function generateReportText(show){var s=journalSummary();var best=s.strategy_stats[0]?s.strategy_stats[0].strategy_type:'—';var txt='AIPICKER V12.7 交易績效報告\n生成時間：'+new Date().toLocaleString('zh-TW')+'\n\n總交易數：'+s.total+'\n勝率：'+s.win_rate+'%\n總損益：'+s.total_pnl+'\n平均報酬：'+s.avg_return_pct+'%\n平均 R：'+s.avg_r_multiple+'\n最佳策略：'+best+'\n\nAI 回顧：'+(s.total?'目前已累積交易樣本，可開始觀察哪些 strategy_type 較適合你。若平均 R 低於 1，建議檢查是否太早出場或 RR 不足。':'目前尚無已結束交易，先從持倉管理結束交易後累積樣本。');setTxt('reportText',txt);if(show)toast('報告已產生','ok');return txt;}
 function exportJournalCsv(){var rows=journalSummary().rows;if(!rows.length){toast('沒有日誌可匯出','warn');return;}var cols=['market','symbol','name','entry_price','exit_price','shares','pnl','return_pct','r_multiple','strategy_type','exit_reason','exit_date'];var csv=[cols.join(',')].concat(rows.map(function(r){r=calcTrade(r);return cols.map(function(c){return '"'+String(r[c]==null?'':r[c]).replace(/"/g,'""')+'"';}).join(',');})).join('\n');var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='aipicker_trade_journal_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href);}
 async function copyReport(){var txt=generateReportText(false);try{await navigator.clipboard.writeText(txt);toast('報告已複製','ok');}catch(e){prompt('複製以下報告',txt);}}
 
