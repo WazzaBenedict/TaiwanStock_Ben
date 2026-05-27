@@ -373,12 +373,24 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .strategy-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;margin-top:10px}.strategy-table th,.strategy-table td{border-bottom:1px solid rgba(148,163,184,.15);padding:7px;text-align:left}.strategy-table th{color:var(--muted)}
 @media(max-width:900px){.journal-summary-grid,.report-summary-grid{grid-template-columns:repeat(2,1fr)}.journal-grid{grid-template-columns:1fr}.journal-metrics{grid-template-columns:repeat(2,auto)}}
 
-/* ── Toast / compact helpers (V12.8.4) ───────────────────────────── */
+/* ── Toast / compact helpers (V12.9.0) ───────────────────────────── */
 .toast{position:fixed;right:18px;bottom:18px;z-index:300;background:#0d1728;border:1px solid var(--line);border-left:3px solid var(--cyan);color:var(--text);border-radius:10px;padding:10px 14px;font-family:var(--mono);font-size:12px;box-shadow:0 8px 28px rgba(0,0,0,.45);opacity:0;transform:translateY(10px);pointer-events:none;transition:.18s}
 .toast.show{opacity:1;transform:translateY(0)}
 .toast.ok{border-left-color:var(--down)}.toast.warn{border-left-color:var(--yellow)}.toast.err{border-left-color:var(--up)}
 .system-health.compact .health-grid{display:none}.system-health.compact .version-warn{display:none!important}
 .name-code{font-weight:800;font-family:var(--mono);letter-spacing:.02em}
+
+
+/* ── V12.9 Multi-Portfolio Watchlist Manager ───────────────────── */
+.portfolio-panel{border:1px solid rgba(0,216,255,.18);background:rgba(12,26,46,.72);border-radius:12px;padding:10px 12px;margin:0 0 12px 0;box-shadow:0 0 0 1px rgba(0,216,255,.03) inset}
+.portfolio-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;font-family:var(--mono);font-size:12px;color:var(--cyan);font-weight:800}
+.portfolio-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.portfolio-select{min-height:36px;border-radius:9px;border:1px solid var(--line);background:#101c31;color:var(--text);font-family:var(--mono);font-size:12px;padding:0 10px;min-width:190px}
+.portfolio-mini{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.portfolio-chip{font-family:var(--mono);font-size:10px;border:1px solid rgba(47,111,184,.55);background:#132742;border-radius:999px;padding:4px 8px;color:#9ec4ff}
+.portfolio-chip b{color:var(--cyan)}
+.portfolio-note{font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.6;margin-top:4px}
+@media(max-width:768px){.portfolio-controls{width:100%}.portfolio-select{width:100%;min-width:0}.portfolio-panel .ghost.sm{flex:1}}
 
 </style>
 </head>
@@ -405,7 +417,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       使用 Google 帳號登入
     </button>
     <div id="loginError"></div>
-    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.8.4 TW Diversity History Parity Fix</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.9.0 Multi-Portfolio Watchlist Manager</div>
   </div>
 </div>
 
@@ -414,7 +426,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="logo">
     <span class="live-dot"></span>
     <span>AI<span style="color:var(--up)">PICKER</span></span>
-    <span class="ver">V12.8.4</span>
+    <span class="ver">V12.9.0</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="mkt-switcher">
@@ -434,7 +446,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
     </div>
     <div class="version-warn" id="versionWarn"></div>
     <div class="health-grid" id="healthGrid">
-      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.8.4</b></div>
+      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.9.0</b></div>
       <div class="health-chip"><span>Backend</span><b id="hBackend">—</b></div>
       <div class="health-chip"><span>Firestore</span><b id="hFirestore">待登入</b></div>
       <div class="health-chip"><span>Yahoo</span><b id="hYahoo">—</b></div>
@@ -461,6 +473,22 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 
 <!-- ═══ TW Trade Page ═══ -->
 <div class="page active" id="p-trade">
+
+<!-- V12.9 Portfolio Manager -->
+<div class="portfolio-panel" id="twPortfolioPanel">
+  <div class="portfolio-head">
+    <span>📁 台股投資組合</span>
+    <div class="portfolio-controls">
+      <select class="portfolio-select" id="twPortfolioSelect"></select>
+      <button class="ghost sm" id="btnTwPortfolioNew">＋新增組合</button>
+      <button class="ghost sm" id="btnTwPortfolioRename">改名</button>
+      <button class="ghost sm" id="btnTwPortfolioDelete">刪除</button>
+      <button class="ghost sm" id="btnTwPortfolioScan">掃描此組合</button>
+    </div>
+  </div>
+  <div class="portfolio-mini" id="twPortfolioStats"></div>
+  <div class="portfolio-note" id="twPortfolioNote">第一次升級會自動把舊自選股放入「預設台股組合」，不會刪除舊資料。</div>
+</div>
 
 <!-- Search -->
 <div class="search-wrap">
@@ -901,7 +929,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       </div>
     </div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;margin-top:10px">
-      台股：users/{uid}/watchlists/tw &nbsp;|&nbsp; 美股：users/{uid}/watchlists/us
+      投資組合：users/{uid}/portfolios/{portfolio_id} &nbsp;|&nbsp; 舊自選股保留：users/{uid}/watchlists/tw/us
     </div>
   </div>
 </div><!-- /p-account -->
@@ -920,6 +948,21 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
     <span class="us-kline-badge">Green=Up / Red=Down</span>
     <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">Yahoo Finance · International convention</span>
   </div>
+  <div class="portfolio-panel" id="usPortfolioPanel">
+  <div class="portfolio-head">
+    <span>📁 US Portfolio</span>
+    <div class="portfolio-controls">
+      <select class="portfolio-select" id="usPortfolioSelect"></select>
+      <button class="ghost sm" id="btnUsPortfolioNew">＋New</button>
+      <button class="ghost sm" id="btnUsPortfolioRename">Rename</button>
+      <button class="ghost sm" id="btnUsPortfolioDelete">Delete</button>
+      <button class="ghost sm" id="btnUsPortfolioScan">Scan Portfolio</button>
+    </div>
+  </div>
+  <div class="portfolio-mini" id="usPortfolioStats"></div>
+  <div class="portfolio-note" id="usPortfolioNote">Legacy US watchlist will be copied into Default US Portfolio. Original data is kept.</div>
+</div>
+
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
     <div style="position:relative">
       <input id="usSymbol" placeholder="Symbol or name: AAPL / NVDA / ASTS…" maxlength="12" autocomplete="off"/>
@@ -1068,12 +1111,12 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 <div class="footer">
   ⚠️ 本工具僅供技術分析學習參考，不構成任何投資建議。台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
   資料來源：TWSE MIS · Yahoo Finance · TWSE Official · FinMind · Google News RSS（均為免費公開）<br>
-  V12.8.4 TW Diversity History Parity Fix
+  V12.9.0 Multi-Portfolio Watchlist Manager
 </div>
 
 <script>
 /* ══════════════════════════════════════════════════════════════════
-   V12.8.4 TW Diversity History Parity Fix
+   V12.9.0 Multi-Portfolio Watchlist Manager
    Complete frontend JavaScript
    ══════════════════════════════════════════════════════════════════ */
 
@@ -1081,7 +1124,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="12.8.4";
+var FRONTEND_VERSION="12.9.0";
 var API = window.API_BASE_URL || "https://taiwanstock-ben-1.onrender.com";
 var FB_CFG = window.FIREBASE_CONFIG || {};
 
@@ -1095,6 +1138,9 @@ var autoOn=false, autoLeft=300, autoTimer=null;
 // US state
 var US_WL=[], US_WL_CACHE={}, US_CURRENT=null;
 var usWlLeft=30, usWlTimer=null, usWlRefreshing=false;
+// V12.9 Multi-Portfolio state
+var PORTFOLIOS={tw:[],us:[]};
+var ACTIVE_PORTFOLIO={tw:null,us:null};
 // Trade Plan Center state
 var TRADE_PLANS={tw:[],us:[]}, PLAN_FILTER="all", POSITIONS={tw:[],us:[]}, POSITION_FILTER="all", JOURNAL={tw:[],us:[]}, JOURNAL_FILTER="all", LAST_TW_DATA=null, LAST_TW_AI=null, LAST_US_DATA=null, LAST_US_AI=null;
 // Charts
@@ -1149,6 +1195,7 @@ async function onUserLogin(user) {
   renderAccountUI(user);
   saveUserProfile(user).catch(function(){});
   await loadWatchlist();
+  await loadPortfolios("tw");
   await loadTradePlans(); renderTradePlans();
   await loadPositions(); renderPositions();
   await loadJournal(); renderJournal();
@@ -1158,7 +1205,7 @@ async function onUserLogin(user) {
   updateAutoUI(); if(autoOn) startAutoTimer();
   setSyncBadge("ok");
   // US WL if on US page
-  if(currentMarket==="us") { await loadUSWatchlist(); renderUSWL(); startUSWLTimer(); }
+  if(currentMarket==="us") { await loadUSWatchlist(); await loadPortfolios("us"); renderUSWL(); startUSWLTimer(); }
 }
 
 // ── Firestore refs ─────────────────────────────────────────────────
@@ -1166,6 +1213,8 @@ function userWLRef(uid) { return db&&uid?db.collection("users").doc(uid).collect
 function userWLRefLegacy(uid) { return db&&uid?db.collection("users").doc(uid).collection("watchlist").doc("main"):null; }
 function userProfileRef(uid) { return db&&uid?db.collection("users").doc(uid).collection("profile").doc("main"):null; }
 function usWLRefFS(uid) { return db&&uid?db.collection("users").doc(uid).collection("watchlists").doc("us"):null; }
+function portfolioColRef(uid) { return db&&uid?db.collection("users").doc(uid).collection("portfolios"):null; }
+function portfolioDocRef(uid,pid) { return db&&uid&&pid?db.collection("users").doc(uid).collection("portfolios").doc(pid):null; }
 function tradePlanRef(uid,mkt) { return db&&uid?db.collection("users").doc(uid).collection("trade_plans").doc(mkt):null; }
 function positionRef(uid,mkt) { return db&&uid?db.collection("users").doc(uid).collection("positions").doc(mkt):null; }
 function journalRef(uid,mkt) { return db&&uid?db.collection("users").doc(uid).collection("trade_journal").doc(mkt):null; }
@@ -1173,6 +1222,115 @@ function learningEventsRef(uid,mkt) { return db&&uid?db.collection("users").doc(
 function aiWeightVersionRef(uid,mkt) { return db&&uid?db.collection("users").doc(uid).collection("ai_weight_versions").doc(mkt):null; }
 function aiLearningSummaryRef(uid,mkt) { return db&&uid?db.collection("users").doc(uid).collection("ai_learning_summary").doc(mkt):null; }
 function legacyDefaultRef() { return db?db.collection("watchlists").doc("default"):null; }
+
+// ── V12.9 Multi-Portfolio Watchlist Manager ───────────────────────
+function nowISO(){return new Date().toISOString();}
+function safePortfolioId(market,name){
+  var base=String(name||'default').trim().toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g,'-').replace(/^-+|-+$/g,'').slice(0,32)||'default';
+  return market+'_'+base+'_'+Math.random().toString(36).slice(2,7);
+}
+function defaultPortfolioName(market){return market==='us'?'Default US Portfolio':'預設台股組合';}
+function normalizePortfolioDoc(id,d){
+  d=d||{};return {id:id,name:d.name||defaultPortfolioName(d.market||'tw'),market:d.market||'tw',risk_profile:d.risk_profile||'balanced',color:d.color||'cyan',is_default:!!d.is_default,watchlist:Array.isArray(d.watchlist)?d.watchlist:[],created_at:d.created_at||nowISO(),updated_at:d.updated_at||nowISO(),migrated_from_legacy:!!d.migrated_from_legacy};
+}
+async function loadPortfolios(market){
+  if(!currentUser||!db)return;
+  var col=portfolioColRef(currentUser.uid); if(!col)return;
+  var list=[];
+  try{
+    var snap=await col.get();
+    snap.forEach(function(doc){var p=normalizePortfolioDoc(doc.id,doc.data()); if(p.market===market)list.push(p);});
+  }catch(e){console.warn('loadPortfolios',market,e.message);}
+  if(!list.length){
+    var legacy=(market==='us'?US_WL:WL)||[];
+    var id='default_'+market;
+    var p=normalizePortfolioDoc(id,{name:defaultPortfolioName(market),market:market,is_default:true,watchlist:legacy,migrated_from_legacy:true,created_at:nowISO(),updated_at:nowISO()});
+    list=[p];
+    try{await portfolioDocRef(currentUser.uid,id).set(p,{merge:true});}catch(e){console.warn('create default portfolio',e.message);}
+  }
+  list.sort(function(a,b){return (b.is_default?1:0)-(a.is_default?1:0)||String(a.name).localeCompare(String(b.name),'zh-Hant');});
+  PORTFOLIOS[market]=list;
+  var savedKey='active_portfolio_'+market+'_'+currentUser.uid;
+  var saved=localStorage.getItem(savedKey);
+  var active=list.find(function(p){return p.id===saved;})||list.find(function(p){return p.is_default;})||list[0];
+  ACTIVE_PORTFOLIO[market]=active.id;
+  applyActivePortfolio(market);
+  renderPortfolioUI(market);
+}
+function getActivePortfolio(market){return (PORTFOLIOS[market]||[]).find(function(p){return p.id===ACTIVE_PORTFOLIO[market];})||null;}
+function applyActivePortfolio(market){
+  var p=getActivePortfolio(market); if(!p)return;
+  if(market==='us'){
+    US_WL=(p.watchlist||[]).filter(function(x){return x&&x.symbol;});
+    US_WL_CACHE={}; renderUSWL(); setTxt('userUsWlCount',US_WL.length+' 檔');
+  }else{
+    WL=normalizeWatchlist(p.watchlist||[]);
+    WL_CACHE={}; renderWL(); setTxt('userWlCount',WL.length+' 檔');
+  }
+}
+function renderPortfolioUI(market){
+  var sel=$I(market==='us'?'usPortfolioSelect':'twPortfolioSelect');
+  var stats=$I(market==='us'?'usPortfolioStats':'twPortfolioStats');
+  var note=$I(market==='us'?'usPortfolioNote':'twPortfolioNote');
+  var list=PORTFOLIOS[market]||[]; var active=getActivePortfolio(market);
+  if(sel){
+    sel.innerHTML=list.map(function(p){return '<option value="'+esc(p.id)+'" '+(active&&p.id===active.id?'selected':'')+'>'+esc(p.name)+' · '+(p.watchlist||[]).length+' 檔</option>';}).join('');
+  }
+  if(stats){
+    var wl=market==='us'?US_WL:WL;
+    var buy=0,watch=0,avoid=0,near=0;
+    wl.forEach(function(it){var id=market==='us'?it.symbol:it.stock_id;var c=(market==='us'?US_WL_CACHE:WL_CACHE)[id]||{};var sig=c.signal||'WATCH';if(sig==='BUY')buy++;else if(sig==='AVOID')avoid++;else watch++;if(c.canEnter||c.entryStatus==='near'||c.entry_status==='near')near++;});
+    stats.innerHTML='<span class="portfolio-chip">目前：<b>'+esc(active?active.name:'—')+'</b></span><span class="portfolio-chip">股票數 <b>'+wl.length+'</b></span><span class="portfolio-chip">WATCH <b>'+watch+'</b></span><span class="portfolio-chip">BUY <b>'+buy+'</b></span><span class="portfolio-chip">AVOID <b>'+avoid+'</b></span><span class="portfolio-chip">接近入場 <b>'+near+'</b></span>';
+  }
+  if(note&&active){note.textContent=(market==='us'?'Current portfolio: ':'目前組合：')+active.name+'｜Firestore: users/{uid}/portfolios/'+active.id;}
+}
+async function saveActivePortfolio(market){
+  if(!currentUser)return;
+  var p=getActivePortfolio(market); if(!p)return;
+  var list=(market==='us'?US_WL:WL);
+  p.watchlist=list; p.updated_at=nowISO();
+  try{await portfolioDocRef(currentUser.uid,p.id).set(p,{merge:true});}catch(e){console.warn('save portfolio',e.message);}
+  renderPortfolioUI(market);
+}
+async function onPortfolioChange(market){
+  var sel=$I(market==='us'?'usPortfolioSelect':'twPortfolioSelect'); if(!sel)return;
+  ACTIVE_PORTFOLIO[market]=sel.value;
+  if(currentUser)localStorage.setItem('active_portfolio_'+market+'_'+currentUser.uid,sel.value);
+  applyActivePortfolio(market);
+  if(market==='us')refreshUSWL(); else refreshWL();
+  renderPortfolioUI(market);
+}
+async function createPortfolio(market){
+  if(!currentUser)return;
+  var def=market==='us'?'US Growth':'短線觀察';
+  var name=prompt(market==='us'?'Portfolio name':'投資組合名稱',def); if(!name)return;
+  var risk=prompt(market==='us'?'Risk profile: conservative / balanced / aggressive':'風險屬性：conservative / balanced / aggressive','balanced')||'balanced';
+  var id=safePortfolioId(market,name);
+  var p=normalizePortfolioDoc(id,{name:name,market:market,risk_profile:risk,is_default:false,watchlist:[],created_at:nowISO(),updated_at:nowISO()});
+  PORTFOLIOS[market].push(p);ACTIVE_PORTFOLIO[market]=id;if(currentUser)localStorage.setItem('active_portfolio_'+market+'_'+currentUser.uid,id);
+  try{await portfolioDocRef(currentUser.uid,id).set(p,{merge:true});}catch(e){alert('建立組合失敗：'+e.message);}
+  applyActivePortfolio(market);renderPortfolioUI(market);toast('已建立投資組合：'+name,'ok');
+}
+async function renamePortfolio(market){
+  var p=getActivePortfolio(market); if(!p||!currentUser)return;
+  var name=prompt(market==='us'?'New portfolio name':'新的投資組合名稱',p.name); if(!name)return;
+  p.name=name;p.updated_at=nowISO();await portfolioDocRef(currentUser.uid,p.id).set({name:name,updated_at:p.updated_at},{merge:true});renderPortfolioUI(market);toast('投資組合已改名','ok');
+}
+async function deletePortfolio(market){
+  var p=getActivePortfolio(market); if(!p||!currentUser)return;
+  if((PORTFOLIOS[market]||[]).length<=1){alert('至少需要保留一個投資組合');return;}
+  if(!confirm((market==='us'?'Delete portfolio ':'刪除投資組合「')+p.name+(market==='us'?'?':'」？\n組合內自選股會移除，但不會影響其他組合。')))return;
+  try{await portfolioDocRef(currentUser.uid,p.id).delete();}catch(e){console.warn('delete portfolio',e.message);}
+  PORTFOLIOS[market]=PORTFOLIOS[market].filter(function(x){return x.id!==p.id;});
+  ACTIVE_PORTFOLIO[market]=(PORTFOLIOS[market][0]||{}).id||null;
+  if(currentUser&&ACTIVE_PORTFOLIO[market])localStorage.setItem('active_portfolio_'+market+'_'+currentUser.uid,ACTIVE_PORTFOLIO[market]);
+  applyActivePortfolio(market);renderPortfolioUI(market);toast('投資組合已刪除','ok');
+}
+function scanActivePortfolio(market){
+  if(market==='us'){var sp=$I('usScanPool');if(sp)sp.value='watchlist';usAiScan('full','watchlist');}
+  else{var sp2=$I('twScanPool');if(sp2)sp2.value='watchlist';aiScan('full','watchlist');}
+}
+
 
 async function saveUserProfile(user) {
   var ref=userProfileRef(user.uid); if(!ref) return;
@@ -1230,6 +1388,7 @@ async function saveWatchlist() {
   setSyncBadge("ing");
   try {
     await ref.set({market:"tw",watchlist:WL,updated_at:new Date().toISOString(),migrated_from_legacy:true});
+    await saveActivePortfolio("tw");
     setTxt("userLastSync",new Date().toLocaleTimeString("zh-TW"));
     setTxt("userWlCount",WL.length+" 檔");
     setSyncBadge("ok");
@@ -1283,7 +1442,7 @@ async function loadUSWatchlist() {
 async function saveUSWatchlist() {
   if(!currentUser) return;
   var ref=usWLRefFS(currentUser.uid); if(!ref) return;
-  try { await ref.set({market:"us",watchlist:US_WL,updated_at:new Date().toISOString()}); setTxt("userUsWlCount",US_WL.length+" 檔"); }
+  try { await ref.set({market:"us",watchlist:US_WL,updated_at:new Date().toISOString()}); await saveActivePortfolio("us"); setTxt("userUsWlCount",US_WL.length+" 檔"); }
   catch(e) { console.warn("saveUSWatchlist:",e.message); }
 }
 
@@ -1294,7 +1453,7 @@ function clearAllState() {
   ["wlGrid","wlGridCompact"].forEach(function(id){var e=$I(id);if(e)e.innerHTML="";});
   setTxt("wlCount","0 檔"); destroyChart();
   var dash=$I("dash"); if(dash) dash.style.display="none";
-  US_WL=[]; US_WL_CACHE={}; US_CURRENT=null;
+  US_WL=[]; US_WL_CACHE={}; US_CURRENT=null; PORTFOLIOS={tw:[],us:[]}; ACTIVE_PORTFOLIO={tw:null,us:null};
   TRADE_PLANS={tw:[],us:[]}; renderTradePlans();
   POSITIONS={tw:[],us:[]}; renderPositions();
   JOURNAL={tw:[],us:[]}; renderJournal();
@@ -1316,7 +1475,7 @@ function switchMarket(mkt) {
   if(mkt==="us") {
     if(tw) tw.style.display="none"; if(us) us.style.display="block";
     if(btnTW){btnTW.className="mkt-btn";} if(btnUS){btnUS.className="mkt-btn active-us";}
-    if(currentUser&&!US_WL.length){loadUSWatchlist().then(function(){renderUSWL();startUSWLTimer();});}
+    if(currentUser&&!US_WL.length){loadUSWatchlist().then(function(){return loadPortfolios("us");}).then(function(){renderUSWL();startUSWLTimer();});}
     else if(US_WL.length) renderUSWL();
   } else {
     if(us) us.style.display="none"; if(tw) tw.style.display="block";
@@ -1476,6 +1635,7 @@ function renderWL() {
     }
     setTxt("btnToggleWl","展開");
   }
+  renderPortfolioUI("tw");
 }
 function bindWLCards(container) {
   container.querySelectorAll("[data-load]").forEach(function(el){el.addEventListener("click",function(e){if(!e.target.closest("[data-del]"))loadStock(el.dataset.load);});});
@@ -1638,7 +1798,7 @@ function updateAutoUI(){var btn=$I("btnAuto");if(!btn)return;if(autoOn){btn.text
 function toggleAuto(){autoOn=!autoOn;if(currentUser)localStorage.setItem("tw_auto_"+currentUser.uid,autoOn?"1":"0");updateAutoUI();if(autoOn)startAutoTimer();else{clearInterval(autoTimer);autoTimer=null;setTxt("autoCountdown","—");}}
 function startAutoTimer(){clearInterval(autoTimer);autoLeft=300;autoTimer=setInterval(async function(){autoLeft--;var m=Math.floor(autoLeft/60),s=autoLeft%60;setTxt("autoCountdown",m+":"+(s<10?"0":"")+s);if(autoLeft<=0){autoLeft=300;setTxt("autoLastT",new Date().toLocaleTimeString("zh-TW"));var r=await scanAlerts(true);if(r){setTxt("autoScanned",r.checked+"檔");setTxt("autoPushed",r.sentLine.length+"檔");}}},1000);}
 
-// ── Mobile Fast Data V12.8.4 ──────────────────────────────────────
+// ── Mobile Fast Data V12.9.0 ──────────────────────────────────────
 function isMobileFastMode(){
   try{
     var c=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
@@ -1742,7 +1902,7 @@ async function doSearch() {
 
 
 function normalizeTwIndicators(d){
-  // V12.8.4: backend now returns indicators directly; this fallback keeps old cached responses usable.
+  // V12.9.0: backend now returns indicators directly; this fallback keeps old cached responses usable.
   var ind=(d&&d.indicators)||{};
   var cd=(d&&Array.isArray(d.chart_data))?d.chart_data:[];
   var last=cd.length?cd[cd.length-1]:{};
@@ -2010,7 +2170,7 @@ async function runBt() {
   finally{if(loading)loading.style.display="none";}
 }
 
-// ── V12.8.4 TW Diversity History Parity Fix ───────────────────────────────────
+// ── V12.9.0 Multi-Portfolio Watchlist Manager ───────────────────────────────────
 var LAST_LEARNING_SUMMARY=null, LAST_SUGGESTED_WEIGHTS=null;
 function getLearningMarket(){var el=$I('learnMarket');return (el&&el.value)||currentMarket||'tw';}
 function baseWeightsForMarket(m){return m==='us'?{technical:0.40,market_context:0.25,fundamental:0.15,risk:0.15,news:0.05}:{technical:0.35,fundamental:0.25,chip:0.25,news:0.15};}
@@ -2118,6 +2278,7 @@ function renderUSWL() {
       requestAnimationFrame(function(){var hw=Math.round(inner.scrollWidth/2);var dur=Math.min(120,Math.max(20,tickers.length*8));tw.style.setProperty("--ticker-half","-"+hw+"px");inner.style.animation="ticker-scroll "+dur+"s linear infinite";});
     } else tw.style.display="none";
   }
+  renderPortfolioUI("us");
 }
 
 async function fetchUSLite(sym) {
@@ -2407,7 +2568,7 @@ function usScanCard(r) {
 
 
 
-// ── Trade Plan Center (V12.8.4 polish) ─────────────────────────────
+// ── Trade Plan Center (V12.9.0 polish) ─────────────────────────────
 function planKey(p){return (p.market||'tw')+":"+(p.symbol||p.stock_id||'');}
 function normalizePlanMarket(m){return (m==='us')?'us':'tw';}
 async function loadTradePlans(){
@@ -2624,7 +2785,7 @@ function renderJournal(){
   var sb=$I('strategyStatsBox');if(sb){sb.innerHTML=sum.strategy_stats.length?'<table class="strategy-table"><thead><tr><th>策略</th><th>交易</th><th>勝率</th><th>損益</th><th>平均 R</th></tr></thead><tbody>'+sum.strategy_stats.map(function(s){return'<tr><td>'+esc(s.strategy_type)+'</td><td>'+s.trades+'</td><td>'+s.win_rate+'%</td><td>'+s.pnl+'</td><td>'+(s.avg_r==null?'—':s.avg_r)+'</td></tr>';}).join('')+'</tbody></table>':'<div class="empty">尚無策略統計</div>';}
   generateReportText(false);
 }
-function generateReportText(show){var s=journalSummary();var best=s.strategy_stats[0]?s.strategy_stats[0].strategy_type:'—';var txt='AIPICKER V12.8.4 交易績效報告\n生成時間：'+new Date().toLocaleString('zh-TW')+'\n\n總交易數：'+s.total+'\n勝率：'+s.win_rate+'%\n總損益：'+s.total_pnl+'\n平均報酬：'+s.avg_return_pct+'%\n平均 R：'+s.avg_r_multiple+'\n最佳策略：'+best+'\n\nAI 回顧：'+(s.total?'目前已累積交易樣本，可開始觀察哪些 strategy_type 較適合你。若平均 R 低於 1，建議檢查是否太早出場或 RR 不足。':'目前尚無已結束交易，先從持倉管理結束交易後累積樣本。');setTxt('reportText',txt);if(show)toast('報告已產生','ok');return txt;}
+function generateReportText(show){var s=journalSummary();var best=s.strategy_stats[0]?s.strategy_stats[0].strategy_type:'—';var txt='AIPICKER V12.9.0 交易績效報告\n生成時間：'+new Date().toLocaleString('zh-TW')+'\n\n總交易數：'+s.total+'\n勝率：'+s.win_rate+'%\n總損益：'+s.total_pnl+'\n平均報酬：'+s.avg_return_pct+'%\n平均 R：'+s.avg_r_multiple+'\n最佳策略：'+best+'\n\nAI 回顧：'+(s.total?'目前已累積交易樣本，可開始觀察哪些 strategy_type 較適合你。若平均 R 低於 1，建議檢查是否太早出場或 RR 不足。':'目前尚無已結束交易，先從持倉管理結束交易後累積樣本。');setTxt('reportText',txt);if(show)toast('報告已產生','ok');return txt;}
 function exportJournalCsv(){var rows=journalSummary().rows;if(!rows.length){toast('沒有日誌可匯出','warn');return;}var cols=['market','symbol','name','entry_price','exit_price','shares','pnl','return_pct','r_multiple','strategy_type','exit_reason','exit_date'];var csv=[cols.join(',')].concat(rows.map(function(r){r=calcTrade(r);return cols.map(function(c){return '"'+String(r[c]==null?'':r[c]).replace(/"/g,'""')+'"';}).join(',');})).join('\n');var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='aipicker_trade_journal_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href);}
 async function copyReport(){var txt=generateReportText(false);try{await navigator.clipboard.writeText(txt);toast('報告已複製','ok');}catch(e){prompt('複製以下報告',txt);}}
 
@@ -2688,6 +2849,11 @@ function bindAllButtons() {
   safeBind("btnTwQuickScan","click",function(){aiScan("quick");});
   safeBind("btnTwFullScan","click",function(){aiScan("full");});
   safeBind("btnToggleWl","click",toggleWatchlistExpanded);
+  safeBind("twPortfolioSelect","change",function(){onPortfolioChange("tw");});
+  safeBind("btnTwPortfolioNew","click",function(){createPortfolio("tw");});
+  safeBind("btnTwPortfolioRename","click",function(){renamePortfolio("tw");});
+  safeBind("btnTwPortfolioDelete","click",function(){deletePortfolio("tw");});
+  safeBind("btnTwPortfolioScan","click",function(){scanActivePortfolio("tw");});
   // TW quick nav
   safeBind("qnAiScan","click",function(){aiScan();});
   safeBind("qnKline","click",function(){scrollToAnchor("anchorKline");});
@@ -2726,6 +2892,11 @@ function bindAllButtons() {
   safeBind("btnUsQuickScan","click",function(){usAiScan("quick");});
   safeBind("btnUsFullScan","click",function(){usAiScan("full");});
   safeBind("btnUsCtx","click",loadUSMarketContext);
+  safeBind("usPortfolioSelect","change",function(){onPortfolioChange("us");});
+  safeBind("btnUsPortfolioNew","click",function(){createPortfolio("us");});
+  safeBind("btnUsPortfolioRename","click",function(){renamePortfolio("us");});
+  safeBind("btnUsPortfolioDelete","click",function(){deletePortfolio("us");});
+  safeBind("btnUsPortfolioScan","click",function(){scanActivePortfolio("us");});
   safeBind("btnSavePlanTw","click",function(){addCurrentTradePlan("tw");});
   safeBind("btnSavePlanUs","click",function(){addCurrentTradePlan("us");});
   safeBind("btnRefreshPlans","click",function(){refreshTradePlans(true);});
