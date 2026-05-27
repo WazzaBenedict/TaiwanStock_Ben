@@ -1,7 +1,7 @@
 """
-V12.8.1 Real AI Learning + Diversity Reality Fix
+V12.8.3 Real AI Learning + Diversity Reality Fix
 架構：TW Engine / US Engine / Shared Engine（三層分離）
-版本：12.8.1
+版本：12.8.3
 """
 import os, re, asyncio, json, time, hashlib
 from datetime import datetime, timedelta
@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="V12.8.1 Real AI Learning + Diversity Reality Fix", version="12.8.1")
+app = FastAPI(title="V12.8.3 Real AI Learning + Diversity Reality Fix", version="12.8.3")
 _raw = os.getenv("ALLOWED_ORIGINS",
     "http://localhost:5500,http://127.0.0.1:5500,"
     "https://taiwanstock-ben.web.app,https://taiwanstock-ben.firebaseapp.com")
@@ -653,7 +653,7 @@ def get_stock_name(sid: str, api_name: str | None=None) -> str:
 # TW LEARNING / WEIGHTS
 # ══════════════════════════════════════════════════════════════════════════════
 TW_DEFAULT_WEIGHTS={"technical":0.35,"fundamental":0.25,"chip":0.25,"news":0.15,
-    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.8.1","last_reason":"預設權重"}
+    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.8.3","last_reason":"預設權重"}
 TW_WEIGHT_LIMITS={"technical":(0.20,0.45),"fundamental":(0.10,0.35),"chip":(0.10,0.40),"news":(0.05,0.25)}
 
 def _rjf(path,default):
@@ -1075,8 +1075,9 @@ def _calc_vol_info(df:pd.DataFrame)->dict:
 
 # Caches
 _tw_lite_cache: dict[str, tuple[dict, float]] = {}
+_tw_mobile_cache: dict[str, tuple[dict, float]] = {}
 _tw_full_cache: dict[str, tuple[dict, float]] = {}
-TW_LITE_TTL = 30; TW_FULL_TTL = 300
+TW_MOBILE_TTL = 12; TW_LITE_TTL = 30; TW_FULL_TTL = 300
 
 async def _analyze_stock_lite(stock_id:str, macro:dict|None=None) -> dict:
     now=time.time()
@@ -1107,6 +1108,153 @@ async def _analyze_stock_lite(stock_id:str, macro:dict|None=None) -> dict:
     except Exception as e:
         return{"stock_id":stock_id,"stock_name":sname,"price":None,"change":None,"change_pct":None,
                "realtime_quote":None,"ai_signal":fai,"data_source":"error","lite":True,"error":str(e)}
+
+
+async def _analyze_stock_mobile(stock_id: str) -> dict:
+    """V12.8.3 mobile-first quote endpoint.
+    Returns very fast quote data without forcing 90/400-day history fetch.
+    The frontend can show this immediately, then lazy-load stock-lite/full analysis.
+    """
+    now=time.time()
+    if stock_id in _tw_mobile_cache:
+        cached,ts=_tw_mobile_cache[stock_id]
+        if now-ts<TW_MOBILE_TTL:
+            return cached
+    sname=get_stock_name(stock_id)
+    # If a full/lite cache already exists, reuse it for better AI while still responding quickly.
+    for cache, ttl in ((_tw_lite_cache, TW_LITE_TTL), (_tw_full_cache, TW_FULL_TTL)):
+        if stock_id in cache:
+            cached,ts=cache[stock_id]
+            if now-ts<ttl:
+                ai=cached.get("ai_signal") or {}
+                price=cached.get("price")
+                if isinstance(price,dict): price=price.get("close")
+                result={"stock_id":stock_id,"stock_name":cached.get("stock_name") or sname,"price":price,
+                        "change":cached.get("change") or (cached.get("price") or {}).get("change") if isinstance(cached.get("price"),dict) else cached.get("change"),
+                        "change_pct":cached.get("change_pct") or (cached.get("price") or {}).get("change_pct") if isinstance(cached.get("price"),dict) else cached.get("change_pct"),
+                        "open":(cached.get("price") or {}).get("open") if isinstance(cached.get("price"),dict) else None,
+                        "high":(cached.get("price") or {}).get("high") if isinstance(cached.get("price"),dict) else None,
+                        "low":(cached.get("price") or {}).get("low") if isinstance(cached.get("price"),dict) else None,
+                        "volume":(cached.get("realtime_quote") or {}).get("volume"),
+                        "quote_time":(cached.get("realtime_quote") or {}).get("quote_time"),
+                        "source":"cache","ai_signal":ai,"mobile_fast":True,"lite":True}
+                _tw_mobile_cache[stock_id]=(result,now)
+                return result
+    try:
+        rt=await asyncio.wait_for(fetch_tw_quote(stock_id),timeout=5)
+        if rt and rt.get("stock_name"): sname=rt["stock_name"]
+        if not rt:
+            result={"stock_id":stock_id,"stock_name":sname,"price":None,"change":None,"change_pct":None,
+                    "source":"unavailable","ai_signal":_empty_ai("WATCH","手機快速報價暫時無法取得"),
+                    "mobile_fast":True,"lite":True,"warning":"即時報價暫時無法取得"}
+        else:
+            price=rt.get("price")
+            result={"stock_id":stock_id,"stock_name":sname,"price":price,"change":rt.get("change"),"change_pct":rt.get("change_pct"),
+                    "open":rt.get("open"),"high":rt.get("high"),"low":rt.get("low"),"volume":rt.get("volume"),
+                    "quote_time":rt.get("quote_time"),"source":rt.get("source","TWSE MIS"),"realtime_quote":rt,
+                    "ai_signal":_empty_ai("WATCH","手機快速模式：完整 AI 分析背景載入中"),
+                    "mobile_fast":True,"lite":True}
+        _tw_mobile_cache[stock_id]=(result,now)
+        return result
+    except Exception as e:
+        return {"stock_id":stock_id,"stock_name":sname,"price":None,"change":None,"change_pct":None,
+                "source":"error","ai_signal":_empty_ai("WATCH",str(e)),"mobile_fast":True,"lite":True,"error":str(e)}
+
+
+def _mobile_indicator_payload(df: pd.DataFrame, latest: pd.Series | None = None) -> dict:
+    """Small JSON-safe indicator pack for mobile technical-first rendering."""
+    if df is None or df.empty:
+        return {}
+    row = latest if latest is not None else df.iloc[-1]
+    def g(col):
+        try:
+            v = row.get(col)
+            if pd.isna(v): return None
+            return round(float(v), 4)
+        except Exception:
+            return None
+    return {
+        "ma5": g("MA5"), "ma20": g("MA20"), "ma60": g("MA60"),
+        "rsi": g("RSI"), "macd": g("MACD"), "signal": g("Signal"), "hist": g("Hist"),
+        "bb_upper": g("BB_upper"), "bb_lower": g("BB_lower"),
+        "atr": g("ATR"), "adx": g("ADX"),
+    }
+
+def _mobile_score_payload(ai: dict) -> dict:
+    ts = ai.get("technical_score") if isinstance(ai, dict) else None
+    try:
+        score5 = max(0, min(5, round(float(ts or 0) / 20)))
+    except Exception:
+        score5 = 0
+    return {
+        "score": score5,
+        "technical_score": ts,
+        "reasons": [
+            f"技術分 {ts}/100" if ts is not None else "技術資料背景載入中",
+            ai.get("strategy_type") or "—" if isinstance(ai, dict) else "—",
+        ]
+    }
+
+async def _analyze_stock_mobile_tech(stock_id: str) -> dict:
+    """V12.8.3 mobile technical endpoint.
+    Goal: show a fast entry decision on phones without waiting for full 400-day analysis,
+    charts, 4D analysis, or heavy report blocks.
+    """
+    sname = get_stock_name(stock_id)
+    try:
+        rt_task = asyncio.create_task(fetch_tw_quote(stock_id))
+        hist_task = asyncio.create_task(fetch_tw_history(stock_id, lookback_days=150))
+        rt = await asyncio.wait_for(rt_task, timeout=5)
+        df, hs = await asyncio.wait_for(hist_task, timeout=10)
+        if rt and rt.get("stock_name"):
+            sname = rt["stock_name"]
+        price = rt.get("price") if rt else None
+        change = rt.get("change") if rt else None
+        chgp = rt.get("change_pct") if rt else None
+        if (price is None) and df is not None and not df.empty:
+            price = float(df.iloc[-1]["收盤價"])
+            if len(df) >= 2:
+                pc = float(df.iloc[-2]["收盤價"])
+                change = round(price - pc, 2)
+                chgp = round(change / pc * 100, 2) if pc else None
+        cp = float(price or 0)
+        ai = _empty_ai("WATCH", "手機技術快判資料不足")
+        indicators = {}
+        score = {}
+        if df is not None and not df.empty and cp > 0:
+            df = compute_all_indicators(df)
+            latest = df.iloc[-1]
+            indicators = _mobile_indicator_payload(df, latest)
+            vol_ratio = _calc_vol_info(df).get("ratio", 1.0)
+            try:
+                macro = await asyncio.wait_for(fetch_macro_context(), timeout=3)
+            except Exception:
+                macro = {}
+            ai = build_tw_ai_signal(latest, cp, _calc_winrate(df), macro, chgp or 0, vol_ratio, df)
+            ai["score_quality"] = "mobile_technical"
+            ai["summary"] = "手機技術快判：" + (ai.get("summary") or "已完成主要技術判斷。")
+            score = _mobile_score_payload(ai)
+        result = {
+            "stock_id": stock_id, "stock_name": sname, "price": price,
+            "change": change, "change_pct": chgp,
+            "open": rt.get("open") if rt else None, "high": rt.get("high") if rt else None,
+            "low": rt.get("low") if rt else None, "volume": rt.get("volume") if rt else None,
+            "quote_time": rt.get("quote_time") if rt else None,
+            "source": f"Mobile Technical · {hs if 'hs' in locals() else 'history'}",
+            "data_source": hs if 'hs' in locals() else "mobile-technical",
+            "realtime_quote": rt, "ai_signal": ai,
+            "indicators": indicators, "score": score,
+            "mobile_fast": True, "mobile_technical": True, "lite": True,
+            "technical_ready": bool(indicators),
+            "chart_data": [],
+        }
+        return result
+    except Exception as e:
+        return {"stock_id": stock_id, "stock_name": sname, "price": None, "change": None,
+                "change_pct": None, "source": "mobile-technical-error",
+                "ai_signal": _empty_ai("WATCH", "手機技術快判暫時失敗：" + str(e)),
+                "indicators": {}, "score": {}, "mobile_fast": True, "mobile_technical": True,
+                "error": str(e)}
 
 async def _analyze_stock_core(stock_id:str) -> dict:
     now=time.time()
@@ -1703,6 +1851,56 @@ async def _fetch_us_lite(symbol: str) -> dict:
             "ai_signal":ai_lite,"lite":True}
     _us_quote_cache[symbol]=(result,now); return result
 
+
+
+async def _fetch_us_mobile_tech(symbol: str) -> dict:
+    """V12.8.3 US mobile technical endpoint: fast technical decision without full profile/chart work."""
+    symbol = symbol.upper()
+    try:
+        async with httpx.AsyncClient() as cl:
+            quote_task = asyncio.create_task(fetch_us_quote(symbol, cl))
+            hist_task = asyncio.create_task(fetch_us_history(symbol, cl, days=180))
+            quote = await asyncio.wait_for(quote_task, timeout=6)
+            df = await asyncio.wait_for(hist_task, timeout=10)
+        name = (quote or {}).get("name") or _us_master.get(symbol, {}).get("name", symbol)
+        price = float((quote or {}).get("price") or 0)
+        change_pct = (quote or {}).get("change_pct") or 0
+        ai = _empty_ai("WATCH", "Mobile technical data unavailable")
+        indicators = {}
+        score = {}
+        market_ctx = {"market_score": 50}
+        if df is not None and not df.empty and price > 0:
+            df = compute_all_indicators(df)
+            latest = df.iloc[-1]
+            indicators = _mobile_indicator_payload(df, latest)
+            vol_ratio = _calc_vol_info(df).get("ratio", 1.0)
+            try:
+                market_ctx = await asyncio.wait_for(fetch_us_market_context(), timeout=4)
+            except Exception:
+                market_ctx = {"market_score": 50}
+            ai = build_us_ai_signal(latest, price, change_pct or 0, vol_ratio, df, market_ctx, symbol)
+            ai["score_quality"] = "mobile_technical"
+            ai["summary"] = "Mobile technical quick read: " + (ai.get("summary") or "core technical decision ready.")
+            score = _mobile_score_payload(ai)
+        return {
+            "market": "us", "symbol": symbol, "name": name,
+            "price": price if price else None,
+            "change": (quote or {}).get("change"), "change_pct": (quote or {}).get("change_pct"),
+            "open": (quote or {}).get("open"), "high": (quote or {}).get("high"), "low": (quote or {}).get("low"),
+            "volume": (quote or {}).get("volume"), "quote_time": (quote or {}).get("quote_time"),
+            "exchange": (quote or {}).get("exchange", _us_master.get(symbol, {}).get("exchange", "US")),
+            "sector": _us_master.get(symbol, {}).get("sector", ""),
+            "source": "Mobile Technical · Yahoo Finance",
+            "ai_signal": ai, "indicators": indicators, "score": score,
+            "market_context": market_ctx, "mobile_fast": True, "mobile_technical": True,
+            "lite": True, "technical_ready": bool(indicators), "chart_data": []
+        }
+    except Exception as e:
+        return {"market": "us", "symbol": symbol, "name": _us_master.get(symbol, {}).get("name", symbol),
+                "price": None, "change": None, "change_pct": None, "source": "mobile-technical-error",
+                "ai_signal": _empty_ai("WATCH", "Mobile technical quick read failed: " + str(e)),
+                "indicators": {}, "score": {}, "mobile_fast": True, "mobile_technical": True, "error": str(e)}
+
 # ── US Scan Pools ────────────────────────────────────────────────────────────
 US_CORE_POOL      = ["AAPL","MSFT","NVDA","AMZN","META","GOOGL","TSLA","AMD","AVGO","NFLX"]
 US_GROWTH_POOL    = ["PLTR","SOFI","RIVN","HOOD","COIN","MSTR","ASTS","RKLB","IONQ","SOUN"]
@@ -1888,7 +2086,7 @@ def _repeat_penalty(sym: str, recent: set[str], current_category: str, previous_
     if s not in recent: return 0
     # Do not punish true upgrades into ENTERABLE too much.
     if str(current_category or "").upper() == "ENTERABLE": return 3
-    # V12.8.1: stronger repeat penalty so recent symbols stop dominating Watch/Fresh lists.
+    # V12.8.3: stronger repeat penalty so recent symbols stop dominating Watch/Fresh lists.
     return 20
 
 def _sector_quota_score(group: str, counts: dict, diversity_mode: str) -> int:
@@ -2180,6 +2378,17 @@ async def get_stock_lite(stock_id:str):
     except: macro={}
     return await _analyze_stock_lite(stock_id,macro)
 
+
+@app.get("/api/stock-mobile/{stock_id}")
+async def get_stock_mobile(stock_id:str):
+    if not re.match(r"^\d{4,6}$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
+    return await _analyze_stock_mobile(stock_id)
+
+@app.get("/api/stock-mobile-tech/{stock_id}")
+async def get_stock_mobile_tech(stock_id:str):
+    if not re.match(r"^\d{4,6}$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
+    return await _analyze_stock_mobile_tech(stock_id)
+
 @app.get("/api/realtime/{stock_id}")
 async def get_realtime(stock_id:str):
     if not re.match(r"^\d{4,6}$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
@@ -2229,7 +2438,7 @@ async def api_market_sentiment():
 # API — TW AI Scan
 # ══════════════════════════════════════════════════════════════════════════════
 async def _tw_scan_core(min_score:int=65,max_stocks:int=50,mode:str="full",pool_name:str="all",symbols:str="",use_cache:bool=True,diversity_mode:str="balanced",history_symbols:str=""):
-    """V12.8.1 TW AI scan core — real diversity fix + safe mode parsing."""
+    """V12.8.3 TW AI scan core — real diversity fix + safe mode parsing."""
     mode, mode_warn = _sanitize_scan_mode(mode)
     diversity_mode, div_warn = _sanitize_diversity_mode(diversity_mode)
     pool=select_tw_scan_pool(pool_name, symbols, max_stocks)
@@ -2532,15 +2741,15 @@ def _suggest_learning_weights(payload: dict) -> dict:
 
 @app.post("/api/learning/summary")
 def api_learning_summary_v128(payload: dict = Body(default={})):
-    return {"version": "12.8.1", "summary": _learning_summary(payload), "time": datetime.now().isoformat()}
+    return {"version": "12.8.3", "summary": _learning_summary(payload), "time": datetime.now().isoformat()}
 
 @app.post("/api/learning/calibrate")
 def api_learning_calibrate_v128(payload: dict = Body(default={})):
-    return {"version": "12.8.1", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
+    return {"version": "12.8.3", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
 
 @app.post("/api/learning/suggest-weights")
 def api_learning_suggest_weights_v128(payload: dict = Body(default={})):
-    return {"version": "12.8.1", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
+    return {"version": "12.8.3", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
 
 @app.post("/api/learning/apply-weights")
 def api_learning_apply_weights_v128(payload: dict = Body(default={})):
@@ -2549,20 +2758,20 @@ def api_learning_apply_weights_v128(payload: dict = Body(default={})):
     # Only TW backend has server-side scoring weights in this single-file app.
     if market == "tw":
         saved = save_ai_weights(weights)
-        return {"version": "12.8.1", "applied": True, "market": market, "weights": saved, "time": datetime.now().isoformat()}
-    return {"version": "12.8.1", "applied": False, "market": market, "weights": weights,
+        return {"version": "12.8.3", "applied": True, "market": market, "weights": saved, "time": datetime.now().isoformat()}
+    return {"version": "12.8.3", "applied": False, "market": market, "weights": weights,
             "message": "US personal weights are stored per user in Firestore by the frontend.", "time": datetime.now().isoformat()}
 
 @app.get("/api/learning/status")
 def api_learning_status_v128():
     h = load_signal_history()
-    return {"version": "12.8.1", "server_tw_signal_history": _lst(h),
+    return {"version": "12.8.3", "server_tw_signal_history": _lst(h),
             "note": "V12.8 personal learning events are stored in each user's Firestore and sent to /api/learning/summary or /api/learning/calibrate for calculation.",
             "time": datetime.now().isoformat()}
 
 @app.get("/api/debug/learning")
 def api_debug_learning_v128():
-    return {"version": "12.8.1", "engine": "Real AI Learning Engine",
+    return {"version": "12.8.3", "engine": "Real AI Learning Engine",
             "frontend_firestore_paths": ["users/{uid}/ai_learning_events/tw", "users/{uid}/ai_learning_events/us", "users/{uid}/ai_weight_versions/tw", "users/{uid}/ai_weight_versions/us", "users/{uid}/ai_learning_summary/tw", "users/{uid}/ai_learning_summary/us"],
             "apis": ["POST /api/learning/summary", "POST /api/learning/calibrate", "POST /api/learning/suggest-weights", "POST /api/learning/apply-weights", "GET /api/learning/status"],
             "time": datetime.now().isoformat()}
@@ -2593,6 +2802,21 @@ async def us_get_stock_lite(symbol:str):
     if not re.match(r'^[A-Za-z.\-]{1,12}$',symbol): raise HTTPException(400,detail="Invalid US stock symbol")
     return await _fetch_us_lite(symbol.upper())
 
+
+@app.get("/api/us/stock-mobile/{symbol}")
+async def us_get_stock_mobile(symbol:str):
+    if not re.match(r'^[A-Za-z.\-]{1,12}$',symbol): raise HTTPException(400,detail="Invalid US stock symbol")
+    # US stock-lite is already quote-first and fast, so reuse it for mobile.
+    d=await _fetch_us_lite(symbol.upper())
+    d["mobile_fast"]=True
+    d["source"]=d.get("source") or "Yahoo Finance"
+    return d
+
+@app.get("/api/us/stock-mobile-tech/{symbol}")
+async def us_get_stock_mobile_tech(symbol:str):
+    if not re.match(r'^[A-Za-z.\-]{1,12}$',symbol): raise HTTPException(400,detail="Invalid US stock symbol")
+    return await _fetch_us_mobile_tech(symbol.upper())
+
 @app.get("/api/us/market-context")
 async def us_market_context():
     try: return await fetch_us_market_context()
@@ -2606,7 +2830,7 @@ async def us_profile(symbol:str):
     return{"symbol":symbol.upper(),"name":master_info.get("name",symbol),"profile":profile}
 
 async def _us_scan_core(min_score:int=60,max_stocks:int=50,mode:str="full",pool_name:str="all",symbols:str="",use_cache:bool=True,diversity_mode:str="balanced",history_symbols:str=""):
-    """V12.8.1 US AI scan core — real diversity fix + safe mode parsing."""
+    """V12.8.3 US AI scan core — real diversity fix + safe mode parsing."""
     t0=time.time()
     mode, mode_warn = _sanitize_scan_mode(mode)
     diversity_mode, div_warn = _sanitize_diversity_mode(diversity_mode)
@@ -2698,7 +2922,7 @@ async def us_scan_diversified(pool:str="diversified",symbols:str="",min_score:in
 
 @app.get("/api/debug/recommendation-history")
 def api_debug_recommendation_history():
-    return {"version":"12.8.1","note":"Per-user recommendation history is stored client-side/localStorage or Firestore by the frontend. Backend diversified scan accepts history_symbols to apply novelty/repeat penalties.","fields":["symbol/stock_id","market","scan_category","shown_at","diversity_group","diversified_score"]}
+    return {"version":"12.8.3","note":"Per-user recommendation history is stored client-side/localStorage or Firestore by the frontend. Backend diversified scan accepts history_symbols to apply novelty/repeat penalties.","fields":["symbol/stock_id","market","scan_category","shown_at","diversity_group","diversified_score"]}
 
 @app.get("/api/debug/scan-status")
 def api_scan_status():
@@ -2708,7 +2932,7 @@ def api_scan_status():
         for k,(payload,ts) in list(cache.items())[-12:]:
             out.append({"key":k,"age_seconds":round(now-ts,1),"market":payload.get("market"),"mode":payload.get("scan_mode"),"pool":payload.get("pool"),"classified":payload.get("classified"),"failed":payload.get("failed")})
         return out
-    return {"version":"12.8.1","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
+    return {"version":"12.8.3","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # API — DATA HEALTH / DIAGNOSTICS
@@ -2819,12 +3043,12 @@ async def api_health_full():
 
     payload = {
         "status": "ok" if not errors else "partial",
-        "version": "12.8.1",
-        "frontend_expected": "12.8.1",
+        "version": "12.8.3",
+        "frontend_expected": "12.8.3",
         "time": datetime.now().isoformat(),
         "backend": {
-            "title": "V12.8.1 Real AI Learning + Diversity Reality Fix",
-            "version": "12.8.1"
+            "title": "V12.8.3 Real AI Learning + Diversity Reality Fix",
+            "version": "12.8.3"
         },
         "line": {
             "configured": bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
@@ -2934,7 +3158,7 @@ async def api_trade_plan_check(
 @app.get("/api/debug/trade-plans")
 def api_debug_trade_plans():
     return {
-        "version": "12.8.1",
+        "version": "12.8.3",
         "storage": "Firestore frontend: users/{uid}/trade_plans/tw and users/{uid}/trade_plans/us",
         "checker": "/api/trade-plan/check",
         "statuses": ["WAITING_ENTRY","ENTERABLE_NOW","ABOVE_ENTRY_ZONE","NEAR_TARGET","NEAR_STOP","STOP_BROKEN","TARGET_REACHED","INVALIDATED","NO_PRICE"],
@@ -3038,7 +3262,7 @@ async def api_position_check(
 @app.get("/api/debug/positions")
 def api_debug_positions():
     return {
-        "version": "12.8.1",
+        "version": "12.8.3",
         "storage": "Firestore frontend: users/{uid}/positions/tw and users/{uid}/positions/us",
         "checker": "/api/position/check",
         "statuses": ["HOLDING_NORMAL","NEAR_TARGET","TARGET_REACHED","NEAR_STOP","STOP_BROKEN","RISK_UP","REVIEW_REQUIRED","NO_PRICE"],
@@ -3162,13 +3386,13 @@ def _build_review_text(total, wins, pnl, avg_r, strategy_stats):
 @app.post("/api/performance/summary")
 def api_performance_summary(payload: dict = Body(default={})):  # frontend sends Firestore journal rows
     trades = payload.get("trades") or payload.get("journal") or []
-    return {"version": "12.8.1", "market": payload.get("market", "all"), "summary": _summarize_trades(trades), "time": datetime.now().isoformat()}
+    return {"version": "12.8.3", "market": payload.get("market", "all"), "summary": _summarize_trades(trades), "time": datetime.now().isoformat()}
 
 @app.post("/api/trade-journal/review")
 def api_trade_journal_review(payload: dict = Body(default={})):
     trades = payload.get("trades") or []
     summary = _summarize_trades(trades)
-    return {"version": "12.8.1", "review": summary.get("review"), "summary": summary, "time": datetime.now().isoformat()}
+    return {"version": "12.8.3", "review": summary.get("review"), "summary": summary, "time": datetime.now().isoformat()}
 
 @app.post("/api/report/summary")
 def api_report_summary(payload: dict = Body(default={})):
@@ -3185,12 +3409,12 @@ def api_report_summary(payload: dict = Body(default={})):
         "",
         summary.get("review") or "",
     ]
-    return {"version": "12.8.1", "report_text": "\n".join(lines), "summary": summary, "time": datetime.now().isoformat()}
+    return {"version": "12.8.3", "report_text": "\n".join(lines), "summary": summary, "time": datetime.now().isoformat()}
 
 @app.get("/api/debug/trade-journal")
 def api_debug_trade_journal():
     return {
-        "version": "12.8.1",
+        "version": "12.8.3",
         "storage": "Firestore frontend: users/{uid}/trade_journal/tw and users/{uid}/trade_journal/us",
         "endpoints": ["/api/performance/summary", "/api/trade-journal/review", "/api/report/summary"],
         "features": ["close position to journal", "R multiple", "strategy performance", "CSV export", "text report"],
@@ -3203,12 +3427,12 @@ def api_debug_trade_journal():
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/health")
 def health():
-    return{"status":"ok","version":"12.8.1","frontend_expected":"12.8.1","time":datetime.now().isoformat(),
+    return{"status":"ok","version":"12.8.3","frontend_expected":"12.8.3","time":datetime.now().isoformat(),
            "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
            "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
            "price_sources":"Yahoo Finance → TWSE Official → FinMind",
            "us_master_count":len(_us_master),"tw_master_count":len(STOCK_MASTER),
-           "features":["V12.8.1 Real AI Learning + Diversity Reality Fix","AI Picker Pro",
+           "features":["V12.8.3 Real AI Learning + Diversity Reality Fix","AI Picker Pro","Mobile Fast Data",
                        "TW Engine + US Engine + Shared Engine",
                        "6-zone scan output","US Market Context","Symbol Master 200+",
                        "validate_trade_plan","compute_final_score","LINE alerts","Quick/Full AI Scan","Watch Closely zone","scan pool selector","scan cache diagnostics","Trade Plan Center","trade plan status checker","Watchlist UI polish","Portfolio Center","position status checker","smart position alerts","Trade Journal","Performance Review","AI Backtest Learning","Report Center","CSV export","AI Discovery Diversity","Fresh Discovery","repeat_penalty","novelty_score","sector_quota"]}

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>V12.0.1 AI Picker Reliability</title>
+<title>V12.0.1 AI Picker Mobile Fast Data</title>
 <script src="config.js"></script>
 <!-- Firebase compat SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -373,7 +373,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .strategy-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;margin-top:10px}.strategy-table th,.strategy-table td{border-bottom:1px solid rgba(148,163,184,.15);padding:7px;text-align:left}.strategy-table th{color:var(--muted)}
 @media(max-width:900px){.journal-summary-grid,.report-summary-grid{grid-template-columns:repeat(2,1fr)}.journal-grid{grid-template-columns:1fr}.journal-metrics{grid-template-columns:repeat(2,auto)}}
 
-/* ── Toast / compact helpers (V12.8.1) ───────────────────────────── */
+/* ── Toast / compact helpers (V12.8.3) ───────────────────────────── */
 .toast{position:fixed;right:18px;bottom:18px;z-index:300;background:#0d1728;border:1px solid var(--line);border-left:3px solid var(--cyan);color:var(--text);border-radius:10px;padding:10px 14px;font-family:var(--mono);font-size:12px;box-shadow:0 8px 28px rgba(0,0,0,.45);opacity:0;transform:translateY(10px);pointer-events:none;transition:.18s}
 .toast.show{opacity:1;transform:translateY(0)}
 .toast.ok{border-left-color:var(--down)}.toast.warn{border-left-color:var(--yellow)}.toast.err{border-left-color:var(--up)}
@@ -388,7 +388,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 <div id="loginOverlay">
   <div class="login-card">
     <div class="logo" style="justify-content:center;margin-bottom:14px;font-size:16px"><span class="live-dot"></span>V12 Global Trading Intelligence</div>
-    <div class="login-title">AI Picker Reliability</div>
+    <div class="login-title">AI Picker Mobile Fast Data</div>
     <div class="login-sub">Multi-Market Stock Analysis</div>
     <div class="login-desc">請使用 Google 登入後開始使用個人化台股 / 美股監測工具</div>
     <div class="login-features">
@@ -405,7 +405,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       使用 Google 帳號登入
     </button>
     <div id="loginError"></div>
-    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.8.1 Real AI Learning + Diversity Reality Fix</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.8.3 Real AI Learning + Diversity Reality Fix</div>
   </div>
 </div>
 
@@ -414,7 +414,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="logo">
     <span class="live-dot"></span>
     <span>AI<span style="color:var(--up)">PICKER</span></span>
-    <span class="ver">V12.8.1</span>
+    <span class="ver">V12.8.3</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="mkt-switcher">
@@ -434,7 +434,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
     </div>
     <div class="version-warn" id="versionWarn"></div>
     <div class="health-grid" id="healthGrid">
-      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.8.1</b></div>
+      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.8.3</b></div>
       <div class="health-chip"><span>Backend</span><b id="hBackend">—</b></div>
       <div class="health-chip"><span>Firestore</span><b id="hFirestore">待登入</b></div>
       <div class="health-chip"><span>Yahoo</span><b id="hYahoo">—</b></div>
@@ -472,6 +472,12 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <button class="ghost" id="btnAdd">＋ 加入自選</button>
 </div>
 <div id="err"></div>
+<div class="mobile-speed-box" id="mobileSpeedBox">
+  <span id="mobileSpeedText">手機快速模式準備中…</span>
+  <span class="mobile-speed-actions">
+    <button class="ghost sm" id="btnLoadFullMobile">載入完整分析</button>
+  </span>
+</div>
 
 <!-- TW Watchlist -->
 <div class="section">
@@ -610,7 +616,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   </div>
 
   <!-- TW K-line -->
-  <div class="kline-wrap" id="klineWrap" style="display:none">
+  <div class="kline-wrap mobile-defer" id="klineWrap" style="display:none">
     <div class="kline-header">
       <span>📊 K 線圖 <span class="tw-kline-badge" style="margin-left:8px">漲紅跌綠（台股）</span></span>
       <span id="klineStatus" style="font-size:11px;color:var(--muted)"></span>
@@ -1062,12 +1068,12 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 <div class="footer">
   ⚠️ 本工具僅供技術分析學習參考，不構成任何投資建議。台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
   資料來源：TWSE MIS · Yahoo Finance · TWSE Official · FinMind · Google News RSS（均為免費公開）<br>
-  V12.8.1 Real AI Learning + Diversity Reality Fix
+  V12.8.3 Real AI Learning + Diversity Reality Fix
 </div>
 
 <script>
 /* ══════════════════════════════════════════════════════════════════
-   V12.8.1 Real AI Learning + Diversity Reality Fix
+   V12.8.3 Real AI Learning + Diversity Reality Fix
    Complete frontend JavaScript
    ══════════════════════════════════════════════════════════════════ */
 
@@ -1075,7 +1081,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="12.8.1";
+var FRONTEND_VERSION="12.8.3";
 var API = window.API_BASE_URL || "https://taiwanstock-ben-1.onrender.com";
 var FB_CFG = window.FIREBASE_CONFIG || {};
 
@@ -1632,6 +1638,69 @@ function updateAutoUI(){var btn=$I("btnAuto");if(!btn)return;if(autoOn){btn.text
 function toggleAuto(){autoOn=!autoOn;if(currentUser)localStorage.setItem("tw_auto_"+currentUser.uid,autoOn?"1":"0");updateAutoUI();if(autoOn)startAutoTimer();else{clearInterval(autoTimer);autoTimer=null;setTxt("autoCountdown","—");}}
 function startAutoTimer(){clearInterval(autoTimer);autoLeft=300;autoTimer=setInterval(async function(){autoLeft--;var m=Math.floor(autoLeft/60),s=autoLeft%60;setTxt("autoCountdown",m+":"+(s<10?"0":"")+s);if(autoLeft<=0){autoLeft=300;setTxt("autoLastT",new Date().toLocaleTimeString("zh-TW"));var r=await scanAlerts(true);if(r){setTxt("autoScanned",r.checked+"檔");setTxt("autoPushed",r.sentLine.length+"檔");}}},1000);}
 
+// ── Mobile Fast Data V12.8.3 ──────────────────────────────────────
+function isMobileFastMode(){
+  try{
+    var c=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+    var slow=c && (/2g|3g/.test(c.effectiveType||"") || c.saveData);
+    return window.innerWidth<=768 || !!slow;
+  }catch(e){return window.innerWidth<=768;}
+}
+function deferWork(fn,delay){
+  if('requestIdleCallback' in window){requestIdleCallback(fn,{timeout:delay||2500});}
+  else setTimeout(fn,delay||700);
+}
+function setMobileSpeed(msg,on){
+  var box=$I('mobileSpeedBox'),txt=$I('mobileSpeedText');
+  if(!box||!txt)return;
+  txt.textContent=msg||'';
+  box.classList.toggle('on',!!on);
+}
+function renderTwMobileFast(d){
+  var dash=$I('dash');if(dash)dash.style.display='block';
+  var ai=d.ai_signal||{};
+  setTxt('dId',d.stock_id||CURRENT_ID);setTxt('dName',dsn(d.stock_id||CURRENT_ID,d.stock_name));
+  setTxt('dDate',d.quote_time?'即時報價：'+d.quote_time:'手機快速報價');
+  setTxt('dSource','來源: '+(d.source||'Mobile Fast'));
+  var mEl=$I('dMode');if(mEl){mEl.textContent='⚡ 快速';mEl.className='mode-rt';}
+  var chg=Number(d.change||0);
+  setTxt('dClose',d.price!=null?f(d.price):'—');addCls('dClose',cc(chg));
+  setTxt('dChg',d.change!=null?(chg>0?'+':'')+f(d.change)+' ('+pct(d.change_pct)+')':'—');addCls('dChg',cc(chg));
+  setTxt('dOpen',d.open!=null?f(d.open):'—');setTxt('dHigh',d.high!=null?f(d.high):'—');setTxt('dLow',d.low!=null?f(d.low):'—');setTxt('dVol',d.volume?fvol(d.volume):'—');
+  var rtEl=$I('rtInfo');if(rtEl)rtEl.innerHTML='<span class="pill pill-ok">⚡ 手機快速資料</span>';
+  var ce=$I('dConc');if(ce){ce.textContent='快速載入完成，完整分析背景更新中';ce.className='conclusion neu';}
+  renderAI(ai);
+}
+
+function renderTwMobileTech(d){
+  renderStockLite(d);
+  var mEl=$I('dMode');if(mEl){mEl.textContent='📊 快判';mEl.className='mode-rt';}
+  setTxt('dDate',d.quote_time?'技術快判：'+d.quote_time:'手機技術快判');
+  var ce=$I('dConc');if(ce){ce.textContent='手機技術快判完成，可先判斷是否接近入場；完整分析與 K 線背景更新中。';ce.className='conclusion neu';}
+  setMobileSpeed('📊 手機技術快判已完成，完整 K 線背景載入中…',true);
+}
+async function loadTwFullAnalysis(id,opts){
+  opts=opts||{};
+  var d4ES=$I('d4ExpandSection');
+  var wakeT=null;
+  try{
+    if(!opts.silent)showErr('⏳ 載入完整分析中…');
+    wakeT=setTimeout(function(){ if(!opts.silent)showErr('⏳ Render 可能正在喚醒，請稍候…'); },12000);
+    var r2=await apiFetch(API+'/api/stock/'+id,{},opts.timeout||45000);
+    clearTimeout(wakeT);hideErr();
+    if(!r2.ok){var ed=await r2.json().catch(function(){return{};});throw new Error(ed.detail||'HTTP '+r2.status);}
+    var d2=await r2.json();LAST_TW_DATA=d2;LAST_TW_AI=d2.ai_signal||{};renderStock(d2);
+    var ai2=d2.ai_signal||{};
+    WL_CACHE[id]={name:d2.stock_name||id,price:(d2.price||{}).close,changePct:(d2.price||{}).change_pct,signal:ai2.signal||null,confidence:ai2.confidence,scoreQuality:ai2.score_quality||'none',entryPrice:ai2.entry_price,targetPrice:ai2.target_price,stopLoss:ai2.stop_loss,entryStatus:ai2.entry_status||'',entryStatusText:ai2.entry_status_text||'',canEnter:ai2.can_enter||false,error:false,noData:false};
+    renderWL();checkLineStatus();
+    if(opts.mobile){deferWork(function(){renderCandlestickChart(d2.chart_data||[],d2.ai_signal||{});},1200);}else{renderCandlestickChart(d2.chart_data||[],d2.ai_signal||{});}
+    if(d4ES)d4ES.style.display='block';
+    setMobileSpeed('完整分析已更新',isMobileFastMode());
+    setTimeout(function(){if(isMobileFastMode())setMobileSpeed('',false);},1800);
+    return d2;
+  }catch(e){if(wakeT)clearTimeout(wakeT); if(!opts.silent)showErr('查詢失敗：'+e.message); else setMobileSpeed('完整分析暫時未載入：'+e.message,true); return null;}
+}
+
 // ── Main TW search ─────────────────────────────────────────────────
 async function doSearch() {
   if(!currentUser) return;
@@ -1644,30 +1713,36 @@ async function doSearch() {
   var d4NS=$I("d4NewsSection");if(d4NS)d4NS.style.display="none";
   var dash=$I("dash");if(dash)dash.style.display="none";
   destroyChart();
-  // Step 1: lite
+
+  var mobile=isMobileFastMode();
+  if(mobile){
+    setMobileSpeed("手機快速模式：先載入即時報價，再快速載入技術快判，完整 K 線背景更新中…",true);
+    try{
+      var rm=await apiFetch(API+"/api/stock-mobile/"+id,{},8000);
+      if(rm.ok){var dm=await rm.json();LAST_TW_DATA=dm;LAST_TW_AI=dm.ai_signal||{};renderTwMobileFast(dm);}
+    }catch(e){setMobileSpeed("快速報價暫時失敗，改用一般載入…",true);}
+    try{
+      setMobileSpeed("📊 手機技術快判載入中：先判斷入場、RR、MA/RSI/MACD…",true);
+      var rt=await apiFetch(API+"/api/stock-mobile-tech/"+id,{},14000);
+      if(rt.ok){var dt=await rt.json();LAST_TW_DATA=dt;LAST_TW_AI=dt.ai_signal||{};renderTwMobileTech(dt);WL_CACHE[id]={name:dt.stock_name||id,price:dt.price,changePct:dt.change_pct,signal:(dt.ai_signal||{}).signal||null,confidence:(dt.ai_signal||{}).confidence,scoreQuality:(dt.ai_signal||{}).score_quality||"mobile_technical",entryPrice:(dt.ai_signal||{}).entry_price,targetPrice:(dt.ai_signal||{}).target_price,stopLoss:(dt.ai_signal||{}).stop_loss,entryStatus:(dt.ai_signal||{}).entry_status||"",entryStatusText:(dt.ai_signal||{}).entry_status_text||"",canEnter:(dt.ai_signal||{}).can_enter||false,error:false,noData:false};renderWL();}
+    }catch(e){
+      try{var rl=await apiFetch(API+"/api/stock-lite/"+id,{},12000);if(rl.ok){var dl=await rl.json();LAST_TW_DATA=dl;LAST_TW_AI=dl.ai_signal||{};renderStockLite(dl);WL_CACHE[id]={name:dl.stock_name||id,price:dl.price,changePct:dl.change_pct,signal:(dl.ai_signal||{}).signal||null,confidence:(dl.ai_signal||{}).confidence,scoreQuality:(dl.ai_signal||{}).score_quality||"none",entryPrice:(dl.ai_signal||{}).entry_price,targetPrice:(dl.ai_signal||{}).target_price,stopLoss:(dl.ai_signal||{}).stop_loss,entryStatus:(dl.ai_signal||{}).entry_status||"",entryStatusText:(dl.ai_signal||{}).entry_status_text||"",canEnter:(dl.ai_signal||{}).can_enter||false,error:false,noData:false};renderWL();}}catch(e2){}
+    }
+    deferWork(function(){loadTwFullAnalysis(id,{silent:true,mobile:true,timeout:45000});},1800);
+    return;
+  }
+
+  // Desktop / tablet normal flow: lite first, then full analysis.
   try {
-    var rl=await apiFetch(API+"/api/stock-lite/"+id,{},20000);
-    if(rl.ok){var dl=await rl.json();LAST_TW_DATA=dl;LAST_TW_AI=dl.ai_signal||{};renderStockLite(dl);WL_CACHE[id]={name:dl.stock_name||id,price:dl.price,changePct:dl.change_pct,signal:(dl.ai_signal||{}).signal||null,confidence:(dl.ai_signal||{}).confidence,scoreQuality:(dl.ai_signal||{}).score_quality||"none",entryPrice:(dl.ai_signal||{}).entry_price,targetPrice:(dl.ai_signal||{}).target_price,stopLoss:(dl.ai_signal||{}).stop_loss,entryStatus:(dl.ai_signal||{}).entry_status||"",entryStatusText:(dl.ai_signal||{}).entry_status_text||"",canEnter:(dl.ai_signal||{}).can_enter||false,error:false,noData:false};renderWL();}
+    var rl2=await apiFetch(API+"/api/stock-lite/"+id,{},20000);
+    if(rl2.ok){var dl2=await rl2.json();LAST_TW_DATA=dl2;LAST_TW_AI=dl2.ai_signal||{};renderStockLite(dl2);WL_CACHE[id]={name:dl2.stock_name||id,price:dl2.price,changePct:dl2.change_pct,signal:(dl2.ai_signal||{}).signal||null,confidence:(dl2.ai_signal||{}).confidence,scoreQuality:(dl2.ai_signal||{}).score_quality||"none",entryPrice:(dl2.ai_signal||{}).entry_price,targetPrice:(dl2.ai_signal||{}).target_price,stopLoss:(dl2.ai_signal||{}).stop_loss,entryStatus:(dl2.ai_signal||{}).entry_status||"",entryStatusText:(dl2.ai_signal||{}).entry_status_text||"",canEnter:(dl2.ai_signal||{}).can_enter||false,error:false,noData:false};renderWL();}
   } catch(e) {}
-  // Step 2: full
-  var wakeT=null;
-  try {
-    wakeT=setTimeout(function(){showErr("⏳ Render 可能正在喚醒，請稍候…");},12000);
-    var r2=await apiFetch(API+"/api/stock/"+id,{},45000);
-    clearTimeout(wakeT);hideErr();
-    if(!r2.ok){var ed=await r2.json().catch(function(){return{};});throw new Error(ed.detail||"HTTP "+r2.status);}
-    var d2=await r2.json();LAST_TW_DATA=d2;LAST_TW_AI=d2.ai_signal||{};renderStock(d2);
-    var ai2=d2.ai_signal||{};
-    WL_CACHE[id]={name:d2.stock_name||id,price:(d2.price||{}).close,changePct:(d2.price||{}).change_pct,signal:ai2.signal||null,confidence:ai2.confidence,scoreQuality:ai2.score_quality||"none",entryPrice:ai2.entry_price,targetPrice:ai2.target_price,stopLoss:ai2.stop_loss,entryStatus:ai2.entry_status||"",entryStatusText:ai2.entry_status_text||"",canEnter:ai2.can_enter||false,error:false,noData:false};
-    renderWL();checkLineStatus();
-    renderCandlestickChart(d2.chart_data||[],d2.ai_signal||{});
-    if(d4ES)d4ES.style.display="block";
-  } catch(e) { if(wakeT)clearTimeout(wakeT); showErr("查詢失敗："+e.message); }
+  await loadTwFullAnalysis(id,{silent:false,mobile:false,timeout:45000});
 }
 
 
 function normalizeTwIndicators(d){
-  // V12.8.1: backend now returns indicators directly; this fallback keeps old cached responses usable.
+  // V12.8.3: backend now returns indicators directly; this fallback keeps old cached responses usable.
   var ind=(d&&d.indicators)||{};
   var cd=(d&&Array.isArray(d.chart_data))?d.chart_data:[];
   var last=cd.length?cd[cd.length-1]:{};
@@ -1683,11 +1758,24 @@ function normalizeTwIndicators(d){
 function renderStockLite(d) {
   var dash=$I("dash");if(dash)dash.style.display="block";
   var ai=d.ai_signal||{},rt=d.realtime_quote||{};
-  setTxt("dId",d.stock_id);setTxt("dName",dsn(d.stock_id,d.stock_name));setTxt("dSource","載入中…");
+  setTxt("dId",d.stock_id);setTxt("dName",dsn(d.stock_id,d.stock_name));
+  setTxt("dSource",(d.source||d.data_source)?"來源: "+(d.source||d.data_source):"載入中…");
   var chg=d.change||0; setTxt("dClose",d.price!=null?f(d.price):"—");addCls("dClose",cc(chg));
   setTxt("dChg",d.change!=null?(chg>0?"+":"")+f(d.change)+" ("+pct(d.change_pct)+")":"—");addCls("dChg",cc(chg));
-  setTxt("dConc","載入中…");var ce=$I("dConc");if(ce)ce.className="conclusion neu";
-  var rtEl=$I("rtInfo");if(rtEl)rtEl.innerHTML=rt&&rt.price!=null?'<span class="pill pill-ok">⚡ '+(rt.source||"TWSE MIS")+'</span>':'<span class="pill pill-warn">休市或無成交</span>';
+  var ce=$I("dConc");if(ce){ce.textContent=d.mobile_technical?"手機技術快判完成：可先看 AI 入場、RR、MA/RSI/MACD；完整 K 線背景載入中。":"載入中…";ce.className="conclusion neu";}
+  var rtEl=$I("rtInfo");if(rtEl)rtEl.innerHTML=rt&&rt.price!=null?'<span class="pill pill-ok">⚡ '+(rt.source||"TWSE MIS")+'</span>':(d.mobile_technical?'<span class="pill pill-ok">📊 手機技術快判</span>':'<span class="pill pill-warn">休市或無成交</span>');
+  if(d.indicators){
+    var ind=normalizeTwIndicators(d);
+    setTxt("dMa5",f(ind.ma5));setTxt("dMa20",f(ind.ma20));setTxt("dMa60",f(ind.ma60));
+    setTxt("dRsi",f(ind.rsi));addCls("dRsi",ind.rsi>50?"up":"down");
+    setTxt("dMacd",f(ind.macd,4));setTxt("dSig",f(ind.signal,4));setTxt("dHist",f(ind.hist,4));
+    addCls("dHist",ind.hist>0?"up":"down");addCls("dMacd",ind.macd>ind.signal?"up":"down");
+    setTxt("dBbU",f(ind.bb_upper));setTxt("dBbL",f(ind.bb_lower));
+    var sc=d.score||{};var scoreVal=(sc.score!==undefined&&sc.score!==null)?Number(sc.score):Math.round(((ai&&ai.technical_score)||0)/20);
+    if(!Number.isFinite(scoreVal))scoreVal=0;scoreVal=Math.max(0,Math.min(5,scoreVal));setTxt("dScore",scoreVal);addCls("dScore",scoreVal>=4?"up":scoreVal<=2?"down":"flat");
+    var dots=$I("scoreDots");if(dots){dots.innerHTML="";for(var i=0;i<5;i++){var dt=document.createElement("div");dt.className="dot"+(i<scoreVal?" on":"");dots.appendChild(dt);}}
+    var srEl=$I("scoreReasons");if(srEl)srEl.innerHTML=(sc.reasons||["手機技術快判已完成"]).map(function(r){return'<div class="reason">'+r+'</div>';}).join("");
+  }
   renderAI(ai);
 }
 
@@ -1922,7 +2010,7 @@ async function runBt() {
   finally{if(loading)loading.style.display="none";}
 }
 
-// ── V12.8.1 Real AI Learning + Diversity Reality Fix ───────────────────────────────────
+// ── V12.8.3 Real AI Learning + Diversity Reality Fix ───────────────────────────────────
 var LAST_LEARNING_SUMMARY=null, LAST_SUGGESTED_WEIGHTS=null;
 function getLearningMarket(){var el=$I('learnMarket');return (el&&el.value)||currentMarket||'tw';}
 function baseWeightsForMarket(m){return m==='us'?{technical:0.40,market_context:0.25,fundamental:0.15,risk:0.15,news:0.05}:{technical:0.35,fundamental:0.25,chip:0.25,news:0.15};}
@@ -2057,6 +2145,33 @@ async function addUSWL() {
 }
 function removeUSWL(sym){US_WL=US_WL.filter(function(x){return x.symbol!==sym;});delete US_WL_CACHE[sym];renderUSWL();saveUSWatchlist();}
 
+function renderUSMobileFast(d){
+  var dash=$I("usDash");if(dash)dash.style.display="block";
+  renderUSQuote(d);
+  renderUSAI(d.ai_signal||{});
+  setTxtUS("usAiSummary", "Mobile fast quote loaded. Full analysis is updating in background…");
+}
+
+function renderUSMobileTech(d){
+  var dash=$I("usDash");if(dash)dash.style.display="block";
+  renderUSQuote(d);
+  renderUSAI(d.ai_signal||{});
+  setTxtUS("usAiSummary", "Mobile technical quick read ready. Full chart/profile update is loading in background…");
+}
+async function loadUSFullAnalysis(sym,opts){
+  opts=opts||{};
+  try{
+    var r=await apiFetch(API+"/api/us/stock/"+sym,{},opts.timeout||45000);if(!r.ok)throw new Error("HTTP "+r.status);
+    var d=await r.json();if(d.error){setTxtUS("usAiSummary",d.error);return null;}
+    LAST_US_DATA=d;LAST_US_AI=d.ai_signal||{};renderUSQuote(d);renderUSAI(d.ai_signal||{});
+    if(opts.mobile){deferWork(function(){renderUSKline(d.chart_data||[],d.ai_signal||{});},1200);}else{renderUSKline(d.chart_data||[],d.ai_signal||{});}
+    var ai=d.ai_signal||{};
+    US_WL_CACHE[sym]={name:d.name||sym,price:d.price,changePct:d.change_pct,signal:ai.signal||"WATCH",confidence:ai.confidence};
+    renderUSWL();
+    if(d.market_context)renderUSCtxInline(d.market_context);
+    return d;
+  }catch(e){if(!opts.silent)setTxtUS("usAiSummary","Data unavailable: "+e.message); return null;}
+}
 async function usLoadStock(sym) {
   if(!currentUser) return;
   sym=sym.toUpperCase();US_CURRENT=sym;
@@ -2065,20 +2180,19 @@ async function usLoadStock(sym) {
   var kw=$I("usKlineWrap");if(kw)kw.style.display="none";
   destroyUSChart();
   setTxtUS("usName",sym);setTxtUS("usSymbolDisplay","");setTxtUS("usPrice","…");setTxtUS("usChg","");setTxtUS("usAiSummary","Loading…");
-  // Lite
-  try{var rl=await apiFetch(API+"/api/us/stock-lite/"+sym,{},12000);if(rl.ok){var dl=await rl.json();LAST_US_DATA=dl;LAST_US_AI=dl.ai_signal||{};renderUSQuote(dl);renderUSAI(dl.ai_signal||{});}}catch{}
-  // Full
-  try {
-    var r=await apiFetch(API+"/api/us/stock/"+sym,{},45000);if(!r.ok)throw new Error("HTTP "+r.status);
-    var d=await r.json();if(d.error){setTxtUS("usAiSummary",d.error);return;}
-    LAST_US_DATA=d;LAST_US_AI=d.ai_signal||{};renderUSQuote(d);renderUSAI(d.ai_signal||{});renderUSKline(d.chart_data||[],d.ai_signal||{});
-    var ai=d.ai_signal||{};
-    US_WL_CACHE[sym]={name:d.name||sym,price:d.price,changePct:d.change_pct,signal:ai.signal||"WATCH",confidence:ai.confidence};
-    renderUSWL();
-    // Show market context
-    if(d.market_context)renderUSCtxInline(d.market_context);
-  } catch(e){setTxtUS("usAiSummary","Data unavailable: "+e.message);}
+  var mobile=isMobileFastMode();
+  if(mobile){
+    try{var rm=await apiFetch(API+"/api/us/stock-mobile/"+sym,{},8000);if(rm.ok){var dm=await rm.json();LAST_US_DATA=dm;LAST_US_AI=dm.ai_signal||{};renderUSMobileFast(dm);}}
+    catch(e){setTxtUS("usAiSummary","Mobile quote unavailable, loading lite…");}
+    try{var rt=await apiFetch(API+"/api/us/stock-mobile-tech/"+sym,{},14000);if(rt.ok){var dt=await rt.json();LAST_US_DATA=dt;LAST_US_AI=dt.ai_signal||{};renderUSMobileTech(dt);}}
+    catch(e){try{var rl=await apiFetch(API+"/api/us/stock-lite/"+sym,{},10000);if(rl.ok){var dl=await rl.json();LAST_US_DATA=dl;LAST_US_AI=dl.ai_signal||{};renderUSQuote(dl);renderUSAI(dl.ai_signal||{});}}catch(e2){}}
+    deferWork(function(){loadUSFullAnalysis(sym,{silent:true,mobile:true,timeout:45000});},1800);
+    return;
+  }
+  try{var rl2=await apiFetch(API+"/api/us/stock-lite/"+sym,{},12000);if(rl2.ok){var dl2=await rl2.json();LAST_US_DATA=dl2;LAST_US_AI=dl2.ai_signal||{};renderUSQuote(dl2);renderUSAI(dl2.ai_signal||{});}}catch{}
+  await loadUSFullAnalysis(sym,{silent:false,mobile:false,timeout:45000});
 }
+
 
 function renderUSQuote(d) {
   var clr=usColorCls(d.change_pct||0);
@@ -2293,7 +2407,7 @@ function usScanCard(r) {
 
 
 
-// ── Trade Plan Center (V12.8.1 polish) ─────────────────────────────
+// ── Trade Plan Center (V12.8.3 polish) ─────────────────────────────
 function planKey(p){return (p.market||'tw')+":"+(p.symbol||p.stock_id||'');}
 function normalizePlanMarket(m){return (m==='us')?'us':'tw';}
 async function loadTradePlans(){
@@ -2510,7 +2624,7 @@ function renderJournal(){
   var sb=$I('strategyStatsBox');if(sb){sb.innerHTML=sum.strategy_stats.length?'<table class="strategy-table"><thead><tr><th>策略</th><th>交易</th><th>勝率</th><th>損益</th><th>平均 R</th></tr></thead><tbody>'+sum.strategy_stats.map(function(s){return'<tr><td>'+esc(s.strategy_type)+'</td><td>'+s.trades+'</td><td>'+s.win_rate+'%</td><td>'+s.pnl+'</td><td>'+(s.avg_r==null?'—':s.avg_r)+'</td></tr>';}).join('')+'</tbody></table>':'<div class="empty">尚無策略統計</div>';}
   generateReportText(false);
 }
-function generateReportText(show){var s=journalSummary();var best=s.strategy_stats[0]?s.strategy_stats[0].strategy_type:'—';var txt='AIPICKER V12.8.1 交易績效報告\n生成時間：'+new Date().toLocaleString('zh-TW')+'\n\n總交易數：'+s.total+'\n勝率：'+s.win_rate+'%\n總損益：'+s.total_pnl+'\n平均報酬：'+s.avg_return_pct+'%\n平均 R：'+s.avg_r_multiple+'\n最佳策略：'+best+'\n\nAI 回顧：'+(s.total?'目前已累積交易樣本，可開始觀察哪些 strategy_type 較適合你。若平均 R 低於 1，建議檢查是否太早出場或 RR 不足。':'目前尚無已結束交易，先從持倉管理結束交易後累積樣本。');setTxt('reportText',txt);if(show)toast('報告已產生','ok');return txt;}
+function generateReportText(show){var s=journalSummary();var best=s.strategy_stats[0]?s.strategy_stats[0].strategy_type:'—';var txt='AIPICKER V12.8.3 交易績效報告\n生成時間：'+new Date().toLocaleString('zh-TW')+'\n\n總交易數：'+s.total+'\n勝率：'+s.win_rate+'%\n總損益：'+s.total_pnl+'\n平均報酬：'+s.avg_return_pct+'%\n平均 R：'+s.avg_r_multiple+'\n最佳策略：'+best+'\n\nAI 回顧：'+(s.total?'目前已累積交易樣本，可開始觀察哪些 strategy_type 較適合你。若平均 R 低於 1，建議檢查是否太早出場或 RR 不足。':'目前尚無已結束交易，先從持倉管理結束交易後累積樣本。');setTxt('reportText',txt);if(show)toast('報告已產生','ok');return txt;}
 function exportJournalCsv(){var rows=journalSummary().rows;if(!rows.length){toast('沒有日誌可匯出','warn');return;}var cols=['market','symbol','name','entry_price','exit_price','shares','pnl','return_pct','r_multiple','strategy_type','exit_reason','exit_date'];var csv=[cols.join(',')].concat(rows.map(function(r){r=calcTrade(r);return cols.map(function(c){return '"'+String(r[c]==null?'':r[c]).replace(/"/g,'""')+'"';}).join(',');})).join('\n');var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='aipicker_trade_journal_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href);}
 async function copyReport(){var txt=generateReportText(false);try{await navigator.clipboard.writeText(txt);toast('報告已複製','ok');}catch(e){prompt('複製以下報告',txt);}}
 
@@ -2565,7 +2679,7 @@ function bindAllButtons() {
   // TW chart tabs
   document.querySelectorAll(".tab[data-tab]").forEach(function(btn){btn.addEventListener("click",function(){swTab(btn.dataset.tab,btn);});});
   // TW search
-  safeBind("btnSearch","click",doSearch);safeBind("btnAdd","click",addWL);initSearchSuggest();
+  safeBind("btnSearch","click",doSearch);safeBind("btnAdd","click",addWL);safeBind("btnLoadFullMobile","click",function(){if(CURRENT_ID)loadTwFullAnalysis(CURRENT_ID,{silent:false,mobile:false,timeout:45000});});initSearchSuggest();
   // TW WL
   safeBind("btnRefresh","click",function(){if(!currentUser)return;isRefreshWL=false;wlLeft=30;refreshWL();});
   safeBind("btnScan","click",function(){scanAlerts(false);});
