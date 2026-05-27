@@ -1,7 +1,7 @@
 """
-V12.7 AI Discovery & Diversity Engine
+V12.8 Real AI Learning Engine
 架構：TW Engine / US Engine / Shared Engine（三層分離）
-版本：12.7.0
+版本：12.8.0
 """
 import os, re, asyncio, json, time
 from datetime import datetime, timedelta
@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="V12.7 AI Discovery & Diversity Engine", version="12.7.0")
+app = FastAPI(title="V12.8 Real AI Learning Engine", version="12.8.0")
 _raw = os.getenv("ALLOWED_ORIGINS",
     "http://localhost:5500,http://127.0.0.1:5500,"
     "https://taiwanstock-ben.web.app,https://taiwanstock-ben.firebaseapp.com")
@@ -653,7 +653,7 @@ def get_stock_name(sid: str, api_name: str | None=None) -> str:
 # TW LEARNING / WEIGHTS
 # ══════════════════════════════════════════════════════════════════════════════
 TW_DEFAULT_WEIGHTS={"technical":0.35,"fundamental":0.25,"chip":0.25,"news":0.15,
-    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.7.0","last_reason":"預設權重"}
+    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.8.0","last_reason":"預設權重"}
 TW_WEIGHT_LIMITS={"technical":(0.20,0.45),"fundamental":(0.10,0.35),"chip":(0.10,0.40),"news":(0.05,0.25)}
 
 def _rjf(path,default):
@@ -2281,6 +2281,188 @@ async def api_learning_evaluate(): return await evaluate_signal_history()
 @app.post("/api/learning/retrain")
 def api_learning_retrain(): return retrain_ai_weights()
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# API — V12.8 REAL AI LEARNING ENGINE
+# Frontend keeps per-user learning events in Firestore and sends them here for
+# lightweight calibration. Backend returns explainable summaries, never a black box.
+# ══════════════════════════════════════════════════════════════════════════════
+def _as_float(v, default=None):
+    try:
+        if v is None or v == "": return default
+        x = float(v)
+        if np.isnan(x) or np.isinf(x): return default
+        return x
+    except Exception:
+        return default
+
+def _norm_strategy(s):
+    s = str(s or "Unclassified").strip()
+    return s if s else "Unclassified"
+
+def _learning_rows_from_payload(payload: dict) -> list:
+    payload = payload or {}
+    rows = []
+    for e in payload.get("events", []) or []:
+        if not isinstance(e, dict):
+            continue
+        r = dict(e)
+        res = r.get("result") if isinstance(r.get("result"), dict) else {}
+        if res:
+            r.setdefault("actual_return", res.get("final_return_pct"))
+            r.setdefault("r_multiple", res.get("r_multiple"))
+            r.setdefault("success", res.get("success"))
+            r.setdefault("hit_target", res.get("hit_target"))
+            r.setdefault("hit_stop", res.get("hit_stop"))
+        rows.append(r)
+    for t in payload.get("trades", []) or []:
+        if not isinstance(t, dict):
+            continue
+        r = dict(t)
+        r["event_type"] = r.get("event_type", "closed_trade")
+        r["evaluated"] = True
+        pnl = _as_float(r.get("pnl"), None)
+        ret = _as_float(r.get("return_pct"), _as_float(r.get("actual_return"), None))
+        r["actual_return"] = ret
+        r["r_multiple"] = _as_float(r.get("r_multiple"), None)
+        r["success"] = bool((pnl is not None and pnl > 0) or (ret is not None and ret > 0))
+        rows.append(r)
+    return rows
+
+def _learning_summary(payload: dict) -> dict:
+    rows = _learning_rows_from_payload(payload)
+    evaluated = [r for r in rows if r.get("evaluated") or r.get("success") is not None]
+    pending = [r for r in rows if r not in evaluated]
+    wins = [r for r in evaluated if bool(r.get("success"))]
+    losses = [r for r in evaluated if not bool(r.get("success"))]
+    rets = [_as_float(r.get("actual_return"), None) for r in evaluated]
+    rets = [x for x in rets if x is not None]
+    rs = [_as_float(r.get("r_multiple"), None) for r in evaluated]
+    rs = [x for x in rs if x is not None]
+    by = {}
+    for r in evaluated:
+        k = _norm_strategy(r.get("strategy_type"))
+        d = by.setdefault(k, {"strategy_type": k, "trades": 0, "wins": 0, "losses": 0, "returns": [], "rs": []})
+        d["trades"] += 1
+        if bool(r.get("success")): d["wins"] += 1
+        else: d["losses"] += 1
+        ar = _as_float(r.get("actual_return"), None)
+        rm = _as_float(r.get("r_multiple"), None)
+        if ar is not None: d["returns"].append(ar)
+        if rm is not None: d["rs"].append(rm)
+    strat=[]
+    for d in by.values():
+        strat.append({
+            "strategy_type": d["strategy_type"],
+            "trades": d["trades"],
+            "wins": d["wins"],
+            "losses": d["losses"],
+            "win_rate": round(d["wins"] / d["trades"] * 100, 1) if d["trades"] else 0,
+            "avg_return": round(sum(d["returns"]) / len(d["returns"]), 2) if d["returns"] else 0,
+            "avg_r": round(sum(d["rs"]) / len(d["rs"]), 2) if d["rs"] else None,
+        })
+    strat.sort(key=lambda x: (x["win_rate"], x["avg_r"] or 0, x["trades"]), reverse=True)
+    # confidence calibration buckets
+    buckets = {"80-100": [], "60-79": [], "40-59": [], "0-39": []}
+    for r in evaluated:
+        c = _as_float(r.get("confidence"), _as_float(r.get("final_score"), None))
+        if c is None: continue
+        b = "80-100" if c >= 80 else "60-79" if c >= 60 else "40-59" if c >= 40 else "0-39"
+        buckets[b].append(r)
+    confidence = []
+    for b, arr in buckets.items():
+        confidence.append({"bucket": b, "count": len(arr), "win_rate": round(sum(1 for x in arr if x.get("success")) / len(arr) * 100, 1) if arr else None})
+    return {
+        "total": len(rows),
+        "evaluated": len(evaluated),
+        "pending": len(pending),
+        "win_rate": round(len(wins) / len(evaluated) * 100, 1) if evaluated else 0,
+        "wins": len(wins),
+        "losses": len(losses),
+        "avg_return": round(sum(rets) / len(rets), 2) if rets else 0,
+        "avg_r": round(sum(rs) / len(rs), 2) if rs else 0,
+        "strategy_stats": strat,
+        "confidence_buckets": confidence,
+    }
+
+def _suggest_learning_weights(payload: dict) -> dict:
+    market = str((payload or {}).get("market", "tw")).lower()
+    current = (payload or {}).get("current_weights") or {}
+    summary = _learning_summary(payload)
+    if market == "us":
+        base = {"technical": 0.40, "market_context": 0.25, "fundamental": 0.15, "risk": 0.15, "news": 0.05}
+        keys = ["technical", "market_context", "fundamental", "risk", "news"]
+    else:
+        base = {"technical": 0.35, "fundamental": 0.25, "chip": 0.25, "news": 0.15}
+        keys = ["technical", "fundamental", "chip", "news"]
+    w = {k: _as_float(current.get(k), base[k]) if isinstance(current, dict) else base[k] for k in keys}
+    reasons = []
+    ev = summary["evaluated"]
+    if ev < 5:
+        return {"updated": False, "sample_count": ev, "current_weights": w, "suggested_weights": w,
+                "reason": "資料不足，至少需要 5 筆已評估紀錄才產生建議。", "summary": summary}
+    # Simple explainable heuristic: poor win rate -> emphasize risk; strong pullback -> emphasize technical/chip; weak breakout -> reduce momentum-like weight.
+    if summary["win_rate"] < 45:
+        if "risk" in w: w["risk"] += 0.05
+        if "technical" in w: w["technical"] -= 0.03
+        reasons.append("近期勝率偏低，建議提高風險權重並降低技術面過度樂觀。")
+    if summary["avg_r"] < 0.5:
+        if "risk" in w: w["risk"] += 0.04
+        if "news" in w: w["news"] -= 0.02
+        reasons.append("平均 R 偏低，表示獲利/風險比不足，建議更重視風控。")
+    best = summary["strategy_stats"][0] if summary["strategy_stats"] else None
+    worst = sorted(summary["strategy_stats"], key=lambda x: (x["win_rate"], x["avg_r"] or -9))[0] if summary["strategy_stats"] else None
+    if best and best["trades"] >= 3:
+        reasons.append(f"近期最佳策略為 {best['strategy_type']}，勝率 {best['win_rate']}%。")
+    if worst and worst["trades"] >= 3 and worst["win_rate"] < 40:
+        reasons.append(f"{worst['strategy_type']} 表現偏弱，後續可降低此類型進場信心。")
+    # normalize and clamp
+    for k in keys:
+        lo, hi = (0.05, 0.50)
+        w[k] = max(lo, min(hi, float(w[k])))
+    tot = sum(w.values()) or 1
+    w = {k: round(w[k] / tot, 4) for k in keys}
+    return {"updated": True, "sample_count": ev, "current_weights": current or base, "suggested_weights": w,
+            "reason": "；".join(reasons) or "根據目前樣本，權重暫無明顯調整。", "summary": summary,
+            "best_strategy": best, "weak_strategy": worst}
+
+@app.post("/api/learning/summary")
+def api_learning_summary_v128(payload: dict = Body(default={})):
+    return {"version": "12.8.0", "summary": _learning_summary(payload), "time": datetime.now().isoformat()}
+
+@app.post("/api/learning/calibrate")
+def api_learning_calibrate_v128(payload: dict = Body(default={})):
+    return {"version": "12.8.0", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
+
+@app.post("/api/learning/suggest-weights")
+def api_learning_suggest_weights_v128(payload: dict = Body(default={})):
+    return {"version": "12.8.0", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
+
+@app.post("/api/learning/apply-weights")
+def api_learning_apply_weights_v128(payload: dict = Body(default={})):
+    market = str((payload or {}).get("market", "tw")).lower()
+    weights = (payload or {}).get("weights") or {}
+    # Only TW backend has server-side scoring weights in this single-file app.
+    if market == "tw":
+        saved = save_ai_weights(weights)
+        return {"version": "12.8.0", "applied": True, "market": market, "weights": saved, "time": datetime.now().isoformat()}
+    return {"version": "12.8.0", "applied": False, "market": market, "weights": weights,
+            "message": "US personal weights are stored per user in Firestore by the frontend.", "time": datetime.now().isoformat()}
+
+@app.get("/api/learning/status")
+def api_learning_status_v128():
+    h = load_signal_history()
+    return {"version": "12.8.0", "server_tw_signal_history": _lst(h),
+            "note": "V12.8 personal learning events are stored in each user's Firestore and sent to /api/learning/summary or /api/learning/calibrate for calculation.",
+            "time": datetime.now().isoformat()}
+
+@app.get("/api/debug/learning")
+def api_debug_learning_v128():
+    return {"version": "12.8.0", "engine": "Real AI Learning Engine",
+            "frontend_firestore_paths": ["users/{uid}/ai_learning_events/tw", "users/{uid}/ai_learning_events/us", "users/{uid}/ai_weight_versions/tw", "users/{uid}/ai_weight_versions/us", "users/{uid}/ai_learning_summary/tw", "users/{uid}/ai_learning_summary/us"],
+            "apis": ["POST /api/learning/summary", "POST /api/learning/calibrate", "POST /api/learning/suggest-weights", "POST /api/learning/apply-weights", "GET /api/learning/status"],
+            "time": datetime.now().isoformat()}
+
 # ══════════════════════════════════════════════════════════════════════════════
 # API — US Stocks
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2408,7 +2590,7 @@ async def us_scan_diversified(pool:str="diversified",symbols:str="",min_score:in
 
 @app.get("/api/debug/recommendation-history")
 def api_debug_recommendation_history():
-    return {"version":"12.7.0","note":"Per-user recommendation history is stored client-side/localStorage or Firestore by the frontend. Backend diversified scan accepts history_symbols to apply novelty/repeat penalties.","fields":["symbol/stock_id","market","scan_category","shown_at","diversity_group","diversified_score"]}
+    return {"version":"12.8.0","note":"Per-user recommendation history is stored client-side/localStorage or Firestore by the frontend. Backend diversified scan accepts history_symbols to apply novelty/repeat penalties.","fields":["symbol/stock_id","market","scan_category","shown_at","diversity_group","diversified_score"]}
 
 @app.get("/api/debug/scan-status")
 def api_scan_status():
@@ -2418,7 +2600,7 @@ def api_scan_status():
         for k,(payload,ts) in list(cache.items())[-12:]:
             out.append({"key":k,"age_seconds":round(now-ts,1),"market":payload.get("market"),"mode":payload.get("scan_mode"),"pool":payload.get("pool"),"classified":payload.get("classified"),"failed":payload.get("failed")})
         return out
-    return {"version":"12.7.0","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
+    return {"version":"12.8.0","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # API — DATA HEALTH / DIAGNOSTICS
@@ -2529,12 +2711,12 @@ async def api_health_full():
 
     payload = {
         "status": "ok" if not errors else "partial",
-        "version": "12.7.0",
-        "frontend_expected": "12.3.1",
+        "version": "12.8.0",
+        "frontend_expected": "12.8.0",
         "time": datetime.now().isoformat(),
         "backend": {
-            "title": "V12.7 AI Discovery & Diversity Engine",
-            "version": "12.7.0"
+            "title": "V12.8 Real AI Learning Engine",
+            "version": "12.8.0"
         },
         "line": {
             "configured": bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
@@ -2644,7 +2826,7 @@ async def api_trade_plan_check(
 @app.get("/api/debug/trade-plans")
 def api_debug_trade_plans():
     return {
-        "version": "12.7.0",
+        "version": "12.8.0",
         "storage": "Firestore frontend: users/{uid}/trade_plans/tw and users/{uid}/trade_plans/us",
         "checker": "/api/trade-plan/check",
         "statuses": ["WAITING_ENTRY","ENTERABLE_NOW","ABOVE_ENTRY_ZONE","NEAR_TARGET","NEAR_STOP","STOP_BROKEN","TARGET_REACHED","INVALIDATED","NO_PRICE"],
@@ -2748,7 +2930,7 @@ async def api_position_check(
 @app.get("/api/debug/positions")
 def api_debug_positions():
     return {
-        "version": "12.7.0",
+        "version": "12.8.0",
         "storage": "Firestore frontend: users/{uid}/positions/tw and users/{uid}/positions/us",
         "checker": "/api/position/check",
         "statuses": ["HOLDING_NORMAL","NEAR_TARGET","TARGET_REACHED","NEAR_STOP","STOP_BROKEN","RISK_UP","REVIEW_REQUIRED","NO_PRICE"],
@@ -2872,13 +3054,13 @@ def _build_review_text(total, wins, pnl, avg_r, strategy_stats):
 @app.post("/api/performance/summary")
 def api_performance_summary(payload: dict = Body(default={})):  # frontend sends Firestore journal rows
     trades = payload.get("trades") or payload.get("journal") or []
-    return {"version": "12.7.0", "market": payload.get("market", "all"), "summary": _summarize_trades(trades), "time": datetime.now().isoformat()}
+    return {"version": "12.8.0", "market": payload.get("market", "all"), "summary": _summarize_trades(trades), "time": datetime.now().isoformat()}
 
 @app.post("/api/trade-journal/review")
 def api_trade_journal_review(payload: dict = Body(default={})):
     trades = payload.get("trades") or []
     summary = _summarize_trades(trades)
-    return {"version": "12.7.0", "review": summary.get("review"), "summary": summary, "time": datetime.now().isoformat()}
+    return {"version": "12.8.0", "review": summary.get("review"), "summary": summary, "time": datetime.now().isoformat()}
 
 @app.post("/api/report/summary")
 def api_report_summary(payload: dict = Body(default={})):
@@ -2895,12 +3077,12 @@ def api_report_summary(payload: dict = Body(default={})):
         "",
         summary.get("review") or "",
     ]
-    return {"version": "12.7.0", "report_text": "\n".join(lines), "summary": summary, "time": datetime.now().isoformat()}
+    return {"version": "12.8.0", "report_text": "\n".join(lines), "summary": summary, "time": datetime.now().isoformat()}
 
 @app.get("/api/debug/trade-journal")
 def api_debug_trade_journal():
     return {
-        "version": "12.7.0",
+        "version": "12.8.0",
         "storage": "Firestore frontend: users/{uid}/trade_journal/tw and users/{uid}/trade_journal/us",
         "endpoints": ["/api/performance/summary", "/api/trade-journal/review", "/api/report/summary"],
         "features": ["close position to journal", "R multiple", "strategy performance", "CSV export", "text report"],
@@ -2913,12 +3095,12 @@ def api_debug_trade_journal():
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/health")
 def health():
-    return{"status":"ok","version":"12.7.0","frontend_expected":"12.7.0","time":datetime.now().isoformat(),
+    return{"status":"ok","version":"12.8.0","frontend_expected":"12.8.0","time":datetime.now().isoformat(),
            "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
            "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
            "price_sources":"Yahoo Finance → TWSE Official → FinMind",
            "us_master_count":len(_us_master),"tw_master_count":len(STOCK_MASTER),
-           "features":["V12.7 AI Discovery & Diversity Engine","AI Picker Pro",
+           "features":["V12.8 Real AI Learning Engine","AI Picker Pro",
                        "TW Engine + US Engine + Shared Engine",
                        "6-zone scan output","US Market Context","Symbol Master 200+",
                        "validate_trade_plan","compute_final_score","LINE alerts","Quick/Full AI Scan","Watch Closely zone","scan pool selector","scan cache diagnostics","Trade Plan Center","trade plan status checker","Watchlist UI polish","Portfolio Center","position status checker","smart position alerts","Trade Journal","Performance Review","AI Backtest Learning","Report Center","CSV export","AI Discovery Diversity","Fresh Discovery","repeat_penalty","novelty_score","sector_quota"]}
