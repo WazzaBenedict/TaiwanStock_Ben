@@ -373,7 +373,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .strategy-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;margin-top:10px}.strategy-table th,.strategy-table td{border-bottom:1px solid rgba(148,163,184,.15);padding:7px;text-align:left}.strategy-table th{color:var(--muted)}
 @media(max-width:900px){.journal-summary-grid,.report-summary-grid{grid-template-columns:repeat(2,1fr)}.journal-grid{grid-template-columns:1fr}.journal-metrics{grid-template-columns:repeat(2,auto)}}
 
-/* ── Toast / compact helpers (V12.7.0) ───────────────────────────── */
+/* ── Toast / compact helpers (V12.8.0) ───────────────────────────── */
 .toast{position:fixed;right:18px;bottom:18px;z-index:300;background:#0d1728;border:1px solid var(--line);border-left:3px solid var(--cyan);color:var(--text);border-radius:10px;padding:10px 14px;font-family:var(--mono);font-size:12px;box-shadow:0 8px 28px rgba(0,0,0,.45);opacity:0;transform:translateY(10px);pointer-events:none;transition:.18s}
 .toast.show{opacity:1;transform:translateY(0)}
 .toast.ok{border-left-color:var(--down)}.toast.warn{border-left-color:var(--yellow)}.toast.err{border-left-color:var(--up)}
@@ -405,7 +405,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       使用 Google 帳號登入
     </button>
     <div id="loginError"></div>
-    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.7 AI Discovery & Diversity Engine</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.8 Real AI Learning Engine</div>
   </div>
 </div>
 
@@ -414,7 +414,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="logo">
     <span class="live-dot"></span>
     <span>AI<span style="color:var(--up)">PICKER</span></span>
-    <span class="ver">V12.7.0</span>
+    <span class="ver">V12.8.0</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="mkt-switcher">
@@ -434,7 +434,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
     </div>
     <div class="version-warn" id="versionWarn"></div>
     <div class="health-grid" id="healthGrid">
-      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.7.0</b></div>
+      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.8.0</b></div>
       <div class="health-chip"><span>Backend</span><b id="hBackend">—</b></div>
       <div class="health-chip"><span>Firestore</span><b id="hFirestore">待登入</b></div>
       <div class="health-chip"><span>Yahoo</span><b id="hYahoo">—</b></div>
@@ -709,23 +709,43 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   </div>
 </div><!-- /p-market -->
 
-<!-- ═══ TW Learn Page ═══ -->
+<!-- ═══ AI Learn Page ═══ -->
 <div class="page" id="p-learn">
   <div class="section">
-    <div class="section-title">🧠 AI 學習中心（台股）<button class="ghost sm" id="btnWeights" style="margin-left:auto">載入</button></div>
+    <div class="section-title">🧠 AI 真實學習中心 V12.8
+      <button class="ghost sm" id="btnWeights" style="margin-left:auto">載入</button>
+    </div>
+    <div class="row" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <select id="learnMarket" style="background:#0d1728;border:1px solid var(--line);border-radius:7px;color:var(--text);padding:7px 10px;font-family:var(--mono);font-size:12px;outline:none">
+        <option value="tw">台股 AI</option>
+        <option value="us">美股 AI</option>
+      </select>
+      <button class="ghost sm" id="btnEval">評估信號</button>
+      <button class="ghost sm" id="btnRetrain">產生建議權重</button>
+      <button class="ghost sm" id="btnApplySuggestedWeights">套用建議權重</button>
+      <button class="ghost sm" id="btnHistory">學習紀錄</button>
+      <button class="ghost sm" id="btnWeightHistory">權重版本</button>
+    </div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px">
+      AI 學習資料來源：AI 選股紀錄、交易追蹤、持倉、交易日誌。每次 AI Scan 會自動累積 learning events；結束交易後會回流成已評估樣本。
+    </div>
     <div class="w-grid" id="weightsGrid"></div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
-      <div class="bt-item"><div class="bt-lbl">訊號總數</div><div class="bt-val" id="lSamples">—</div></div>
+      <div class="bt-item"><div class="bt-lbl">學習事件</div><div class="bt-val" id="lSamples">—</div></div>
       <div class="bt-item"><div class="bt-lbl">已評估</div><div class="bt-val" id="lEval">—</div></div>
       <div class="bt-item"><div class="bt-lbl">待評估</div><div class="bt-val" id="lPending">—</div></div>
-      <div class="bt-item"><div class="bt-lbl">近30筆勝率</div><div class="bt-val" id="lWr">—</div></div>
+      <div class="bt-item"><div class="bt-lbl">勝率</div><div class="bt-val" id="lWr">—</div></div>
     </div>
-    <div class="row" style="gap:8px;margin-bottom:12px">
-      <button class="ghost sm" id="btnEval">評估信號</button>
-      <button class="ghost sm" id="btnRetrain">重訓 AI</button>
-      <button class="ghost sm" id="btnHistory">訊號歷史</button>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px" id="learningSourceGrid"></div>
+    <div class="section" style="margin:0 0 12px 0;padding:12px;background:#0b1424">
+      <div class="section-title" style="margin-bottom:8px">📊 策略表現排行</div>
+      <div id="learningStrategyBox" class="learn-log">尚無策略統計</div>
     </div>
-    <div class="learn-log" id="learnMsg">按「載入」查看 AI 學習狀態</div>
+    <div class="section" style="margin:0 0 12px 0;padding:12px;background:#0b1424">
+      <div class="section-title" style="margin-bottom:8px">⚖️ 權重建議</div>
+      <div id="learningSuggestionBox" class="learn-log">請按「產生建議權重」</div>
+    </div>
+    <div class="learn-log" id="learnMsg">按「載入」查看 AI 真實學習狀態</div>
   </div>
   <!-- Backtest -->
   <div class="section">
@@ -821,7 +841,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       </div>
     </div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px">
-      V12.4–V12.7 一次整合：結束持倉會移入交易日誌；系統計算勝率、R 倍數、策略型態表現，並可產出文字報告與 CSV。資料儲存在 Firestore：users/{uid}/trade_journal/tw / us。
+      V12.4–V12.8 一次整合：結束持倉會移入交易日誌；系統計算勝率、R 倍數、策略型態表現，並可產出文字報告與 CSV。資料儲存在 Firestore：users/{uid}/trade_journal/tw / us。
     </div>
     <div class="journal-summary-grid" id="journalSummaryGrid"></div>
     <div class="quick-nav" style="margin-bottom:8px">
@@ -1042,12 +1062,12 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 <div class="footer">
   ⚠️ 本工具僅供技術分析學習參考，不構成任何投資建議。台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
   資料來源：TWSE MIS · Yahoo Finance · TWSE Official · FinMind · Google News RSS（均為免費公開）<br>
-  V12.7 AI Discovery & Diversity Engine
+  V12.8 Real AI Learning Engine
 </div>
 
 <script>
 /* ══════════════════════════════════════════════════════════════════
-   V12.7 AI Discovery & Diversity Engine
+   V12.8 Real AI Learning Engine
    Complete frontend JavaScript
    ══════════════════════════════════════════════════════════════════ */
 
@@ -1055,7 +1075,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="12.7.0";
+var FRONTEND_VERSION="12.8.0";
 var API = window.API_BASE_URL || "https://taiwanstock-ben-1.onrender.com";
 var FB_CFG = window.FIREBASE_CONFIG || {};
 
@@ -1143,6 +1163,9 @@ function usWLRefFS(uid) { return db&&uid?db.collection("users").doc(uid).collect
 function tradePlanRef(uid,mkt) { return db&&uid?db.collection("users").doc(uid).collection("trade_plans").doc(mkt):null; }
 function positionRef(uid,mkt) { return db&&uid?db.collection("users").doc(uid).collection("positions").doc(mkt):null; }
 function journalRef(uid,mkt) { return db&&uid?db.collection("users").doc(uid).collection("trade_journal").doc(mkt):null; }
+function learningEventsRef(uid,mkt) { return db&&uid?db.collection("users").doc(uid).collection("ai_learning_events").doc(mkt):null; }
+function aiWeightVersionRef(uid,mkt) { return db&&uid?db.collection("users").doc(uid).collection("ai_weight_versions").doc(mkt):null; }
+function aiLearningSummaryRef(uid,mkt) { return db&&uid?db.collection("users").doc(uid).collection("ai_learning_summary").doc(mkt):null; }
 function legacyDefaultRef() { return db?db.collection("watchlists").doc("default"):null; }
 
 async function saveUserProfile(user) {
@@ -1542,7 +1565,7 @@ async function aiScan(forceMode, forcePool) {
     var url=API+endpoint+"?min_score=55&max_stocks="+max+"&mode="+encodeURIComponent(mode)+"&pool="+encodeURIComponent(pool)+"&diversity_mode="+encodeURIComponent(diversityMode)+"&symbols="+encodeURIComponent(symbols)+"&history_symbols="+encodeURIComponent(history);
     var r=await apiFetch(url,{},mode==="quick"?45000:120000); var d=await r.json(); d=normalizeScanPayload(d);
     var s=d.summary||{}; if(sum)sum.textContent=(d.scan_label||"")+" | 掃描 "+safeVal(d.scanned,0)+" 檔 | 分類 "+safeVal(d.classified,0)+" | 失敗 "+safeVal(d.failed||d.error_count,0)+" | "+safeVal(d.duration_seconds,"—")+"s | 市場 "+safeVal(s.market_score??d.market_score,"—")+"/100"+(s.message?" — "+s.message:"");
-    renderScanKpis("tw",d); setTxt("twScanCache","cache: "+(d.cache_status||"fresh")+" · "+(d.diversity_mode||diversityMode)); saveRecommendationHistory("tw",d); updateScanProgress("tw",100); renderTWScan(d);
+    renderScanKpis("tw",d); setTxt("twScanCache","cache: "+(d.cache_status||"fresh")+" · "+(d.diversity_mode||diversityMode)); saveRecommendationHistory("tw",d); await recordLearningEventsFromScan("tw",d); updateScanProgress("tw",100); renderTWScan(d);
   } catch(e) { if(sum)sum.textContent="掃描失敗："+e.message; updateScanProgress("tw",0); }
   finally { clearInterval(fake); if(btn)btn.disabled=false; if(btn2)btn2.disabled=false; }
 }
@@ -1638,7 +1661,7 @@ async function doSearch() {
 
 
 function normalizeTwIndicators(d){
-  // V12.7.0: backend now returns indicators directly; this fallback keeps old cached responses usable.
+  // V12.8.0: backend now returns indicators directly; this fallback keeps old cached responses usable.
   var ind=(d&&d.indicators)||{};
   var cd=(d&&Array.isArray(d.chart_data))?d.chart_data:[];
   var last=cd.length?cd[cd.length-1]:{};
@@ -1893,27 +1916,33 @@ async function runBt() {
   finally{if(loading)loading.style.display="none";}
 }
 
-// ── TW AI Learning ─────────────────────────────────────────────────
-async function loadWeights() {
-  try {
-    var r=await apiFetch(API+"/api/learning/weights",{},15000);var d=await r.json();
-    var w=d.weights||{},st=d.stats||{};
-    var wg=$I("weightsGrid");if(wg)wg.innerHTML=["technical","fundamental","chip","news"].map(function(k){return'<div class="w-item"><div class="w-lbl">'+{technical:"技術面",fundamental:"基本面",chip:"籌碼面",news:"消息面"}[k]+'</div><div class="w-val">'+Math.round((w[k]||0)*100)+'%</div></div>';}).join("");
-    setTxt("lSamples",st.total||0);setTxt("lEval",st.evaluated||0);setTxt("lPending",st.pending||0);setTxt("lWr",(st.winrate_30||0)+"%");
-    var recent=d.recent||[];var lm=$I("learnMsg");if(lm)lm.textContent=recent.length?recent.map(function(x){return x.stock_name+" ("+x.stock_id+") "+x.signal+" "+x.confidence+"分 "+(x.created_at||"").slice(0,10);}).join("\n"):"尚無訊號紀錄";
-  } catch(e){var lm=$I("learnMsg");if(lm)lm.textContent="載入失敗："+e.message;}
-}
-async function learnAction(type) {
-  var btnMap={eval:"btnEval",retrain:"btnRetrain",history:"btnHistory"};var btn=$I(btnMap[type]);if(btn)btn.disabled=true;
-  try {
-    var url=type==="eval"?"/api/learning/evaluate":type==="retrain"?"/api/learning/retrain":"/api/learning/history";
-    var opt=type==="retrain"?{method:"POST"}:{};
-    var r=await apiFetch(API+url,opt,90000);var d=await r.json();
-    if(type==="history"){var sigs=d.signals||[];var lm=$I("learnMsg");if(lm)lm.textContent=sigs.slice(0,20).map(function(x){return"["+(x.evaluated?"✅":"⏳")+"] "+x.stock_name+" ("+x.stock_id+") "+x.signal+" "+x.confidence+"分 "+(x.created_at||"").slice(0,10)+(x.result?" → "+(x.result.success?"成功 +":"失敗 ")+x.result.final_return_pct+"%":"");}).join("\n")||"尚無訊號紀錄";}
-    else{var lm=$I("learnMsg");if(lm)lm.textContent=JSON.stringify(d,null,2);await loadWeights();}
-  } catch(e){var lm=$I("learnMsg");if(lm)lm.textContent="操作失敗："+e.message;}
-  finally{if(btn)btn.disabled=false;}
-}
+// ── V12.8 Real AI Learning Engine ───────────────────────────────────
+var LAST_LEARNING_SUMMARY=null, LAST_SUGGESTED_WEIGHTS=null;
+function getLearningMarket(){var el=$I('learnMarket');return (el&&el.value)||currentMarket||'tw';}
+function baseWeightsForMarket(m){return m==='us'?{technical:0.40,market_context:0.25,fundamental:0.15,risk:0.15,news:0.05}:{technical:0.35,fundamental:0.25,chip:0.25,news:0.15};}
+function weightLabels(m){return m==='us'?{technical:'技術面',market_context:'市場環境',fundamental:'基本面',risk:'風控',news:'消息'}:{technical:'技術面',fundamental:'基本面',chip:'籌碼面',news:'消息面'};}
+async function getPersonalWeights(m){if(!currentUser||!db)return baseWeightsForMarket(m);try{var ref=aiWeightVersionRef(currentUser.uid,m);var s=await ref.get();var d=s.exists?s.data():{};return d.current_weights||baseWeightsForMarket(m);}catch(e){return baseWeightsForMarket(m);}}
+async function savePersonalWeights(m,w,reason){if(!currentUser||!db)return;var ref=aiWeightVersionRef(currentUser.uid,m);var s=await ref.get();var d=s.exists?s.data():{};var hist=Array.isArray(d.history)?d.history:[];hist.unshift({created_at:new Date().toISOString(),weights:w,reason:reason||'',market:m});hist=hist.slice(0,30);await ref.set({market:m,current_weights:w,history:hist,updated_at:new Date().toISOString()},{merge:true});}
+async function loadLearningEvents(m){if(!currentUser||!db)return[];try{var ref=learningEventsRef(currentUser.uid,m);var s=await ref.get();var d=s.exists?s.data():{};return Array.isArray(d.events)?d.events:[];}catch(e){console.warn('load learning events',e);return[];}}
+async function saveLearningEvents(m,events){if(!currentUser||!db)return;try{var ref=learningEventsRef(currentUser.uid,m);await ref.set({market:m,events:(events||[]).slice(0,700),updated_at:new Date().toISOString()},{merge:true});}catch(e){console.warn('save learning events',e);}}
+function eventKey(e){return [e.market,e.symbol||e.stock_id,e.event_type,e.scan_category,e.created_at&&String(e.created_at).slice(0,10)].join(':');}
+function candidateToLearningEvent(m,it,cat,source){var sym=String(it.symbol||it.stock_id||'').toUpperCase();if(!sym)return null;return{market:m,symbol:sym,stock_id:it.stock_id||sym,name:it.name||it.stock_name||sym,event_type:'scan_candidate',source:source||'ai_scan',signal:it.signal||'WATCH',scan_category:(it.scan_category||cat||'NEAR_MISS').toUpperCase(),strategy_type:it.strategy_type||'Unclassified',entry_price:num(it.entry_price),entry_zone_low:num(it.entry_zone_low),entry_zone_high:num(it.entry_zone_high),target_price:num(it.target_price),stop_loss:num(it.stop_loss),rr:num(it.risk_reward_ratio),confidence:num(it.confidence),technical_score:num(it.technical_score),final_score:num(it.final_score),risk_score:num(it.risk_score),market_score:num(it.market_score),created_at:new Date().toISOString(),evaluated:false,result:null};}
+async function recordLearningEventsFromScan(m,d){if(!currentUser||!db||!d)return;try{var zones=['enterable','watch_closely','fresh_discovery','pullback','breakout_watch','near_miss','risk_watch'];var add=[];zones.forEach(function(z){(d[z]||[]).slice(0,20).forEach(function(it){var ev=candidateToLearningEvent(m,it,z,'ai_scan_'+(d.diversity_mode||d.scan_mode||''));if(ev)add.push(ev);});});if(!add.length)return;var old=await loadLearningEvents(m);var merged=add.concat(old||[]);var seen={};merged=merged.filter(function(e){var k=eventKey(e);if(seen[k])return false;seen[k]=1;return true;}).slice(0,700);await saveLearningEvents(m,merged);}catch(e){console.warn('record learning failed',e);}}
+function num(v){var n=Number(v);return Number.isFinite(n)?n:null;}
+function tradeToLearningEvent(t){t=calcTrade(t);var m=t.market||'tw',sym=String(t.symbol||t.stock_id||'').toUpperCase();return{market:m,symbol:sym,stock_id:t.stock_id||sym,name:t.name||sym,event_type:'closed_trade',source:'trade_journal',signal:t.signal||'',scan_category:t.scan_category||'',strategy_type:t.strategy_type||'Unclassified',entry_price:num(t.entry_price||t.avg_price),target_price:num(t.target_price),stop_loss:num(t.stop_loss),rr:num(t.risk_reward_ratio),confidence:num(t.confidence),technical_score:num(t.technical_score),final_score:num(t.final_score),risk_score:num(t.risk_score),actual_return:num(t.return_pct),r_multiple:num(t.r_multiple),hit_target:!!t.hit_target,hit_stop:!!t.hit_stop,exit_reason:t.exit_reason||'',holding_days:t.hold_days,evaluated:true,success:!!t.win,created_at:t.created_at||t.entry_date||'',evaluated_at:t.closed_at||t.exit_date||new Date().toISOString()};}
+async function latestPriceForLearning(m,sym){try{var url=m==='us'?API+'/api/us/stock-lite/'+encodeURIComponent(sym):API+'/api/stock-lite/'+encodeURIComponent(sym);var r=await apiFetch(url,{},12000);var d=await r.json();return num(d.price??d.current_price??d.close??d.last_price);}catch(e){return null;}}
+async function evaluatePersonalLearningEvents(m){var events=await loadLearningEvents(m), now=Date.now(), changed=0;for(var i=0;i<events.length;i++){var e=events[i];if(e.evaluated)continue;var ts=Date.parse(e.created_at||'');if(!ts||now-ts<3*86400000)continue;var px=await latestPriceForLearning(m,e.symbol||e.stock_id);var entry=num(e.entry_price);if(px==null||entry==null||entry<=0)continue;var ret=(px-entry)/entry*100;var hitTarget=e.target_price!=null&&px>=Number(e.target_price);var hitStop=e.stop_loss!=null&&px<=Number(e.stop_loss);var rmult=(e.stop_loss!=null&&entry>Number(e.stop_loss))?(px-entry)/(entry-Number(e.stop_loss)):null;e.evaluated=true;e.evaluated_at=new Date().toISOString();e.actual_return=Number(ret.toFixed(2));e.r_multiple=rmult==null?null:Number(rmult.toFixed(2));e.hit_target=hitTarget;e.hit_stop=hitStop;e.success=(hitTarget||ret>2)&&!hitStop;e.result={final_return_pct:e.actual_return,r_multiple:e.r_multiple,hit_target:hitTarget,hit_stop:hitStop,success:e.success};changed++;if(changed>=25)break;}if(changed)await saveLearningEvents(m,events);return{updated:changed,events:events};}
+function localLearningSummary(events,trades){events=events||[];var rows=events.concat((trades||[]).map(tradeToLearningEvent));var evals=rows.filter(function(r){return r.evaluated||r.success!==undefined||r.actual_return!=null;});var wins=evals.filter(function(r){return !!r.success;});var rs=evals.map(function(r){return num(r.r_multiple);}).filter(function(x){return x!=null;});var by={};evals.forEach(function(r){var k=r.strategy_type||'Unclassified';var d=by[k]||(by[k]={strategy_type:k,trades:0,wins:0,returns:[],rs:[]});d.trades++;if(r.success)d.wins++;var ar=num(r.actual_return);var rm=num(r.r_multiple);if(ar!=null)d.returns.push(ar);if(rm!=null)d.rs.push(rm);});var strat=Object.keys(by).map(function(k){var d=by[k];return{strategy_type:k,trades:d.trades,win_rate:d.trades?Number((d.wins/d.trades*100).toFixed(1)):0,avg_return:d.returns.length?Number((d.returns.reduce((a,b)=>a+b,0)/d.returns.length).toFixed(2)):0,avg_r:d.rs.length?Number((d.rs.reduce((a,b)=>a+b,0)/d.rs.length).toFixed(2)):null};}).sort(function(a,b){return b.win_rate-a.win_rate;});return{total:rows.length,evaluated:evals.length,pending:rows.length-evals.length,win_rate:evals.length?Number((wins.length/evals.length*100).toFixed(1)):0,avg_r:rs.length?Number((rs.reduce((a,b)=>a+b,0)/rs.length).toFixed(2)):0,strategy_stats:strat,rows:rows};}
+async function buildLearningPayload(m){await loadJournal();var events=await loadLearningEvents(m);var trades=(JOURNAL[m]||[]).map(tradeToLearningEvent);var current=await getPersonalWeights(m);return{market:m,events:events,trades:trades,current_weights:current};}
+async function loadWeights(){var m=getLearningMarket();var labels=weightLabels(m);var current=await getPersonalWeights(m);var wg=$I('weightsGrid');if(wg)wg.innerHTML=Object.keys(labels).map(function(k){return'<div class="w-item"><div class="w-lbl">'+labels[k]+'</div><div class="w-val">'+Math.round((current[k]||0)*100)+'%</div></div>';}).join('');try{var payload=await buildLearningPayload(m);var local=localLearningSummary(payload.events,payload.trades);var r=await apiFetch(API+'/api/learning/summary',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)},20000);var d=await r.json();var s=(d.summary)||local;LAST_LEARNING_SUMMARY=s;setTxt('lSamples',s.total||0);setTxt('lEval',s.evaluated||0);setTxt('lPending',s.pending||0);setTxt('lWr',(s.win_rate||0)+'%');renderLearningSources(payload);renderLearningStrategy(s);var lm=$I('learnMsg');if(lm)lm.textContent=(s.total?'已載入 '+s.total+' 筆學習資料，其中 '+s.evaluated+' 筆已評估。':'目前尚未累積可學習資料。請先執行 AI 選股、加入交易追蹤，或完成交易日誌。');}catch(e){var payload=await buildLearningPayload(m);var s=localLearningSummary(payload.events,payload.trades);LAST_LEARNING_SUMMARY=s;setTxt('lSamples',s.total||0);setTxt('lEval',s.evaluated||0);setTxt('lPending',s.pending||0);setTxt('lWr',(s.win_rate||0)+'%');renderLearningSources(payload);renderLearningStrategy(s);var lm=$I('learnMsg');if(lm)lm.textContent='後端學習摘要暫時失敗，已使用前端資料計算：'+e.message;}}
+function renderLearningSources(payload){var el=$I('learningSourceGrid');if(!el)return;var ev=payload.events||[],tr=payload.trades||[];var scan=ev.filter(function(x){return x.event_type==='scan_candidate';}).length;var evals=ev.filter(function(x){return x.evaluated;}).length;var items=[['AI選股紀錄',scan],['交易日誌',tr.length],['已評估事件',evals],['資料市場',String(payload.market||'tw').toUpperCase()]];el.innerHTML=items.map(function(x){return'<div class="bt-item"><div class="bt-lbl">'+x[0]+'</div><div class="bt-val">'+x[1]+'</div></div>';}).join('');}
+function renderLearningStrategy(s){var el=$I('learningStrategyBox');if(!el)return;var arr=s.strategy_stats||[];if(!arr.length){el.textContent='尚無策略統計。完成幾筆 AI 掃描與交易日誌後，這裡會顯示策略勝率。';return;}el.innerHTML='<table class="strategy-table"><thead><tr><th>策略</th><th>筆數</th><th>勝率</th><th>平均報酬</th><th>平均 R</th></tr></thead><tbody>'+arr.slice(0,12).map(function(x){return'<tr><td>'+esc(x.strategy_type)+'</td><td>'+x.trades+'</td><td>'+x.win_rate+'%</td><td>'+(x.avg_return??'—')+'%</td><td>'+(x.avg_r==null?'—':x.avg_r)+'</td></tr>';}).join('')+'</tbody></table>';}
+async function suggestLearningWeights(){var m=getLearningMarket();var box=$I('learningSuggestionBox');if(box)box.textContent='計算建議權重中…';try{var payload=await buildLearningPayload(m);var r=await apiFetch(API+'/api/learning/calibrate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)},30000);var d=await r.json();var c=d.calibration||{};LAST_SUGGESTED_WEIGHTS=c.suggested_weights||null;renderWeightSuggestion(m,c);await aiLearningSummaryRef(currentUser.uid,m).set({market:m,calibration:c,updated_at:new Date().toISOString()},{merge:true});}catch(e){if(box)box.textContent='產生建議失敗：'+e.message;}}
+function renderWeightSuggestion(m,c){var box=$I('learningSuggestionBox');if(!box)return;var labels=weightLabels(m), cur=c.current_weights||baseWeightsForMarket(m), sug=c.suggested_weights||cur;var html='<div style="margin-bottom:8px">'+esc(c.reason||'—')+'</div><table class="strategy-table"><thead><tr><th>項目</th><th>目前</th><th>建議</th></tr></thead><tbody>';Object.keys(sug).forEach(function(k){html+='<tr><td>'+esc(labels[k]||k)+'</td><td>'+Math.round((cur[k]||0)*100)+'%</td><td>'+Math.round((sug[k]||0)*100)+'%</td></tr>';});html+='</tbody></table>';if(c.sample_count!=null)html+='<div style="margin-top:8px;color:var(--muted);font-size:11px">根據已評估樣本：'+c.sample_count+' 筆</div>';box.innerHTML=html;}
+async function applySuggestedWeights(){var m=getLearningMarket();if(!LAST_SUGGESTED_WEIGHTS){toast('請先產生建議權重','warn');return;}if(!confirm('套用 '+m.toUpperCase()+' 建議權重？'))return;await savePersonalWeights(m,LAST_SUGGESTED_WEIGHTS,'V12.8 suggested weights');if(m==='tw'){try{await apiFetch(API+'/api/learning/apply-weights',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({market:m,weights:LAST_SUGGESTED_WEIGHTS})},15000);}catch(e){console.warn(e);}}toast('已套用建議權重','ok');await loadWeights();}
+async function showWeightHistory(){var m=getLearningMarket();try{var ref=aiWeightVersionRef(currentUser.uid,m);var s=await ref.get();var d=s.exists?s.data():{};var hist=d.history||[];var lm=$I('learnMsg');if(lm)lm.textContent=hist.length?hist.slice(0,20).map(function(x){return'['+(x.created_at||'').slice(0,19)+'] '+Object.keys(x.weights||{}).map(function(k){return k+':'+Math.round((x.weights[k]||0)*100)+'%';}).join(' / ')+'  '+(x.reason||'');}).join('\n'):'尚無權重版本紀錄';}catch(e){toast('讀取權重歷史失敗','err');}}
+async function showLearningHistory(){var m=getLearningMarket();var ev=await loadLearningEvents(m);var lm=$I('learnMsg');if(lm)lm.textContent=ev.length?ev.slice(0,60).map(function(x){return'['+(x.evaluated?'✅':'⏳')+'] '+(x.name||x.symbol)+' '+(x.scan_category||'')+' '+(x.strategy_type||'')+' F'+(x.final_score??'—')+(x.actual_return!=null?' → '+x.actual_return+'%':'');}).join('\n'):'尚無學習事件。請先執行 AI Scan。';}
+async function learnAction(type){if(type==='eval'){var m=getLearningMarket();var btn=$I('btnEval');if(btn)btn.disabled=true;try{var res=await evaluatePersonalLearningEvents(m);toast('已評估 '+res.updated+' 筆學習事件','ok');await loadWeights();}catch(e){toast('評估失敗：'+e.message,'err');}finally{if(btn)btn.disabled=false;}return;}if(type==='retrain'){await suggestLearningWeights();return;}if(type==='history'){await showLearningHistory();return;}await loadWeights();}
 
 // ── Chart.js charts ────────────────────────────────────────────────
 function killCJCharts(){Object.values(cjCharts).forEach(function(c){try{c.destroy();}catch{}});cjCharts={};}
@@ -2178,7 +2207,7 @@ async function usAiScan(forceMode, forcePool) {
     var d=await r.json(); d=normalizeUSScanPayload(d);
     var s=d.summary||{};
     if(sum)sum.textContent=(d.scan_label||"")+" | Scanned "+safeVal(d.scanned,0)+" | Classified "+safeVal(d.classified,0)+" | Failed "+safeVal(d.failed||d.error_count,0)+" | "+safeVal(d.duration_seconds,"—")+"s | Market "+safeVal(s.market_score??d.market_score,"—")+"/100"+(s.message?" — "+s.message:"");
-    renderScanKpis("us",d); setTxtUS("usScanCache","cache: "+(d.cache_status||"fresh")+" · "+(d.diversity_mode||diversityMode)); saveRecommendationHistory("us",d); updateScanProgress("us",100); renderUSScan(d);
+    renderScanKpis("us",d); setTxtUS("usScanCache","cache: "+(d.cache_status||"fresh")+" · "+(d.diversity_mode||diversityMode)); saveRecommendationHistory("us",d); await recordLearningEventsFromScan("us",d); updateScanProgress("us",100); renderUSScan(d);
   } catch(e){
     console.error("US AI scan failed", e); if(sum)sum.textContent="Scan failed: "+(e.message||e); updateScanProgress("us",0);
     var risk=$I("usZoneRisk"); if(risk)risk.innerHTML='<div class="scan-zone-lbl sz-risk">⚠️ US Scan Error</div><div class="empty" style="padding:8px;font-size:11px">'+escapeHTML(String(e.message||e))+'</div>';
@@ -2257,7 +2286,7 @@ function usScanCard(r) {
 
 
 
-// ── Trade Plan Center (V12.7.0 polish) ─────────────────────────────
+// ── Trade Plan Center (V12.8.0 polish) ─────────────────────────────
 function planKey(p){return (p.market||'tw')+":"+(p.symbol||p.stock_id||'');}
 function normalizePlanMarket(m){return (m==='us')?'us':'tw';}
 async function loadTradePlans(){
@@ -2474,7 +2503,7 @@ function renderJournal(){
   var sb=$I('strategyStatsBox');if(sb){sb.innerHTML=sum.strategy_stats.length?'<table class="strategy-table"><thead><tr><th>策略</th><th>交易</th><th>勝率</th><th>損益</th><th>平均 R</th></tr></thead><tbody>'+sum.strategy_stats.map(function(s){return'<tr><td>'+esc(s.strategy_type)+'</td><td>'+s.trades+'</td><td>'+s.win_rate+'%</td><td>'+s.pnl+'</td><td>'+(s.avg_r==null?'—':s.avg_r)+'</td></tr>';}).join('')+'</tbody></table>':'<div class="empty">尚無策略統計</div>';}
   generateReportText(false);
 }
-function generateReportText(show){var s=journalSummary();var best=s.strategy_stats[0]?s.strategy_stats[0].strategy_type:'—';var txt='AIPICKER V12.7 交易績效報告\n生成時間：'+new Date().toLocaleString('zh-TW')+'\n\n總交易數：'+s.total+'\n勝率：'+s.win_rate+'%\n總損益：'+s.total_pnl+'\n平均報酬：'+s.avg_return_pct+'%\n平均 R：'+s.avg_r_multiple+'\n最佳策略：'+best+'\n\nAI 回顧：'+(s.total?'目前已累積交易樣本，可開始觀察哪些 strategy_type 較適合你。若平均 R 低於 1，建議檢查是否太早出場或 RR 不足。':'目前尚無已結束交易，先從持倉管理結束交易後累積樣本。');setTxt('reportText',txt);if(show)toast('報告已產生','ok');return txt;}
+function generateReportText(show){var s=journalSummary();var best=s.strategy_stats[0]?s.strategy_stats[0].strategy_type:'—';var txt='AIPICKER V12.8 交易績效報告\n生成時間：'+new Date().toLocaleString('zh-TW')+'\n\n總交易數：'+s.total+'\n勝率：'+s.win_rate+'%\n總損益：'+s.total_pnl+'\n平均報酬：'+s.avg_return_pct+'%\n平均 R：'+s.avg_r_multiple+'\n最佳策略：'+best+'\n\nAI 回顧：'+(s.total?'目前已累積交易樣本，可開始觀察哪些 strategy_type 較適合你。若平均 R 低於 1，建議檢查是否太早出場或 RR 不足。':'目前尚無已結束交易，先從持倉管理結束交易後累積樣本。');setTxt('reportText',txt);if(show)toast('報告已產生','ok');return txt;}
 function exportJournalCsv(){var rows=journalSummary().rows;if(!rows.length){toast('沒有日誌可匯出','warn');return;}var cols=['market','symbol','name','entry_price','exit_price','shares','pnl','return_pct','r_multiple','strategy_type','exit_reason','exit_date'];var csv=[cols.join(',')].concat(rows.map(function(r){r=calcTrade(r);return cols.map(function(c){return '"'+String(r[c]==null?'':r[c]).replace(/"/g,'""')+'"';}).join(',');})).join('\n');var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='aipicker_trade_journal_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href);}
 async function copyReport(){var txt=generateReportText(false);try{await navigator.clipboard.writeText(txt);toast('報告已複製','ok');}catch(e){prompt('複製以下報告',txt);}}
 
@@ -2554,6 +2583,9 @@ function bindAllButtons() {
   safeBind("btnEval","click",function(){learnAction("eval");});
   safeBind("btnRetrain","click",function(){learnAction("retrain");});
   safeBind("btnHistory","click",function(){learnAction("history");});
+  safeBind("btnApplySuggestedWeights","click",applySuggestedWeights);
+  safeBind("btnWeightHistory","click",showWeightHistory);
+  safeBind("learnMarket","change",loadWeights);
   // TW macro/sentiment
   safeBind("btnLoadMacro","click",loadMacro);
   safeBind("btnLoadSentiment","click",loadSentiment);
