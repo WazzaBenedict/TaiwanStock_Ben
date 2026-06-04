@@ -373,7 +373,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .strategy-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;margin-top:10px}.strategy-table th,.strategy-table td{border-bottom:1px solid rgba(148,163,184,.15);padding:7px;text-align:left}.strategy-table th{color:var(--muted)}
 @media(max-width:900px){.journal-summary-grid,.report-summary-grid{grid-template-columns:repeat(2,1fr)}.journal-grid{grid-template-columns:1fr}.journal-metrics{grid-template-columns:repeat(2,auto)}}
 
-/* ── Toast / compact helpers (V12.9.0) ───────────────────────────── */
+/* ── Toast / compact helpers (V12.9.1) ───────────────────────────── */
 .toast{position:fixed;right:18px;bottom:18px;z-index:300;background:#0d1728;border:1px solid var(--line);border-left:3px solid var(--cyan);color:var(--text);border-radius:10px;padding:10px 14px;font-family:var(--mono);font-size:12px;box-shadow:0 8px 28px rgba(0,0,0,.45);opacity:0;transform:translateY(10px);pointer-events:none;transition:.18s}
 .toast.show{opacity:1;transform:translateY(0)}
 .toast.ok{border-left-color:var(--down)}.toast.warn{border-left-color:var(--yellow)}.toast.err{border-left-color:var(--up)}
@@ -417,7 +417,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       使用 Google 帳號登入
     </button>
     <div id="loginError"></div>
-    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.9.0 Multi-Portfolio Watchlist Manager</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:12px">V12.9.1 Multi-Portfolio Watchlist Manager</div>
   </div>
 </div>
 
@@ -426,7 +426,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <div class="logo">
     <span class="live-dot"></span>
     <span>AI<span style="color:var(--up)">PICKER</span></span>
-    <span class="ver">V12.9.0</span>
+    <span class="ver">V12.9.1</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="mkt-switcher">
@@ -446,7 +446,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
     </div>
     <div class="version-warn" id="versionWarn"></div>
     <div class="health-grid" id="healthGrid">
-      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.9.0</b></div>
+      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V12.9.1</b></div>
       <div class="health-chip"><span>Backend</span><b id="hBackend">—</b></div>
       <div class="health-chip"><span>Firestore</span><b id="hFirestore">待登入</b></div>
       <div class="health-chip"><span>Yahoo</span><b id="hYahoo">—</b></div>
@@ -870,12 +870,13 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       <div class="section-title-left">📘 交易日誌與績效回顧 <span class="d-badge" id="journalTotalBadge">0 trades</span></div>
       <div class="row" style="gap:6px">
         <button class="ghost sm" id="btnJournalRefresh">重新整理</button>
+        <button class="ghost sm" id="btnJournalRepair">修復日誌</button>
         <button class="ghost sm" id="btnJournalExport">匯出 CSV</button>
         <button class="ghost sm" id="btnReportCopy">複製報告</button>
       </div>
     </div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px">
-      V12.4–V12.8 一次整合：結束持倉會移入交易日誌；系統計算勝率、R 倍數、策略型態表現，並可產出文字報告與 CSV。資料儲存在 Firestore：users/{uid}/trade_journal/tw / us。
+      V12.4–V12.9.1 一次整合：結束持倉會移入交易日誌；系統計算勝率、R 倍數、策略型態表現，並可產出文字報告與 CSV。資料儲存在 Firestore：users/{uid}/trade_journal/tw / us。
     </div>
     <div class="journal-summary-grid" id="journalSummaryGrid"></div>
     <div class="quick-nav" style="margin-bottom:8px">
@@ -1111,12 +1112,12 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 <div class="footer">
   ⚠️ 本工具僅供技術分析學習參考，不構成任何投資建議。台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
   資料來源：TWSE MIS · Yahoo Finance · TWSE Official · FinMind · Google News RSS（均為免費公開）<br>
-  V12.9.0 Multi-Portfolio Watchlist Manager
+  V12.9.1 Multi-Portfolio Watchlist Manager
 </div>
 
 <script>
 /* ══════════════════════════════════════════════════════════════════
-   V12.9.0 Multi-Portfolio Watchlist Manager
+   V12.9.1 Multi-Portfolio Watchlist Manager
    Complete frontend JavaScript
    ══════════════════════════════════════════════════════════════════ */
 
@@ -1798,7 +1799,7 @@ function updateAutoUI(){var btn=$I("btnAuto");if(!btn)return;if(autoOn){btn.text
 function toggleAuto(){autoOn=!autoOn;if(currentUser)localStorage.setItem("tw_auto_"+currentUser.uid,autoOn?"1":"0");updateAutoUI();if(autoOn)startAutoTimer();else{clearInterval(autoTimer);autoTimer=null;setTxt("autoCountdown","—");}}
 function startAutoTimer(){clearInterval(autoTimer);autoLeft=300;autoTimer=setInterval(async function(){autoLeft--;var m=Math.floor(autoLeft/60),s=autoLeft%60;setTxt("autoCountdown",m+":"+(s<10?"0":"")+s);if(autoLeft<=0){autoLeft=300;setTxt("autoLastT",new Date().toLocaleTimeString("zh-TW"));var r=await scanAlerts(true);if(r){setTxt("autoScanned",r.checked+"檔");setTxt("autoPushed",r.sentLine.length+"檔");}}},1000);}
 
-// ── Mobile Fast Data V12.9.0 ──────────────────────────────────────
+// ── Mobile Fast Data V12.9.1 ──────────────────────────────────────
 function isMobileFastMode(){
   try{
     var c=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
@@ -1902,7 +1903,7 @@ async function doSearch() {
 
 
 function normalizeTwIndicators(d){
-  // V12.9.0: backend now returns indicators directly; this fallback keeps old cached responses usable.
+  // V12.9.1: backend now returns indicators directly; this fallback keeps old cached responses usable.
   var ind=(d&&d.indicators)||{};
   var cd=(d&&Array.isArray(d.chart_data))?d.chart_data:[];
   var last=cd.length?cd[cd.length-1]:{};
@@ -2170,7 +2171,7 @@ async function runBt() {
   finally{if(loading)loading.style.display="none";}
 }
 
-// ── V12.9.0 Multi-Portfolio Watchlist Manager ───────────────────────────────────
+// ── V12.9.1 Multi-Portfolio Watchlist Manager ───────────────────────────────────
 var LAST_LEARNING_SUMMARY=null, LAST_SUGGESTED_WEIGHTS=null;
 function getLearningMarket(){var el=$I('learnMarket');return (el&&el.value)||currentMarket||'tw';}
 function baseWeightsForMarket(m){return m==='us'?{technical:0.40,market_context:0.25,fundamental:0.15,risk:0.15,news:0.05}:{technical:0.35,fundamental:0.25,chip:0.25,news:0.15};}
@@ -2568,7 +2569,7 @@ function usScanCard(r) {
 
 
 
-// ── Trade Plan Center (V12.9.0 polish) ─────────────────────────────
+// ── Trade Plan Center (V12.9.1 polish) ─────────────────────────────
 function planKey(p){return (p.market||'tw')+":"+(p.symbol||p.stock_id||'');}
 function normalizePlanMarket(m){return (m==='us')?'us':'tw';}
 async function loadTradePlans(){
@@ -2750,12 +2751,59 @@ function openPosition(mkt,id){switchMarket(mkt);if(mkt==='us')usLoadStock(id);el
 
 // ── Trade Journal / Performance / Report Center (V12.7) ─────────────
 function journalRefSafe(uid,mkt){return journalRef(uid,mkt);} 
-async function loadJournal(){
-  JOURNAL={tw:[],us:[]}; if(!currentUser||!db)return JOURNAL;
-  for(var m of ['tw','us']){try{var ref=journalRefSafe(currentUser.uid,m);if(ref){var s=await ref.get();var d=s.exists?s.data():{};JOURNAL[m]=Array.isArray(d.trades)?d.trades:[];}}catch(e){console.warn('load journal',m,e);}}
+function normalizeJournalTrade(t,mkt){
+  t=t||{};var sym=t.symbol||t.stock_id||t.code||t.ticker||t.id||'';
+  return Object.assign({},t,{market:normalizePositionMarket(t.market||mkt||'tw'),symbol:String(sym||'').toUpperCase(),stock_id:t.stock_id||String(sym||'').toUpperCase(),name:t.name||t.stock_name||t.title||sym,closed_at:t.closed_at||t.exit_date||t.updated_at||t.created_at||nowISO()});
+}
+function journalMergeKey(t){return [t.market||'tw',String(t.symbol||t.stock_id||''),String(t.closed_at||t.exit_date||t.created_at||''),String(t.exit_price||t.sell_price||''),String(t.entry_price||t.avg_price||t.buy_price||'')].join('|');}
+function mergeJournalRows(base,extra,mkt){
+  var out=[],seen={};
+  (base||[]).concat(extra||[]).forEach(function(x){if(!x)return;var t=normalizeJournalTrade(x,mkt);var k=journalMergeKey(t);if(!seen[k]){seen[k]=1;out.push(t);}});
+  return out.sort(function(a,b){return new Date(b.closed_at||b.exit_date||b.created_at||0)-new Date(a.closed_at||a.exit_date||a.created_at||0);});
+}
+function extractJournalArrays(d){
+  d=d||{};var arr=[];['trades','records','items','journal','closed_trades','history','data'].forEach(function(k){if(Array.isArray(d[k]))arr=arr.concat(d[k]);});
+  return arr;
+}
+async function getDocJournalRows(ref,mkt){
+  var rows=[];try{var s=await ref.get();if(s&&s.exists)rows=rows.concat(extractJournalArrays(s.data()));}catch(e){console.warn('journal doc read skipped',e.message||e);}
+  try{var qs=await ref.collection('trades').get();qs.forEach(function(doc){rows.push(Object.assign({id:doc.id},doc.data()||{}));});}catch(e){}
+  try{var qs2=await ref.collection('items').get();qs2.forEach(function(doc){rows.push(Object.assign({id:doc.id},doc.data()||{}));});}catch(e){}
+  return rows.map(function(x){return normalizeJournalTrade(x,mkt);});
+}
+async function recoverJournalRows(uid,mkt){
+  var rows=[];if(!db||!uid)return rows;
+  var user=db.collection('users').doc(uid);
+  var refs=[
+    user.collection('trade_journal').doc(mkt),
+    user.collection('trade_journals').doc(mkt),
+    user.collection('journals').doc(mkt),
+    user.collection('closed_trades').doc(mkt),
+    user.collection('tradeHistory').doc(mkt),
+    user.collection('trade_journal_'+mkt).doc('main')
+  ];
+  for(var i=0;i<refs.length;i++){rows=mergeJournalRows(rows,await getDocJournalRows(refs[i],mkt),mkt);}
+  ['aipicker_trade_journal_','trade_journal_','journal_','AIPICKER_JOURNAL_'].forEach(function(prefix){
+    try{var raw=localStorage.getItem(prefix+uid+'_'+mkt)||localStorage.getItem(prefix+mkt+'_'+uid)||localStorage.getItem(prefix+mkt);if(raw){var v=JSON.parse(raw);rows=mergeJournalRows(rows,Array.isArray(v)?v:extractJournalArrays(v),mkt);}}catch(e){}
+  });
+  return rows;
+}
+async function loadJournal(autoRepair){
+  JOURNAL={tw:[],us:[]}; if(!currentUser||!db)return JOURNAL;var recoveredCount=0;
+  for(var m of ['tw','us']){
+    try{
+      var canonical=journalRefSafe(currentUser.uid,m), canonicalRows=[];
+      if(canonical){var s=await canonical.get();var d=s.exists?s.data():{};canonicalRows=Array.isArray(d.trades)?d.trades:extractJournalArrays(d);}
+      var allRows=autoRepair?await recoverJournalRows(currentUser.uid,m):canonicalRows;
+      JOURNAL[m]=mergeJournalRows([],allRows,m);
+      if(autoRepair&&JOURNAL[m].length>canonicalRows.length){recoveredCount+=JOURNAL[m].length-canonicalRows.length;await saveJournal(m);}
+    }catch(e){console.warn('load journal',m,e);}
+  }
+  if(autoRepair&&recoveredCount>0)toast('已修復交易日誌 '+recoveredCount+' 筆','ok');
   return JOURNAL;
 }
-async function saveJournal(mkt){mkt=normalizePositionMarket(mkt);if(!currentUser||!db)return;var ref=journalRefSafe(currentUser.uid,mkt);if(!ref)return;await ref.set({market:mkt,trades:JOURNAL[mkt]||[],updated_at:new Date().toISOString()},{merge:true});}
+async function reloadJournal(autoRepair){await loadJournal(!!autoRepair);renderJournal();toast(autoRepair?'交易日誌已重新掃描並修復':'交易日誌已重新載入','ok');}
+async function saveJournal(mkt){mkt=normalizePositionMarket(mkt);if(!currentUser||!db)return;var ref=journalRefSafe(currentUser.uid,mkt);if(!ref)return;await ref.set({market:mkt,trades:mergeJournalRows([],JOURNAL[mkt]||[],mkt),updated_at:new Date().toISOString()},{merge:true});}
 function allJournal(){return (JOURNAL.tw||[]).concat(JOURNAL.us||[]);}
 function tradeKey(t){return (t.market||'tw')+":"+String(t.symbol||t.stock_id||t.id)+":"+String(t.closed_at||t.exit_date||t.created_at||'');}
 function calcTrade(t){
@@ -2785,7 +2833,7 @@ function renderJournal(){
   var sb=$I('strategyStatsBox');if(sb){sb.innerHTML=sum.strategy_stats.length?'<table class="strategy-table"><thead><tr><th>策略</th><th>交易</th><th>勝率</th><th>損益</th><th>平均 R</th></tr></thead><tbody>'+sum.strategy_stats.map(function(s){return'<tr><td>'+esc(s.strategy_type)+'</td><td>'+s.trades+'</td><td>'+s.win_rate+'%</td><td>'+s.pnl+'</td><td>'+(s.avg_r==null?'—':s.avg_r)+'</td></tr>';}).join('')+'</tbody></table>':'<div class="empty">尚無策略統計</div>';}
   generateReportText(false);
 }
-function generateReportText(show){var s=journalSummary();var best=s.strategy_stats[0]?s.strategy_stats[0].strategy_type:'—';var txt='AIPICKER V12.9.0 交易績效報告\n生成時間：'+new Date().toLocaleString('zh-TW')+'\n\n總交易數：'+s.total+'\n勝率：'+s.win_rate+'%\n總損益：'+s.total_pnl+'\n平均報酬：'+s.avg_return_pct+'%\n平均 R：'+s.avg_r_multiple+'\n最佳策略：'+best+'\n\nAI 回顧：'+(s.total?'目前已累積交易樣本，可開始觀察哪些 strategy_type 較適合你。若平均 R 低於 1，建議檢查是否太早出場或 RR 不足。':'目前尚無已結束交易，先從持倉管理結束交易後累積樣本。');setTxt('reportText',txt);if(show)toast('報告已產生','ok');return txt;}
+function generateReportText(show){var s=journalSummary();var best=s.strategy_stats[0]?s.strategy_stats[0].strategy_type:'—';var txt='AIPICKER V12.9.1 交易績效報告\n生成時間：'+new Date().toLocaleString('zh-TW')+'\n\n總交易數：'+s.total+'\n勝率：'+s.win_rate+'%\n總損益：'+s.total_pnl+'\n平均報酬：'+s.avg_return_pct+'%\n平均 R：'+s.avg_r_multiple+'\n最佳策略：'+best+'\n\nAI 回顧：'+(s.total?'目前已累積交易樣本，可開始觀察哪些 strategy_type 較適合你。若平均 R 低於 1，建議檢查是否太早出場或 RR 不足。':'目前尚無已結束交易，先從持倉管理結束交易後累積樣本。');setTxt('reportText',txt);if(show)toast('報告已產生','ok');return txt;}
 function exportJournalCsv(){var rows=journalSummary().rows;if(!rows.length){toast('沒有日誌可匯出','warn');return;}var cols=['market','symbol','name','entry_price','exit_price','shares','pnl','return_pct','r_multiple','strategy_type','exit_reason','exit_date'];var csv=[cols.join(',')].concat(rows.map(function(r){r=calcTrade(r);return cols.map(function(c){return '"'+String(r[c]==null?'':r[c]).replace(/"/g,'""')+'"';}).join(',');})).join('\n');var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='aipicker_trade_journal_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href);}
 async function copyReport(){var txt=generateReportText(false);try{await navigator.clipboard.writeText(txt);toast('報告已複製','ok');}catch(e){prompt('複製以下報告',txt);}}
 
@@ -2902,7 +2950,8 @@ function bindAllButtons() {
   safeBind("btnRefreshPlans","click",function(){refreshTradePlans(true);});
   safeBind("btnAddPosition","click",manualAddPosition);
   safeBind("btnRefreshPositions","click",function(){refreshPositions(true);});
-  safeBind("btnJournalRefresh","click",function(){renderJournal();toast("交易日誌已更新","ok");});
+  safeBind("btnJournalRefresh","click",function(){reloadJournal(false);});
+  safeBind("btnJournalRepair","click",function(){reloadJournal(true);});
   safeBind("btnJournalExport","click",exportJournalCsv);
   safeBind("btnReportCopy","click",copyReport);
   safeBind("btnReportGenerate","click",function(){generateReportText(true);});

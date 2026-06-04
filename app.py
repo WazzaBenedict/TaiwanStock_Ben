@@ -1,7 +1,7 @@
 """
-V12.9.0 Multi-Portfolio Watchlist Manager
+V12.9.1 Multi-Portfolio Watchlist Manager
 架構：TW Engine / US Engine / Shared Engine（三層分離）
-版本：12.9.0
+版本：12.9.1
 """
 import os, re, asyncio, json, time, hashlib
 from datetime import datetime, timedelta
@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="V12.9.0 Multi-Portfolio Watchlist Manager", version="12.9.0")
+app = FastAPI(title="V12.9.1 Multi-Portfolio Watchlist Manager", version="12.9.1")
 _raw = os.getenv("ALLOWED_ORIGINS",
     "http://localhost:5500,http://127.0.0.1:5500,"
     "https://taiwanstock-ben.web.app,https://taiwanstock-ben.firebaseapp.com")
@@ -653,7 +653,7 @@ def get_stock_name(sid: str, api_name: str | None=None) -> str:
 # TW LEARNING / WEIGHTS
 # ══════════════════════════════════════════════════════════════════════════════
 TW_DEFAULT_WEIGHTS={"technical":0.35,"fundamental":0.25,"chip":0.25,"news":0.15,
-    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.9.0","last_reason":"預設權重"}
+    "risk":0.10,"macro":0.05,"updated_at":"","version":"12.9.1","last_reason":"預設權重"}
 TW_WEIGHT_LIMITS={"technical":(0.20,0.45),"fundamental":(0.10,0.35),"chip":(0.10,0.40),"news":(0.05,0.25)}
 
 def _rjf(path,default):
@@ -1111,7 +1111,7 @@ async def _analyze_stock_lite(stock_id:str, macro:dict|None=None) -> dict:
 
 
 async def _analyze_stock_mobile(stock_id: str) -> dict:
-    """V12.9.0 mobile-first quote endpoint.
+    """V12.9.1 mobile-first quote endpoint.
     Returns very fast quote data without forcing 90/400-day history fetch.
     The frontend can show this immediately, then lazy-load stock-lite/full analysis.
     """
@@ -1196,7 +1196,7 @@ def _mobile_score_payload(ai: dict) -> dict:
     }
 
 async def _analyze_stock_mobile_tech(stock_id: str) -> dict:
-    """V12.9.0 mobile technical endpoint.
+    """V12.9.1 mobile technical endpoint.
     Goal: show a fast entry decision on phones without waiting for full 400-day analysis,
     charts, 4D analysis, or heavy report blocks.
     """
@@ -1854,7 +1854,7 @@ async def _fetch_us_lite(symbol: str) -> dict:
 
 
 async def _fetch_us_mobile_tech(symbol: str) -> dict:
-    """V12.9.0 US mobile technical endpoint: fast technical decision without full profile/chart work."""
+    """V12.9.1 US mobile technical endpoint: fast technical decision without full profile/chart work."""
     symbol = symbol.upper()
     try:
         async with httpx.AsyncClient() as cl:
@@ -1934,7 +1934,7 @@ TW_DISCOVERY_POOL = [
     "3260","5483","5351","6147","2342","2344","6173","8086","6274","8358"
 ]
 TW_GROUP_MAP = {
-    # V12.9.0: more granular Taiwan theme taxonomy so sector_spread is meaningful.
+    # V12.9.1: more granular Taiwan theme taxonomy so sector_spread is meaningful.
     # Order matters: specific themes first, broad fallback groups later.
     "semiconductor": {"2330","2454","2303","2327","2379","3034","3711","2408","2337","2344","2449","4919","6182","4967","5388"},
     "ai_server": {"2317","2382","2356","6669","3231","2357","2376","3005","3706","2395","4938","2301","2324"},
@@ -2053,7 +2053,7 @@ def select_us_scan_pool(pool: str = "all", symbols: str = "", limit: int = 50) -
     return list(dict.fromkeys(base))[:limit]
 
 def select_tw_scan_pool(pool: str = "all", symbols: str = "", limit: int = 50) -> list[str]:
-    """V12.9.0 Taiwan pool selector with true discovery mix.
+    """V12.9.1 Taiwan pool selector with true discovery mix.
     Core 30% + user watchlist/custom 20% + theme rotation 30% + random/exploration 20%.
     This prevents diversified scans from repeatedly using the same fixed top-60 list.
     """
@@ -2131,7 +2131,7 @@ def _repeat_penalty(sym: str, recent: set[str], current_category: str, previous_
     if s not in recent: return 0
     # Do not punish true upgrades into ENTERABLE too much.
     if str(current_category or "").upper() == "ENTERABLE": return 3
-    # V12.9.0: stronger repeat penalty so recent symbols stop dominating Watch/Fresh lists.
+    # V12.9.1: stronger repeat penalty so recent symbols stop dominating Watch/Fresh lists.
     return 20
 
 def _sector_quota_score(group: str, counts: dict, diversity_mode: str) -> int:
@@ -2483,7 +2483,7 @@ async def api_market_sentiment():
 # API — TW AI Scan
 # ══════════════════════════════════════════════════════════════════════════════
 async def _tw_scan_core(min_score:int=65,max_stocks:int=50,mode:str="full",pool_name:str="all",symbols:str="",use_cache:bool=True,diversity_mode:str="balanced",history_symbols:str=""):
-    """V12.9.0 TW AI scan core — real diversity fix + safe mode parsing."""
+    """V12.9.1 TW AI scan core — real diversity fix + safe mode parsing."""
     mode, mode_warn = _sanitize_scan_mode(mode)
     diversity_mode, div_warn = _sanitize_diversity_mode(diversity_mode)
     pool=select_tw_scan_pool(pool_name, symbols, max_stocks)
@@ -2548,7 +2548,7 @@ async def _tw_scan_core(min_score:int=65,max_stocks:int=50,mode:str="full",pool_
            "risk_watch":risk_watch,"avoid":avoid,"near_miss":near_miss,"errors":errors,"error_count":len(errors)}
     if mode_warn or div_warn:
         payload["mode_warning"] = "; ".join([x for x in [mode_warn, div_warn] if x])
-    # V12.9.0: TW now uses the same diversity/history reranker as US.
+    # V12.9.1: TW now uses the same diversity/history reranker as US.
     payload=_rebuild_diversified_payload(payload,"tw",_parse_history_symbols(history_symbols),diversity_mode)
     return _scan_cache_set(TW_SCAN_CACHE, cache_key, payload)
 
@@ -2790,15 +2790,15 @@ def _suggest_learning_weights(payload: dict) -> dict:
 
 @app.post("/api/learning/summary")
 def api_learning_summary_v128(payload: dict = Body(default={})):
-    return {"version": "12.9.0", "summary": _learning_summary(payload), "time": datetime.now().isoformat()}
+    return {"version": "12.9.1", "summary": _learning_summary(payload), "time": datetime.now().isoformat()}
 
 @app.post("/api/learning/calibrate")
 def api_learning_calibrate_v128(payload: dict = Body(default={})):
-    return {"version": "12.9.0", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
+    return {"version": "12.9.1", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
 
 @app.post("/api/learning/suggest-weights")
 def api_learning_suggest_weights_v128(payload: dict = Body(default={})):
-    return {"version": "12.9.0", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
+    return {"version": "12.9.1", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
 
 @app.post("/api/learning/apply-weights")
 def api_learning_apply_weights_v128(payload: dict = Body(default={})):
@@ -2807,20 +2807,20 @@ def api_learning_apply_weights_v128(payload: dict = Body(default={})):
     # Only TW backend has server-side scoring weights in this single-file app.
     if market == "tw":
         saved = save_ai_weights(weights)
-        return {"version": "12.9.0", "applied": True, "market": market, "weights": saved, "time": datetime.now().isoformat()}
-    return {"version": "12.9.0", "applied": False, "market": market, "weights": weights,
+        return {"version": "12.9.1", "applied": True, "market": market, "weights": saved, "time": datetime.now().isoformat()}
+    return {"version": "12.9.1", "applied": False, "market": market, "weights": weights,
             "message": "US personal weights are stored per user in Firestore by the frontend.", "time": datetime.now().isoformat()}
 
 @app.get("/api/learning/status")
 def api_learning_status_v128():
     h = load_signal_history()
-    return {"version": "12.9.0", "server_tw_signal_history": _lst(h),
+    return {"version": "12.9.1", "server_tw_signal_history": _lst(h),
             "note": "V12.8 personal learning events are stored in each user's Firestore and sent to /api/learning/summary or /api/learning/calibrate for calculation.",
             "time": datetime.now().isoformat()}
 
 @app.get("/api/debug/learning")
 def api_debug_learning_v128():
-    return {"version": "12.9.0", "engine": "Real AI Learning Engine",
+    return {"version": "12.9.1", "engine": "Real AI Learning Engine",
             "frontend_firestore_paths": ["users/{uid}/ai_learning_events/tw", "users/{uid}/ai_learning_events/us", "users/{uid}/ai_weight_versions/tw", "users/{uid}/ai_weight_versions/us", "users/{uid}/ai_learning_summary/tw", "users/{uid}/ai_learning_summary/us"],
             "apis": ["POST /api/learning/summary", "POST /api/learning/calibrate", "POST /api/learning/suggest-weights", "POST /api/learning/apply-weights", "GET /api/learning/status"],
             "time": datetime.now().isoformat()}
@@ -2879,7 +2879,7 @@ async def us_profile(symbol:str):
     return{"symbol":symbol.upper(),"name":master_info.get("name",symbol),"profile":profile}
 
 async def _us_scan_core(min_score:int=60,max_stocks:int=50,mode:str="full",pool_name:str="all",symbols:str="",use_cache:bool=True,diversity_mode:str="balanced",history_symbols:str=""):
-    """V12.9.0 US AI scan core — real diversity fix + safe mode parsing."""
+    """V12.9.1 US AI scan core — real diversity fix + safe mode parsing."""
     t0=time.time()
     mode, mode_warn = _sanitize_scan_mode(mode)
     diversity_mode, div_warn = _sanitize_diversity_mode(diversity_mode)
@@ -2971,7 +2971,7 @@ async def us_scan_diversified(pool:str="diversified",symbols:str="",min_score:in
 
 @app.get("/api/debug/recommendation-history")
 def api_debug_recommendation_history():
-    return {"version":"12.9.0","note":"Per-user recommendation history is stored client-side/localStorage or Firestore by the frontend. Backend diversified scan accepts history_symbols to apply novelty/repeat penalties.","fields":["symbol/stock_id","market","scan_category","shown_at","diversity_group","diversified_score"]}
+    return {"version":"12.9.1","note":"Per-user recommendation history is stored client-side/localStorage or Firestore by the frontend. Backend diversified scan accepts history_symbols to apply novelty/repeat penalties.","fields":["symbol/stock_id","market","scan_category","shown_at","diversity_group","diversified_score"]}
 
 @app.get("/api/debug/scan-status")
 def api_scan_status():
@@ -2981,7 +2981,7 @@ def api_scan_status():
         for k,(payload,ts) in list(cache.items())[-12:]:
             out.append({"key":k,"age_seconds":round(now-ts,1),"market":payload.get("market"),"mode":payload.get("scan_mode"),"pool":payload.get("pool"),"classified":payload.get("classified"),"failed":payload.get("failed")})
         return out
-    return {"version":"12.9.0","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
+    return {"version":"12.9.1","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # API — DATA HEALTH / DIAGNOSTICS
@@ -3092,12 +3092,12 @@ async def api_health_full():
 
     payload = {
         "status": "ok" if not errors else "partial",
-        "version": "12.9.0",
-        "frontend_expected": "12.9.0",
+        "version": "12.9.1",
+        "frontend_expected": "12.9.1",
         "time": datetime.now().isoformat(),
         "backend": {
-            "title": "V12.9.0 Multi-Portfolio Watchlist Manager",
-            "version": "12.9.0"
+            "title": "V12.9.1 Multi-Portfolio Watchlist Manager",
+            "version": "12.9.1"
         },
         "line": {
             "configured": bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
@@ -3207,7 +3207,7 @@ async def api_trade_plan_check(
 @app.get("/api/debug/trade-plans")
 def api_debug_trade_plans():
     return {
-        "version": "12.9.0",
+        "version": "12.9.1",
         "storage": "Firestore frontend: users/{uid}/trade_plans/tw and users/{uid}/trade_plans/us",
         "checker": "/api/trade-plan/check",
         "statuses": ["WAITING_ENTRY","ENTERABLE_NOW","ABOVE_ENTRY_ZONE","NEAR_TARGET","NEAR_STOP","STOP_BROKEN","TARGET_REACHED","INVALIDATED","NO_PRICE"],
@@ -3311,7 +3311,7 @@ async def api_position_check(
 @app.get("/api/debug/positions")
 def api_debug_positions():
     return {
-        "version": "12.9.0",
+        "version": "12.9.1",
         "storage": "Firestore frontend: users/{uid}/positions/tw and users/{uid}/positions/us",
         "checker": "/api/position/check",
         "statuses": ["HOLDING_NORMAL","NEAR_TARGET","TARGET_REACHED","NEAR_STOP","STOP_BROKEN","RISK_UP","REVIEW_REQUIRED","NO_PRICE"],
@@ -3435,13 +3435,13 @@ def _build_review_text(total, wins, pnl, avg_r, strategy_stats):
 @app.post("/api/performance/summary")
 def api_performance_summary(payload: dict = Body(default={})):  # frontend sends Firestore journal rows
     trades = payload.get("trades") or payload.get("journal") or []
-    return {"version": "12.9.0", "market": payload.get("market", "all"), "summary": _summarize_trades(trades), "time": datetime.now().isoformat()}
+    return {"version": "12.9.1", "market": payload.get("market", "all"), "summary": _summarize_trades(trades), "time": datetime.now().isoformat()}
 
 @app.post("/api/trade-journal/review")
 def api_trade_journal_review(payload: dict = Body(default={})):
     trades = payload.get("trades") or []
     summary = _summarize_trades(trades)
-    return {"version": "12.9.0", "review": summary.get("review"), "summary": summary, "time": datetime.now().isoformat()}
+    return {"version": "12.9.1", "review": summary.get("review"), "summary": summary, "time": datetime.now().isoformat()}
 
 @app.post("/api/report/summary")
 def api_report_summary(payload: dict = Body(default={})):
@@ -3458,12 +3458,12 @@ def api_report_summary(payload: dict = Body(default={})):
         "",
         summary.get("review") or "",
     ]
-    return {"version": "12.9.0", "report_text": "\n".join(lines), "summary": summary, "time": datetime.now().isoformat()}
+    return {"version": "12.9.1", "report_text": "\n".join(lines), "summary": summary, "time": datetime.now().isoformat()}
 
 @app.get("/api/debug/portfolios")
 def api_debug_portfolios():
     return {
-        "version": "12.9.0",
+        "version": "12.9.1",
         "storage": "Firestore frontend: users/{uid}/portfolios/{portfolio_id}",
         "legacy_watchlists": "users/{uid}/watchlists/tw and users/{uid}/watchlists/us are kept for fallback",
         "features": ["multiple portfolios", "default portfolio migration", "portfolio-specific watchlist", "portfolio scan"],
@@ -3473,7 +3473,7 @@ def api_debug_portfolios():
 @app.get("/api/debug/trade-journal")
 def api_debug_trade_journal():
     return {
-        "version": "12.9.0",
+        "version": "12.9.1",
         "storage": "Firestore frontend: users/{uid}/trade_journal/tw and users/{uid}/trade_journal/us",
         "endpoints": ["/api/performance/summary", "/api/trade-journal/review", "/api/report/summary"],
         "features": ["close position to journal", "R multiple", "strategy performance", "CSV export", "text report"],
@@ -3486,12 +3486,12 @@ def api_debug_trade_journal():
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/health")
 def health():
-    return{"status":"ok","version":"12.9.0","frontend_expected":"12.9.0","time":datetime.now().isoformat(),
+    return{"status":"ok","version":"12.9.1","frontend_expected":"12.9.1","time":datetime.now().isoformat(),
            "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
            "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
            "price_sources":"Yahoo Finance → TWSE Official → FinMind",
            "us_master_count":len(_us_master),"tw_master_count":len(STOCK_MASTER),
-           "features":["V12.9.0 Multi-Portfolio Watchlist Manager","AI Picker Pro","Mobile Fast Data",
+           "features":["V12.9.1 Multi-Portfolio Watchlist Manager","AI Picker Pro","Mobile Fast Data",
                        "TW Engine + US Engine + Shared Engine",
                        "6-zone scan output","US Market Context","Symbol Master 200+",
                        "validate_trade_plan","compute_final_score","LINE alerts","Quick/Full AI Scan","Watch Closely zone","scan pool selector","scan cache diagnostics","Trade Plan Center","trade plan status checker","Watchlist UI polish","Portfolio Center","position status checker","smart position alerts","Trade Journal","Performance Review","AI Backtest Learning","Report Center","CSV export","AI Discovery Diversity","Fresh Discovery","repeat_penalty","novelty_score","sector_quota","TW diversity history parity"]}
