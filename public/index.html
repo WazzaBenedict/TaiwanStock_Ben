@@ -1574,7 +1574,7 @@ async function fetchSuggest(q) {
 function showSuggest(results) {
   var box=$I("suggestBox"); if(!box) return;
   if(!results.length){box.style.display="none";return;}
-  box.innerHTML=results.map(function(r){return'<div class="suggest-item" data-id="'+r.stock_id+'" data-name="'+r.stock_name+'"><span class="si-name">'+r.stock_name+'</span><span class="si-id">'+r.stock_id+'</span></div>';}).join("");
+  box.innerHTML=results.map(function(r){return'<div class="suggest-item" data-id="'+esc(r.stock_id)+'" data-name="'+esc(r.stock_name)+'"><span class="si-name">'+esc(r.stock_name)+'</span><span class="si-id">'+esc(r.stock_id)+'</span></div>';}).join("");
   box.style.display="block";
   box.querySelectorAll(".suggest-item").forEach(function(el){el.addEventListener("click",function(){var inp=$I("sid");if(inp)inp.value=el.dataset.id;box.style.display="none";doSearch();});});
 }
@@ -2479,7 +2479,7 @@ function initUSSuggest() {
 }
 async function fetchUSSuggest(q) {
   var box=$I("usSuggestBox");if(!box)return;
-  try{var r=await apiFetch(API+"/api/us/suggest?q="+encodeURIComponent(q),{},5000);if(!r.ok)return;var d=await r.json();var results=d.results||[];if(!results.length){box.style.display="none";return;}box.innerHTML=results.map(function(r2){return'<div class="us-suggest-item" data-us-sym="'+r2.symbol+'"><div><span class="us-sym">'+r2.symbol+'</span> <span class="us-sname">'+r2.name+'</span></div><span class="us-exch">'+(r2.exchange||r2.type||"")+'</span></div>';}).join("");box.style.display="block";}catch{}
+  try{var r=await apiFetch(API+"/api/us/suggest?q="+encodeURIComponent(q),{},5000);if(!r.ok)return;var d=await r.json();var results=d.results||[];if(!results.length){box.style.display="none";return;}box.innerHTML=results.map(function(r2){return'<div class="us-suggest-item" data-us-sym="'+esc(r2.symbol)+'"><div><span class="us-sym">'+esc(r2.symbol)+'</span> <span class="us-sname">'+esc(r2.name)+'</span></div><span class="us-exch">'+esc(r2.exchange||r2.type||"")+'</span></div>';}).join("");box.style.display="block";}catch{}
 }
 function usDoSearch(){var inp=$I("usSymbol");var sym=inp?inp.value.trim().toUpperCase():"";if(/^[A-Z.\-]{1,12}$/.test(sym))usLoadStock(sym);else if(sym)alert("Please enter a valid US symbol (letters only)");}
 
