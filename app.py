@@ -295,15 +295,17 @@ def build_trade_plan(row: pd.Series, cp: float, signal: str,
     if ma20: sl_cands.append(round(ma20*0.985,4))
     if sup:  sl_cands.append(round(sup*0.99,4))
     if atr and atr>0: sl_cands.append(round(ep-atr*1.5,4))
-    sl = min(sl_cands)
-    if sl>=ep or sl<=0: sl=round(ep*0.96,4)
+    # 取最近的合理停損（至少低於進場 1%），舊版取最寬的停損會讓 R:R 虛胖
+    near_sl=[x for x in sl_cands if 0<x<=ep*0.99]
+    sl = max(near_sl) if near_sl else round(ep*0.96,4)
 
     # Target
     tp_cands=[round(ep*1.05,4)]
     if res and res>ep*1.01: tp_cands.append(round(res,4))
     if atr and atr>0: tp_cands.append(round(ep+atr*2.5,4))
-    tp=max(tp_cands)
-    if tp<=ep: tp=round(ep*1.06,4)
+    # 取最近的合理目標（至少高於進場 2%），舊版取最樂觀的目標
+    near_tp=[x for x in tp_cands if x>=ep*1.02]
+    tp=min(near_tp) if near_tp else round(ep*1.06,4)
 
     # Final validation
     if not (sl<ep<tp):
@@ -452,9 +454,12 @@ async def _ffy(sid, days, cl):
     return None
 
 async def _fft(sid, cl):
-    frames=[]; today=datetime.today()
-    for dm in range(3):
-        dt=(today-timedelta(days=30*dm)).strftime("%Y%m")
+    frames=[]; first=datetime.today().replace(day=1)
+    # 逐月往前抓（舊版用「今天−30×n 天」會跳過月份，只抓 3 個月也不夠算 MA60／ADX）
+    for dm in range(7):
+        y,m=first.year,first.month-dm
+        while m<=0: y-=1; m+=12
+        dt=f"{y}{m:02d}"
         try:
             r=await cl.get(f"https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date={dt}01&stockNo={sid}&response=json",timeout=HTTP_TIMEOUT,follow_redirects=True)
             rows=r.json().get("data",[])
@@ -468,7 +473,7 @@ async def _fft(sid, cl):
                     def _p(x): return float(str(x).replace(",","")) if x and x!="--" else None
                     op,hp,lp,cp=_p(row[3]),_p(row[4]),_p(row[5]),_p(row[6])
                     if cp is None: continue
-                    recs.append({"日期":dobj,"成交股數":vol*1000,"開盤價":op or cp,"最高價":hp or cp,"最低價":lp or cp,"收盤價":cp})
+                    recs.append({"日期":dobj,"成交股數":vol,"開盤價":op or cp,"最高價":hp or cp,"最低價":lp or cp,"收盤價":cp})
                 except: continue
             if recs: frames.append(pd.DataFrame(recs))
         except: continue
@@ -532,7 +537,7 @@ def build_tw_ai_signal(row: pd.Series, cp: float, winrate_info: dict,
 
     dq = "full" if price_df is not None and len(price_df)>=60 else "partial"
     final = compute_final_score(ts,setup_score,rr_score,market_score,vol_score,risk_score,dq)
-    conf  = min(100, final + (5 if winrate_info.get("winrate",0)>=55 else 0))
+    conf  = min(100, final)   # 舊版：同一檔股票樣本內勝率 ≥55% 加 5 分（自我驗證，已移除）
 
     # entry_status refinement
     if tv:
@@ -665,9 +670,9 @@ def _rjf(path,default):
     except: pass
     return default
 
-def _wjf(path,data):
-    try: path.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding="utf-8")
-    except: pass
+def _wjf(path,data) -> bool:
+    try: path.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding="utf-8"); return True
+    except Exception: return False
 
 def _nw(w,defaults,limits):
     base=defaults.copy()
@@ -680,7 +685,7 @@ def _nw(w,defaults,limits):
     return base
 
 def load_ai_weights() -> dict:  return _nw(_rjf(TW_WEIGHTS_FILE,TW_DEFAULT_WEIGHTS.copy()),TW_DEFAULT_WEIGHTS,TW_WEIGHT_LIMITS)
-def save_ai_weights(w):         w=_nw(w,TW_DEFAULT_WEIGHTS,TW_WEIGHT_LIMITS); w["updated_at"]=datetime.now().isoformat(); _wjf(TW_WEIGHTS_FILE,w); return w
+def save_ai_weights(w):         w=_nw(w,TW_DEFAULT_WEIGHTS,TW_WEIGHT_LIMITS); w["updated_at"]=datetime.now().isoformat(); w["saved"]=_wjf(TW_WEIGHTS_FILE,w); return w
 def load_signal_history() -> list:
     d=_rjf(TW_HISTORY_FILE,{"signals":[]})
     return d.get("signals",[]) if isinstance(d,dict) else (d if isinstance(d,list) else [])
@@ -838,9 +843,8 @@ def _rwl()->list[dict]:
     except: pass
     return []
 
-def _wwl(items:list[dict]):
-    try: WATCHLIST_FILE.write_text(json.dumps({"watchlist":items},ensure_ascii=False,indent=2),encoding="utf-8")
-    except: pass
+def _wwl(items:list[dict]) -> bool:
+    return _wjf(WATCHLIST_FILE,{"watchlist":items})
 
 class WatchlistUpdateBody(BaseModel): watchlist: list
 class WatchlistBody(BaseModel): watchlist: list[str]
@@ -2338,11 +2342,16 @@ def advanced_backtest(df,holding_days=5,min_score=75,bench_df=None,stock_id=""):
     req=[c for c in["MA5","MA20","MA60","RSI","MACD","Signal"] if c in df.columns]
     df=(df.dropna(subset=req) if req else df).reset_index(drop=True)
     if len(df)<holding_days+2: return empty
+    # 與即時分析相同的輸入：量比（當日量 / 20 日均量）、當日漲跌幅、近 60 日價格
+    vol_ratio=df["成交股數"]/df["成交股數"].rolling(20,min_periods=5).mean()
+    chg=df["收盤價"].pct_change()*100
     trades,equity,peak,max_dd,in_mkt=[],1.0,1.0,0.0,0
     i=0
     while i+holding_days<len(df):
         row=df.iloc[i]; cur=float(row["收盤價"])
-        ai=build_tw_ai_signal(row,cur,{"winrate":0,"trials":0,"wins":0},{},0,1.0,None)
+        vr=float(vol_ratio.iloc[i]) if pd.notna(vol_ratio.iloc[i]) else 1.0
+        cg=float(chg.iloc[i]) if pd.notna(chg.iloc[i]) else 0.0
+        ai=build_tw_ai_signal(row,cur,{"winrate":0,"trials":0,"wins":0},{},cg,vr,df.iloc[max(0,i-59):i+1])
         if (ai.get("confidence") or 0)<min_score: i+=1; continue
         ep=_entry_open(df,i+1); xp=float(df.iloc[i+holding_days]["收盤價"])
         if not ep: i+=1; continue
@@ -2443,7 +2452,7 @@ async def api_get_watchlist():
 
 @app.post("/api/watchlist")
 async def api_post_watchlist(body:WatchlistUpdateBody):
-    items=_nwl(body.watchlist); _wwl(items); return{"watchlist":items,"count":len(items),"saved":True}
+    items=_nwl(body.watchlist); ok=_wwl(items); return{"watchlist":items,"count":len(items),"saved":ok}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # API — TW Stocks
@@ -2867,7 +2876,7 @@ def api_learning_apply_weights_v128(payload: dict = Body(default={})):
     # Only TW backend has server-side scoring weights in this single-file app.
     if market == "tw":
         saved = save_ai_weights(weights)
-        return {"version": "12.9.2", "applied": True, "market": market, "weights": saved, "time": datetime.now().isoformat()}
+        return {"version": "12.9.2", "applied": bool(saved.get("saved")), "market": market, "weights": saved, "time": datetime.now().isoformat()}
     return {"version": "12.9.2", "applied": False, "market": market, "weights": weights,
             "message": "US personal weights are stored per user in Firestore by the frontend.", "time": datetime.now().isoformat()}
 
@@ -3415,9 +3424,18 @@ def _calc_trade_result(t: dict) -> dict:
     pnl = pct = r_mult = None
     hit_target = False
     hit_stop = False
+    pnl_gross = fees = None
     if entry is not None and exitp is not None:
-        pnl = round((exitp - entry) * shares, 2)
-        pct = round((exitp - entry) / entry * 100, 2) if entry else None
+        pnl_gross = round((exitp - entry) * shares, 2)
+        fees = 0.0
+        if str(t.get("market", "tw")).lower() == "tw":
+            # 台股：手續費 0.1425%（每筆最低 20 元）買賣各一次，賣出證交稅 0.3%（ETF 0.1%）
+            sym = str(t.get("stock_id") or t.get("symbol") or "")
+            fee = lambda amt: max(20.0, amt * TW_COSTS.fee_rate) if amt > 0 else 0.0
+            fees = fee(entry * shares) + fee(exitp * shares) + exitp * shares * (TW_COSTS.tax_etf if is_etf(sym) else TW_COSTS.tax_stock)
+        pnl = round(pnl_gross - fees, 2)
+        cost_basis = entry * shares
+        pct = round(pnl / cost_basis * 100, 2) if cost_basis else None
         hit_target = bool(target is not None and exitp >= target)
         hit_stop = bool(stop is not None and exitp <= stop)
         risk_per_share = (entry - stop) if stop is not None else None
@@ -3431,6 +3449,8 @@ def _calc_trade_result(t: dict) -> dict:
     result = dict(t)
     result.update({
         "pnl": pnl,
+        "pnl_gross": pnl_gross,
+        "fees_and_tax": round(fees, 2) if fees is not None else None,
         "return_pct": pct,
         "r_multiple": r_mult,
         "hit_target": hit_target,

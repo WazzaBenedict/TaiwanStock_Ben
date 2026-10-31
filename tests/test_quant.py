@@ -181,3 +181,39 @@ def test_clean_price_breaks_removes_spike_but_keeps_normal_moves():
     assert n == 2
     r = new_close["1101"].pct_change().dropna().round(6).tolist()
     assert r == [0.1, 0.0, 0.0, 0.1, 0.0]
+
+
+def test_trade_plan_uses_nearest_stop_and_target():
+    import app
+    row = pd.Series({"MA5": 100.0, "MA20": 95.0, "ATR": 4.0})
+    plan = app.build_trade_plan(row, 100.0, "BUY", None)
+    ep = plan["entry_price"]
+    # 候選停損：97、93.575、94；最近且合理的是 97（舊版取最寬的 93.575）
+    assert plan["stop_loss"] == pytest.approx(ep * 0.97)
+    # 候選目標：105、110；取最近的 105（舊版取 110）
+    assert plan["target_price"] == pytest.approx(ep * 1.05)
+
+
+def test_confidence_has_no_in_sample_winrate_bonus():
+    import app
+    df = app.compute_all_indicators(_price_df(list(np.linspace(50, 100, 120) + np.tile([0.6, -0.6], 60))))
+    row = df.iloc[-1]
+    a = app.build_tw_ai_signal(row, float(row["收盤價"]), {"winrate": 90}, {}, 0, 1.0, df)
+    b = app.build_tw_ai_signal(row, float(row["收盤價"]), {"winrate": 0}, {}, 0, 1.0, df)
+    assert a["confidence"] == b["confidence"]
+
+
+def test_trade_journal_pnl_net_of_fees_and_tax():
+    import app
+    r = app._calc_trade_result({"market": "tw", "stock_id": "2330", "entry_price": 100, "exit_price": 110, "shares": 1000})
+    fees = 100_000 * 0.001425 + 110_000 * 0.001425 + 110_000 * 0.003
+    assert r["pnl_gross"] == 10_000
+    assert r["pnl"] == pytest.approx(10_000 - fees, abs=0.01)
+    small = app._calc_trade_result({"market": "tw", "stock_id": "2330", "entry_price": 10, "exit_price": 10, "shares": 1})
+    assert small["fees_and_tax"] == pytest.approx(20 + 20 + 0.03)   # 每筆最低手續費 20 元
+
+
+def test_write_failure_is_reported(tmp_path):
+    import app
+    assert app._wjf(tmp_path / "ok.json", {"a": 1}) is True
+    assert app._wjf(tmp_path / "missing_dir" / "x.json", {"a": 1}) is False
