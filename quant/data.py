@@ -174,6 +174,43 @@ def load_price_yahoo(stock_id: str, start: str, end: str) -> pd.DataFrame:
     return _cached(_cache_path("yahoo", f"{stock_id}_{start}_{end}.pkl"), fetch)
 
 
+def load_ohlcv(stock_id: str, start: str, end: str, listed: bool = True) -> pd.DataFrame:
+    """App 格式的日線（日期、開盤價、最高價、最低價、收盤價、成交股數），用來在全市場重算 App 的技術面評分。
+
+    上市中股票用 Yahoo 還原價（開高低依 adjclose/close 同比例調整），下市股用 FinMind 未還原價。
+    """
+    def fetch():
+        df = pd.DataFrame()
+        if listed:
+            p1 = int(pd.Timestamp(start).timestamp())
+            p2 = int((pd.Timestamp(end) + pd.Timedelta(days=1)).timestamp())
+            try:
+                r = _get(YAHOO_URL.format(sym=f"{stock_id}.TW"), {"period1": p1, "period2": p2, "interval": "1d"}, retries=2)
+                res = (r.json().get("chart", {}).get("result") or [None])[0]
+            except RuntimeError:
+                res = None
+            if res and res.get("timestamp"):
+                q = res["indicators"]["quote"][0]
+                adj = res["indicators"].get("adjclose", [{}])[0].get("adjclose") or q["close"]
+                idx = pd.to_datetime(res["timestamp"], unit="s", utc=True).tz_convert("Asia/Taipei").normalize().tz_localize(None)
+                raw = pd.DataFrame({"o": q["open"], "h": q["high"], "l": q["low"], "c": q["close"], "a": adj,
+                                    "v": q["volume"]}, index=idx, dtype=float)
+                raw = raw[~raw.index.duplicated(keep="last")].dropna(subset=["c"])
+                raw = raw[(raw["c"] > 0) & (raw["v"] > 0)]
+                f = raw["a"] / raw["c"]
+                df = pd.DataFrame({"日期": raw.index, "開盤價": (raw["o"] * f).values, "最高價": (raw["h"] * f).values,
+                                   "最低價": (raw["l"] * f).values, "收盤價": raw["a"].values, "成交股數": raw["v"].values})
+        if df.empty:
+            fm = finmind("TaiwanStockPrice", stock_id, start, end)
+            if not fm.empty:
+                fm = fm[fm["close"] > 0]
+                df = pd.DataFrame({"日期": pd.to_datetime(fm["date"]).values, "開盤價": fm["open"].values,
+                                   "最高價": fm["max"].values, "最低價": fm["min"].values,
+                                   "收盤價": fm["close"].values, "成交股數": fm["Trading_Volume"].values})
+        return df.reset_index(drop=True)
+    return _cached(_cache_path("ohlcv", f"{stock_id}_{start}_{end}.pkl"), fetch)
+
+
 _MOPS_ROW = re.compile(r"<td align=center>(\d{4})</td><td align=left>[^<]*</td><td nowrap>\s*([-\d,]+)</td>")
 
 
@@ -272,7 +309,7 @@ def build_panel(start: str, end: str, benchmark: str = "0050", with_inst: bool =
     uni = uni[uni["listed"] | uni["stock_id"].isin(ever_twse)].reset_index(drop=True)
     log(f"universe: {uni['listed'].sum()} listed + {(~uni['listed']).sum()} delisted")
 
-    opens, closes, values = {}, {}, {}
+    opens, closes, values, volumes = {}, {}, {}, {}
     for i, row in enumerate(uni.itertuples()):
         sid = row.stock_id
         try:
@@ -284,7 +321,7 @@ def build_panel(start: str, end: str, benchmark: str = "0050", with_inst: bool =
             continue
         if df.empty:
             continue
-        opens[sid], closes[sid], values[sid] = df["open"], df["close"], df["value"]
+        opens[sid], closes[sid], values[sid], volumes[sid] = df["open"], df["close"], df["value"], df["volume"]
         if i % 100 == 0:
             log(f"prices {i}/{len(uni)}")
     bench = load_price_yahoo(benchmark, start, end)
@@ -298,6 +335,8 @@ def build_panel(start: str, end: str, benchmark: str = "0050", with_inst: bool =
         "close": close,
         "open": open_,
         "volume_value": pd.DataFrame(values).reindex(cal),
+        # 未還原均價 = 成交金額 / 成交股數；只用在需要「當時真實價格」的地方（法人買賣超金額）
+        "raw_close": (pd.DataFrame(values) / pd.DataFrame(volumes)).reindex(cal),
         "revenue": revenue.reindex(columns=close.columns),
         "benchmark_close": bench["close"].reindex(cal),
         "benchmark_open": bench["open"].reindex(cal),
@@ -326,9 +365,8 @@ def build_inst_panel(panel: dict, days_before: int, log=print) -> pd.DataFrame:
         if i % 200 == 0:
             log(f"T86 {i}/{len(need)}")
     shares = pd.DataFrame(rows).T.reindex(columns=panel["close"].columns)
-    # 法人買賣超股數 × 未還原收盤價 ≈ 買賣超金額；未還原收盤 = 成交金額 / 成交股數 不可得，
-    # 用 value 與 volume 的比例較麻煩，這裡用還原價近似（比例誤差在橫斷面標準化後影響很小）
-    px = panel["close"].reindex(shares.index)
+    # 法人買賣超股數 × 當日未還原均價 ≈ 買賣超金額（不可用還原價，否則過去的金額會被股利調整縮小）
+    px = panel["raw_close"].reindex(shares.index)
     net_value = shares * px
     full = pd.DataFrame(np.nan, index=cal, columns=panel["close"].columns)
     full.loc[net_value.index] = net_value.values

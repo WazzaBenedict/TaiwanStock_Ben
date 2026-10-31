@@ -118,7 +118,10 @@ def test_delisted_stock_exits_at_last_price_with_sell_cost():
     c = cfg.costs
     first = res["rebalances"][0]
     assert first["picks"] == ["1101"]
-    assert res["equity"].loc[cal[300]] == pytest.approx((1 - c.buy_rate) * (1 - c.sell_rate(False)))
+    K = cfg.capital
+    buy = c.order_cost(K, "buy", 0.001) / K           # 成交金額 10 億 → 滑價 0.1%
+    sell = c.order_cost(K * (1 - buy), "sell", 0.005) / (K * (1 - buy))   # 下市強制出場用 0.5% 滑價
+    assert res["equity"].loc[cal[300]] == pytest.approx((1 - buy) * (1 - sell))
 
 
 # ── 營收公告延遲 ──────────────────────────────────────────────────────────────
@@ -217,3 +220,81 @@ def test_write_failure_is_reported(tmp_path):
     import app
     assert app._wjf(tmp_path / "ok.json", {"a": 1}) is True
     assert app._wjf(tmp_path / "missing_dir" / "x.json", {"a": 1}) is False
+
+
+# ── 審查意見補強 ──────────────────────────────────────────────────────────────
+def test_min_fee_and_tiered_slippage():
+    from quant.costs import tiered_slippage
+    c = TaiwanCosts()
+    assert c.fee(1000) == 20                       # 1000 × 0.1425% = 1.4 元 → 最低 20 元
+    assert c.fee(1_000_000) == pytest.approx(1425)
+    assert c.order_cost(1_000_000, "sell", 0.002) == pytest.approx(1425 + 1_000_000 * (0.002 + 0.003))
+    assert tiered_slippage(2e9) == 0.001 and tiered_slippage(2e8) == 0.003 and tiered_slippage(6e7) == 0.005
+
+
+def test_small_capital_pays_relatively_more_fees():
+    panel = flat_panel()
+    cal = panel["close"].index
+    kw = dict(weights={"momentum_12_1": 1.0}, top_n=1, min_avg_value=0, start=str(cal[280].date()))
+    big = run_backtest(panel, BacktestConfig(capital=1e7, **kw))["equity"].iloc[-1]
+    small = run_backtest(panel, BacktestConfig(capital=5_000, **kw))["equity"].iloc[-1]
+    assert small < big
+
+
+def test_stale_price_gets_no_momentum_score():
+    panel = make_panel()
+    as_of = panel["close"].index[400]
+    panel["close"].loc[panel["close"].index[395]:, "1000"] = np.nan    # 停牌／下市 5 天
+    assert pd.isna(momentum_12_1(panel, as_of).get("1000"))
+    assert pd.isna(low_volatility(panel, as_of).get("1000"))
+
+
+def test_revenue_yoy_aligns_by_month_label_when_a_month_is_missing():
+    months = pd.date_range("2022-01-01", "2023-12-01", freq="MS")
+    rev = pd.DataFrame({"1101": 100.0, "1102": 100.0}, index=months)
+    rev.loc["2023-12-01", ["1101", "1102"]] = 200.0
+    rev = rev.drop(pd.Timestamp("2023-05-01"))           # 全市場缺一個月的檔案
+    out = revenue_yoy({"revenue": rev}, pd.Timestamp("2024-01-15"), months=1)
+    assert out["1101"] == pytest.approx(1.0)              # 2023/12 對 2022/12，不是對 2023/01
+    rev.loc[pd.Timestamp("2022-12-01"), "1102"] = np.nan    # 去年同月缺值 → 不給分
+    out2 = revenue_yoy({"revenue": rev}, pd.Timestamp("2024-01-15"), months=1)
+    assert pd.isna(out2["1102"])
+
+
+def test_revenue_yoy_ignores_stale_filers():
+    months = pd.date_range("2022-01-01", "2023-12-01", freq="MS")
+    rev = pd.DataFrame({"1101": 100.0, "1102": 100.0}, index=months)
+    rev.loc["2023-06-01":, "1102"] = np.nan               # 1102 半年沒申報
+    out = revenue_yoy({"revenue": rev}, pd.Timestamp("2024-01-15"), months=1)
+    assert pd.notna(out["1101"]) and pd.isna(out.get("1102"))
+
+
+def test_institutional_flow_requires_data_through_as_of():
+    from quant.factors import institutional_flow
+    panel = make_panel()
+    cal = panel["close"].index
+    inst = panel["volume_value"] * 0.01
+    inst.loc[cal[380]:, "1001"] = np.nan                   # 1001 的法人資料在 as_of 前就斷了
+    inst = inst.drop(index=cal[390])                       # 另有一天整天缺檔（日期需對齊）
+    panel["inst_net"] = inst
+    out = institutional_flow(panel, cal[400])
+    assert out["1000"] == pytest.approx(0.01)
+    assert pd.isna(out["1001"])
+
+
+def test_empty_factor_is_skipped_not_emptying_candidates():
+    from quant.factors import composite_score
+    panel = make_panel()
+    as_of = panel["close"].index[400]
+    info = {}
+    score = composite_score(panel, as_of, {"momentum_12_1": 1.0, "inst_flow": 1.0},
+                            universe=panel["close"].columns, info=info)
+    assert len(score) == 30
+    assert info["factors_skipped"] == ["inst_flow"] and info["factors_used"] == ["momentum_12_1"]
+
+
+def test_rank_normalize_is_bounded_and_ordered():
+    from quant.factors import rank_normalize
+    r = rank_normalize(pd.Series([1.0, 1000.0, 2.0, np.nan]))
+    assert r.max() < 0.5 and r.min() > -0.5
+    assert r.idxmax() == 1 and len(r) == 3
