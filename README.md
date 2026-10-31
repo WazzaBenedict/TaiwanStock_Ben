@@ -275,3 +275,25 @@ ALLOWED_ORIGINS="https://你的專案.web.app,https://你的專案.firebaseapp.c
 | Firebase Hosting | 前端部署 | 免費方案夠用 |
 | Render | 後端部署 | 免費方案（有休眠限制） |
 | GitHub | 程式碼管理 | 免費 |
+
+## 📊 回測與研究工具（quant/）
+
+> 回測不保證未來獲利。以下工具是研究用，不是投資建議；長期核心部位建議以 0050 等大盤 ETF 為預設。
+
+| 檔案 | 用途 |
+|---|---|
+| `quant/costs.py` | 台股成本：手續費 0.1425%（每筆最低 20 元）、證交稅 0.3%／ETF 0.1%、依流動性分級的滑價 |
+| `quant/factors.py` | 只用當時已公開資料的因子（動能、低波動、營收年增〔次月 11 日才可用〕、法人買超、App 評分） |
+| `quant/data.py` | FinMind／Yahoo／公開資訊觀測站／證交所 T86 載入器，含下市股，快取在 `data_cache/`（不 commit） |
+| `quant/engine.py` | 月調整回測：月底打分 → 隔日開盤成交 → 每日計價 → 扣成本 → 下市以最後價出場 → 0050 基準 |
+| `quant/metrics.py` | 年化報酬、波動、Sharpe、最大回撤、週轉率、對 0050 的月超額 t 值、Deflated Sharpe |
+| `quant/spec.json` | 事前登錄的設定與通過門檻（樣本外只開一次） |
+| `quant/signal_validation.py` | 在全市場驗證 App 現有技術面評分 |
+| `quant/report.py` | 跑 walk-forward 並產生 `reports/backtest_report.md` |
+
+```bash
+pip install -r requirements.txt pytest
+python -m pytest tests            # 不偷看未來、成本、營收公告延遲等測試
+python -m quant.signal_validation # 約 15 分鐘（需先有資料快取）
+python -m quant.report            # 第一次會下載資料，證交所限速約 2–3 小時；可設 FINMIND_TOKEN 提高 FinMind 額度
+```
