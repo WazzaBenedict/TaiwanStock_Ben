@@ -547,7 +547,7 @@ def build_tw_ai_signal(row: pd.Series, cp: float, winrate_info: dict,
 
     scan_cat = classify_scan_category(signal,es,tv,overheat,fb,final,ts,market_score,risk_score,conf)
 
-    ts_label = {"BUY_NOW":"✅ BUY NOW","BUY_PULLBACK":"⏳ Wait Pullback","WATCH":"👀 WATCH","AVOID":"🚫 AVOID"}
+    ts_label = {"BUY_NOW":"✅ 技術面條件符合","BUY_PULLBACK":"⏳ 等回檔","WATCH":"👀 觀望","AVOID":"🚫 條件不符"}
     if signal=="BUY" and tv and es=="ENTERABLE" and rr and rr>=1.5:
         trade_status="BUY_NOW"
     elif signal=="BUY": trade_status="BUY_PULLBACK"
@@ -1056,7 +1056,8 @@ def compute_4d_ai_signal(ov,fu,te,ch,nw,latest_row,cp,macro=None)->dict:
 # ══════════════════════════════════════════════════════════════════════════════
 # TW CORE ANALYSIS
 # ══════════════════════════════════════════════════════════════════════════════
-TW_COSTS = TaiwanCosts()   # 手續費 0.1425% ×2、證交稅 0.3%（ETF 0.1%）、滑價 0.1% ×2
+TW_COSTS = TaiwanCosts()
+MIN_TRADES_FOR_WINRATE = 30   # 少於 30 筆不重疊、扣成本的交易，勝率不具參考性，前端顯示「樣本不足」   # 手續費 0.1425% ×2、證交稅 0.3%（ETF 0.1%）、滑價 0.1% ×2
 
 def _net_trade_return(entry:float, exit_:float, etf:bool=False) -> float:
     """扣除買賣手續費、證交稅、滑價後的單筆報酬（小數）。"""
@@ -1090,6 +1091,7 @@ def _calc_winrate(df:pd.DataFrame, holding_days:int=5, etf:bool=False)->dict:
             trials+=1; wins+=n>0; gross.append(g); net.append(n)
         i+=holding_days   # 出場當天收盤才可能產生下一個訊號
     return{**empty,"winrate":round(wins/trials*100,1) if trials else 0,"trials":trials,"wins":wins,
+           "winrate_reliable":trials>=MIN_TRADES_FOR_WINRATE,
            "avg_net_return_pct":round(float(np.mean(net))*100,2) if net else 0,
            "avg_gross_return_pct":round(float(np.mean(gross))*100,2) if gross else 0}
 
@@ -2382,6 +2384,8 @@ def advanced_backtest(df,holding_days=5,min_score=75,bench_df=None,stock_id=""):
            "max_drawdown":round(max_dd,2),"profit_factor":round(gain/loss,2) if loss else 0,
            "sharpe_ratio":round(avg_r/std_r,2) if std_r>0 else 0,"trades":list(reversed(trades))[:20],
            "avg_gross_return":round(sum(grs)/total,2) if total else 0,"total_return_pct":strat,
+           "expectancy_pct":round(avg_r,2),"winrate_reliable":total>=MIN_TRADES_FOR_WINRATE,
+           "min_trades_for_winrate":MIN_TRADES_FOR_WINRATE,
            "exposure_pct":round(in_mkt/max(1,len(df)-1)*100,1),
            "benchmark":{"period_start":start_d.strftime("%Y-%m-%d"),"period_end":end_d.strftime("%Y-%m-%d"),
                         "buy_hold_return_pct":bh,"benchmark_0050_return_pct":b50,"strategy_total_return_pct":strat,
