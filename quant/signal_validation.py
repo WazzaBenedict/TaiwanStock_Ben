@@ -105,13 +105,13 @@ def summarize(obs: pd.DataFrame, bench: pd.DataFrame) -> dict:
     obs["excess"] = obs["gross"] - obs.groupby("date")["gross"].transform("mean")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        ic = obs.groupby("date").apply(lambda g: g["confidence"].corr(g["gross"], method="spearman")
+        ic = obs.groupby("date").apply(lambda g: g["confidence"].rank().corr(g["gross"].rank())
                                        if g["confidence"].nunique() > 1 else np.nan).dropna()
     by_sig = obs.groupby("signal").agg(n=("gross", "size"), gross=("gross", "mean"), net=("net", "mean"),
                                        excess=("excess", "mean"), win_net=("net", lambda x: (x > 0).mean()))
     # 每個打分日內依評分分五組（等級分組，避免同分全部擠在同一組）
     obs["quintile"] = obs.groupby("date")["confidence"].transform(
-        lambda x: pd.qcut(x.rank(method="first"), 5, labels=False) + 1)
+        lambda x: np.ceil(x.rank(method="first", pct=True) * 5).clip(1, 5))
     by_q = obs.groupby("quintile").agg(n=("gross", "size"), conf=("confidence", "mean"), gross=("gross", "mean"),
                                        excess=("excess", "mean"))
     q_spread = obs[obs.quintile == 5].groupby("date")["gross"].mean() - obs[obs.quintile == 1].groupby("date")["gross"].mean()
@@ -205,8 +205,12 @@ def main():
     results = {}
     for name, freq, h in [("5 個交易日（App 回測預設，每週打分）", "W", 5), ("20 個交易日（每月打分）", "M", 20)]:
         dates = sample_dates(cal, freq, h)
-        obs = collect(panel, prepared, dates, h)
-        obs.to_pickle(data.CACHE_DIR / f"signal_obs_{h}.pkl")
+        cached = data.CACHE_DIR / f"signal_obs_{h}.pkl"
+        if "--reuse" in sys.argv and cached.exists():
+            obs = pd.read_pickle(cached)
+        else:
+            obs = collect(panel, prepared, dates, h)
+            obs.to_pickle(cached)
         results[name] = summarize(obs, bench_returns(panel, dates, h))
     out = ROOT / "reports" / "signal_validation.md"
     out.parent.mkdir(exist_ok=True)
