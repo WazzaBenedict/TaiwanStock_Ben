@@ -48,6 +48,8 @@ TWSE_NAME_URL = "https://www.twse.com.tw/rwd/zh/api/basic"
 TWSE_MIS_URL  = "https://mis.twse.com.tw/stock/api/getStockInfo.jsp"
 LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push"
 HTTP_TIMEOUT  = 10
+# 快速版／行動版／完整版用同樣長度的歷史，MA60、ADX 與歷史勝率才會一致（舊版快速版只抓 90 天）
+TW_SCORE_LOOKBACK_DAYS = 400
 NEWS_TIMEOUT  = 5
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1111,7 +1113,7 @@ async def _analyze_stock_lite(stock_id:str, macro:dict|None=None) -> dict:
         if rt and rt.get("stock_name"): sname=rt["stock_name"]
         price=rt["price"] if rt and rt.get("price") is not None else None
         change=rt["change"] if rt else None; chgp=rt["change_pct"] if rt else None
-        df,hs=await fetch_tw_history(stock_id,lookback_days=90)
+        df,hs=await fetch_tw_history(stock_id,lookback_days=TW_SCORE_LOOKBACK_DAYS)
         if price is None and not df.empty:
             price=float(df.iloc[-1]["收盤價"])
             if len(df)>=2: pc=float(df.iloc[-2]["收盤價"]); change=round(price-pc,2); chgp=round(change/pc*100,2) if pc else None
@@ -1223,7 +1225,7 @@ async def _analyze_stock_mobile_tech(stock_id: str) -> dict:
     sname = get_stock_name(stock_id)
     try:
         rt_task = asyncio.create_task(fetch_tw_quote(stock_id))
-        hist_task = asyncio.create_task(fetch_tw_history(stock_id, lookback_days=150))
+        hist_task = asyncio.create_task(fetch_tw_history(stock_id, lookback_days=TW_SCORE_LOOKBACK_DAYS))
         rt = await asyncio.wait_for(rt_task, timeout=5)
         df, hs = await asyncio.wait_for(hist_task, timeout=10)
         if rt and rt.get("stock_name"):
@@ -1285,7 +1287,7 @@ async def _analyze_stock_core(stock_id:str) -> dict:
     try:
         rt=await fetch_tw_quote(stock_id)
         if rt and rt.get("stock_name"): sname=rt["stock_name"]
-        df,dsrc=await fetch_tw_history(stock_id,lookback_days=400)
+        df,dsrc=await fetch_tw_history(stock_id,lookback_days=TW_SCORE_LOOKBACK_DAYS)
         if df.empty:
             rtp=rt.get("price") if rt else None
             return{"stock_id":stock_id,"stock_name":sname,"last_date":"N/A","data_source":"none",
@@ -2502,7 +2504,7 @@ async def get_analysis_4d(stock_id:str):
     if not re.match(r"^\d{4,6}$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
     try:
         at=asyncio.create_task(_fname(stock_id))
-        df,dsrc=await fetch_tw_history(stock_id,lookback_days=400)
+        df,dsrc=await fetch_tw_history(stock_id,lookback_days=TW_SCORE_LOOKBACK_DAYS)
         an=await at; sname=get_stock_name(stock_id,an); lr=None
         rt=await fetch_tw_quote(stock_id)
         if df.empty: cp=float(rt["price"]) if rt and rt.get("price") else 0.0
