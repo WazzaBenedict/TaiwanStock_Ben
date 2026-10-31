@@ -11,6 +11,7 @@ import httpx, numpy as np, pandas as pd
 from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from quant.costs import TaiwanCosts, is_etf
 
 app = FastAPI(title="V12.9.2 Multi-Portfolio Watchlist Manager", version="12.9.2")
 _raw = os.getenv("ALLOWED_ORIGINS",
@@ -737,14 +738,11 @@ async def evaluate_signal_history() -> dict:
     return{"updated":upd,"stats":_lst(h)}
 
 def retrain_ai_weights() -> dict:
+    """舊版這裡只把原權重存回去卻回報「重訓完成」。訊號紀錄沒有保存各面向分數，
+    無法歸因哪個面向有效，所以不再假裝重訓；個人化權重請用 /api/learning/suggest-weights。"""
     h=load_signal_history(); ev=[x for x in h if x.get("evaluated") and x.get("result")]
-    if len(ev)<30: return{"updated":False,"message":"樣本不足（至少需要 30 筆）","sample_count":len(ev)}
-    ok=[x for x in ev if x.get("result",{}).get("success")]; fail=[x for x in ev if not x.get("result",{}).get("success")]
-    if not ok or not fail: return{"updated":False,"message":"成功或失敗樣本不足","sample_count":len(ev)}
-    w=load_ai_weights(); rs=[]; dl={k:0.0 for k in ["technical","fundamental","chip","news"]}
-    # (simplified retrain logic)
-    save_ai_weights(w)
-    return{"updated":True,"sample_count":len(ev),"message":"AI 權重重訓完成"}
+    return{"updated":False,"sample_count":len(ev),"weights":load_ai_weights(),
+           "message":"未調整權重：訊號紀錄缺少各面向分數，無法據以重訓。請改用「建議權重」（/api/learning/suggest-weights）。"}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TW MACRO
@@ -1052,20 +1050,42 @@ def compute_4d_ai_signal(ov,fu,te,ch,nw,latest_row,cp,macro=None)->dict:
 # ══════════════════════════════════════════════════════════════════════════════
 # TW CORE ANALYSIS
 # ══════════════════════════════════════════════════════════════════════════════
-def _calc_winrate(df:pd.DataFrame)->dict:
-    if df.empty: return{"winrate":0,"trials":0,"wins":0}
+TW_COSTS = TaiwanCosts()   # 手續費 0.1425% ×2、證交稅 0.3%（ETF 0.1%）、滑價 0.1% ×2
+
+def _net_trade_return(entry:float, exit_:float, etf:bool=False) -> float:
+    """扣除買賣手續費、證交稅、滑價後的單筆報酬（小數）。"""
+    return exit_*(1-TW_COSTS.sell_rate(etf))/(entry*(1+TW_COSTS.buy_rate))-1
+
+def _entry_open(df2:pd.DataFrame, pos:int) -> float|None:
+    o=df2.iloc[pos]["開盤價"] if "開盤價" in df2.columns else None
+    if o is None or pd.isna(o) or o<=0: o=df2.iloc[pos-1]["收盤價"]
+    return float(o) if pd.notna(o) and o>0 else None
+
+def _calc_winrate(df:pd.DataFrame, holding_days:int=5, etf:bool=False)->dict:
+    """簡易歷史勝率：收盤站上 MA20 且 RSI>50 → 隔日開盤買、持有 holding_days 日收盤賣。
+
+    交易不重疊、扣交易成本。注意這仍是單一股票的樣本內統計，只能當參考。
+    """
+    empty={"winrate":0,"trials":0,"wins":0,"avg_net_return_pct":0,"avg_gross_return_pct":0,
+           "holding_days":holding_days,"method":"next_open_entry_non_overlapping_net_of_costs"}
+    if df.empty: return empty
     req=[c for c in["MA5","MA20","MA60","RSI","MACD","Signal"] if c in df.columns]
-    df2=df.dropna(subset=req) if req else df
-    if len(df2)<10: return{"winrate":0,"trials":0,"wins":0}
-    wins=trials=0
-    cond=((df2["收盤價"]>df2.get("MA20",pd.Series([0]*len(df2),index=df2.index)))
-          &(df2.get("RSI",pd.Series([50]*len(df2),index=df2.index))>50))
-    for idx in df2[cond].index:
-        pos=df2.index.get_loc(idx)
-        if pos+5<len(df2):
-            trials+=1
-            if df2.iloc[pos+5]["收盤價"]>df2.iloc[pos]["收盤價"]: wins+=1
-    return{"winrate":round(wins/trials*100,1) if trials else 0,"trials":trials,"wins":wins}
+    df2=(df.dropna(subset=req) if req else df).reset_index(drop=True)
+    if len(df2)<10: return empty
+    ma20=df2["MA20"] if "MA20" in df2.columns else pd.Series(0,index=df2.index)
+    rsi=df2["RSI"] if "RSI" in df2.columns else pd.Series(50,index=df2.index)
+    cond=((df2["收盤價"]>ma20)&(rsi>50)).values
+    wins=trials=0; gross=[]; net=[]; i=0
+    while i+holding_days<len(df2):
+        if not cond[i]: i+=1; continue
+        ep=_entry_open(df2,i+1); xp=float(df2.iloc[i+holding_days]["收盤價"])
+        if ep:
+            g=xp/ep-1; n=_net_trade_return(ep,xp,etf)
+            trials+=1; wins+=n>0; gross.append(g); net.append(n)
+        i+=holding_days   # 出場當天收盤才可能產生下一個訊號
+    return{**empty,"winrate":round(wins/trials*100,1) if trials else 0,"trials":trials,"wins":wins,
+           "avg_net_return_pct":round(float(np.mean(net))*100,2) if net else 0,
+           "avg_gross_return_pct":round(float(np.mean(gross))*100,2) if gross else 0}
 
 def _calc_vol_info(df:pd.DataFrame)->dict:
     if df.empty: return{"latest_volume":0,"avg_volume_20d":0,"ratio":1.0,"alert":False}
@@ -1097,7 +1117,7 @@ async def _analyze_stock_lite(stock_id:str, macro:dict|None=None) -> dict:
             if len(df)>=2: pc=float(df.iloc[-2]["收盤價"]); change=round(price-pc,2); chgp=round(change/pc*100,2) if pc else None
         cp=price or 0.0; ai=fai.copy()
         if not df.empty and cp>0:
-            df=compute_all_indicators(df); latest=df.iloc[-1]; wr=_calc_winrate(df); vi=_calc_vol_info(df)
+            df=compute_all_indicators(df); latest=df.iloc[-1]; wr=_calc_winrate(df,etf=is_etf(stock_id)); vi=_calc_vol_info(df)
             ai=build_tw_ai_signal(latest,cp,wr,macro,chgp or 0,vi.get("ratio",1.0),df)
         elif cp>0:
             ai=_empty_ai("WATCH","歷史資料不足，無法完整分析")
@@ -1230,7 +1250,7 @@ async def _analyze_stock_mobile_tech(stock_id: str) -> dict:
                 macro = await asyncio.wait_for(fetch_macro_context(), timeout=3)
             except Exception:
                 macro = {}
-            ai = build_tw_ai_signal(latest, cp, _calc_winrate(df), macro, chgp or 0, vol_ratio, df)
+            ai = build_tw_ai_signal(latest, cp, _calc_winrate(df,etf=is_etf(stock_id)), macro, chgp or 0, vol_ratio, df)
             ai["score_quality"] = "mobile_technical"
             ai["summary"] = "手機技術快判：" + (ai.get("summary") or "已完成主要技術判斷。")
             score = _mobile_score_payload(ai)
@@ -1278,7 +1298,7 @@ async def _analyze_stock_core(stock_id:str) -> dict:
         chg=float(latest["收盤價"]-prev["收盤價"])
         chgp=round(chg/float(prev["收盤價"])*100,2) if float(prev["收盤價"]) else 0
         cp=float(rt["price"]) if rt and rt.get("price") is not None else float(latest["收盤價"])
-        wr=_calc_winrate(df); vi=_calc_vol_info(df)
+        wr=_calc_winrate(df,etf=is_etf(stock_id)); vi=_calc_vol_info(df)
         try: macro=await asyncio.wait_for(fetch_macro_context(),timeout=6)
         except: macro={"usd_twd":None,"dxy":None,"risk_note":"","macro_adj":0}
         ai=build_tw_ai_signal(latest,cp,wr,macro,chgp,vi.get("ratio",1.0),df)
@@ -2297,34 +2317,70 @@ async def _scan_market_sentiment() -> dict:
             "buy_pct":round(buy/tot*100,1),"sentiment":sent,"scanned_at":datetime.now().isoformat()}
     _sc_cache=result; _sc_ts=time.time(); return result
 
-# TW backtest (preserved)
-def advanced_backtest(df,holding_days=5,min_score=75):
-    empty={"total_trades":0,"wins":0,"losses":0,"winrate":0,"avg_return":0,"best_return":0,"worst_return":0,"max_drawdown":0,"profit_factor":0,"sharpe_ratio":0,"trades":[]}
+# TW backtest — 隔日開盤進場、不重疊、扣成本、附買進持有與 0050 基準
+def _period_return(df:pd.DataFrame, start_date, end_date, etf:bool=False):
+    """start_date 開盤買、end_date 收盤賣（扣成本）的報酬 %；資料不足回傳 None。"""
+    if df is None or df.empty: return None
+    d=df[(df["日期"]>=start_date)&(df["日期"]<=end_date)]
+    if len(d)<2: return None
+    ep=d.iloc[0]["開盤價"] if "開盤價" in d.columns and pd.notna(d.iloc[0]["開盤價"]) and d.iloc[0]["開盤價"]>0 else d.iloc[0]["收盤價"]
+    return round(_net_trade_return(float(ep),float(d.iloc[-1]["收盤價"]),etf)*100,2)
+
+def advanced_backtest(df,holding_days=5,min_score=75,bench_df=None,stock_id=""):
+    holding_days=max(1,int(holding_days)); etf=is_etf(stock_id)
+    empty={"total_trades":0,"wins":0,"losses":0,"winrate":0,"avg_return":0,"best_return":0,"worst_return":0,"max_drawdown":0,"profit_factor":0,"sharpe_ratio":0,"trades":[],
+           "avg_gross_return":0,"total_return_pct":0,"exposure_pct":0,
+           "benchmark":{"buy_hold_return_pct":None,"benchmark_0050_return_pct":None,"strategy_total_return_pct":0,"excess_vs_buy_hold_pct":None,"excess_vs_0050_pct":None}}
     if df.empty: return empty
     df=df.copy().reset_index(drop=True); df=compute_all_indicators(df)
     req=[c for c in["MA5","MA20","MA60","RSI","MACD","Signal"] if c in df.columns]
-    df=df.dropna(subset=req) if req else df
-    trades,equity,peak,max_dd=[],1.0,1.0,0.0
-    for i,(_,row) in enumerate(df.iterrows()):
-        if i+holding_days>=len(df): break
-        cur=float(row["收盤價"])
-        vi={"ratio":1.0,"alert":False,"latest_volume":0,"avg_volume_20d":0}
-        wr={"winrate":0,"trials":0,"wins":0}
-        ai=build_tw_ai_signal(row,cur,wr,{},0,1.0,None)
-        if (ai.get("confidence") or 0)<min_score: continue
-        ep=float(df.iloc[i+holding_days]["收盤價"]); rp=round((ep-cur)/cur*100,2)
-        trades.append({"date":row["日期"].strftime("%Y-%m-%d"),"entry_price":cur,"exit_price":ep,
-                       "return_pct":rp,"win":ep>cur,"confidence":ai.get("confidence",0),"signal":ai.get("signal","WATCH")})
-        equity*=(1+rp/100); peak=max(peak,equity); dd=(peak-equity)/peak*100; max_dd=max(max_dd,dd)
+    df=(df.dropna(subset=req) if req else df).reset_index(drop=True)
+    if len(df)<holding_days+2: return empty
+    trades,equity,peak,max_dd,in_mkt=[],1.0,1.0,0.0,0
+    i=0
+    while i+holding_days<len(df):
+        row=df.iloc[i]; cur=float(row["收盤價"])
+        ai=build_tw_ai_signal(row,cur,{"winrate":0,"trials":0,"wins":0},{},0,1.0,None)
+        if (ai.get("confidence") or 0)<min_score: i+=1; continue
+        ep=_entry_open(df,i+1); xp=float(df.iloc[i+holding_days]["收盤價"])
+        if not ep: i+=1; continue
+        g=xp/ep-1; n=_net_trade_return(ep,xp,etf); rp=round(n*100,2)
+        trades.append({"date":row["日期"].strftime("%Y-%m-%d"),"entry_date":df.iloc[i+1]["日期"].strftime("%Y-%m-%d"),
+                       "exit_date":df.iloc[i+holding_days]["日期"].strftime("%Y-%m-%d"),
+                       "entry_price":round(ep,2),"exit_price":xp,"return_pct":rp,"gross_return_pct":round(g*100,2),
+                       "win":n>0,"confidence":ai.get("confidence",0),"signal":ai.get("signal","WATCH")})
+        equity*=(1+n); peak=max(peak,equity); dd=(peak-equity)/peak*100; max_dd=max(max_dd,dd)
+        in_mkt+=holding_days; i+=holding_days
     total=len(trades); wins=sum(1 for t in trades if t["win"])
-    rets=[t["return_pct"] for t in trades]
+    rets=[t["return_pct"] for t in trades]; grs=[t["gross_return_pct"] for t in trades]
     avg_r=sum(rets)/total if total else 0; std_r=(sum((r-avg_r)**2 for r in rets)/total)**0.5 if total>1 else 0
     gain=sum(r for r in rets if r>0); loss=abs(sum(r for r in rets if r<0))
+    start_d=df.iloc[1]["日期"]; end_d=df.iloc[-1]["日期"]
+    strat=round((equity-1)*100,2)
+    bh=_period_return(df,start_d,end_d,etf)
+    b50=_period_return(bench_df,start_d,end_d,True) if bench_df is not None else None
+    if stock_id=="0050": b50=bh
+    warnings=["單一股票、單一期間的樣本內回測，結果不代表未來表現",
+              "已扣手續費 0.1425%×2、證交稅、滑價 0.1%×2；未計股利（買進持有基準同樣未計）"]
+    if total<30: warnings.append(f"交易次數只有 {total} 筆，統計上不可靠")
+    if bh is not None and strat<bh: warnings.append("策略報酬低於直接買進持有這檔股票")
+    if b50 is not None and strat<b50: warnings.append("策略報酬低於同期買進持有 0050")
     return{"total_trades":total,"wins":wins,"losses":total-wins,
            "winrate":round(wins/total*100,1) if total else 0,"avg_return":round(avg_r,2),
            "best_return":round(max(rets),2) if rets else 0,"worst_return":round(min(rets),2) if rets else 0,
            "max_drawdown":round(max_dd,2),"profit_factor":round(gain/loss,2) if loss else 0,
-           "sharpe_ratio":round(avg_r/std_r,2) if std_r>0 else 0,"trades":list(reversed(trades))[:20]}
+           "sharpe_ratio":round(avg_r/std_r,2) if std_r>0 else 0,"trades":list(reversed(trades))[:20],
+           "avg_gross_return":round(sum(grs)/total,2) if total else 0,"total_return_pct":strat,
+           "exposure_pct":round(in_mkt/max(1,len(df)-1)*100,1),
+           "benchmark":{"period_start":start_d.strftime("%Y-%m-%d"),"period_end":end_d.strftime("%Y-%m-%d"),
+                        "buy_hold_return_pct":bh,"benchmark_0050_return_pct":b50,"strategy_total_return_pct":strat,
+                        "excess_vs_buy_hold_pct":round(strat-bh,2) if bh is not None else None,
+                        "excess_vs_0050_pct":round(strat-b50,2) if b50 is not None else None},
+           "cost_model":{"fee_rate":TW_COSTS.fee_rate,"sell_tax":TW_COSTS.tax_etf if etf else TW_COSTS.tax_stock,
+                         "slippage_each_side":TW_COSTS.slippage,"round_trip_pct":round(TW_COSTS.round_trip(etf)*100,3)},
+           "method":"訊號日收盤判斷 → 隔日開盤買進 → 持有 N 日收盤賣出；交易不重疊；報酬為扣成本後淨值",
+           "sharpe_note":"sharpe_ratio 為每筆交易報酬平均/標準差（未年化）",
+           "warnings":warnings}
 
 # TW LINE helpers
 def _lc(): return bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID and ENABLE_LINE_ALERTS)
@@ -2622,12 +2678,14 @@ async def check_alerts(body:WatchlistBody):
 @app.get("/api/backtest/{stock_id}")
 async def run_backtest(stock_id:str,lookback_days:int=400,holding_days:int=5,min_score:int=75):
     if not re.match(r"^\d{4,6}$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
-    df,_=await fetch_tw_history(stock_id,lookback_days)
+    (df,_),(bdf,_)=await asyncio.gather(fetch_tw_history(stock_id,lookback_days),
+                                         fetch_tw_history("0050",lookback_days+10))
     an=await _fname(stock_id); sname=get_stock_name(stock_id,an)
-    result=advanced_backtest(df,holding_days=holding_days,min_score=min_score)
+    result=advanced_backtest(df,holding_days=holding_days,min_score=min_score,bench_df=bdf,stock_id=stock_id)
     return{"stock_id":stock_id,"stock_name":sname,
            "params":{"lookback_days":lookback_days,"holding_days":holding_days,"min_score":min_score},
-           "result":{k:v for k,v in result.items() if k!="trades"},"trades":result["trades"]}
+           "result":{k:v for k,v in result.items() if k!="trades"},"trades":result["trades"],
+           "benchmark":result.get("benchmark")}
 
 @app.get("/api/learning/weights")
 def api_learning_weights():

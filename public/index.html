@@ -802,6 +802,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
         <div class="bt-item"><div class="bt-lbl">最佳</div><div class="bt-val" id="btBest">—</div></div>
         <div class="bt-item"><div class="bt-lbl">最差</div><div class="bt-val" id="btWorst">—</div></div>
       </div>
+      <div id="btBench" style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin:8px 0"></div>
       <table class="bt-trades"><thead><tr><th>日期</th><th>入場</th><th>出場</th><th>報酬</th><th>信心</th><th>訊號</th></tr></thead><tbody id="btTrades"></tbody></table>
     </div>
   </div>
@@ -2176,6 +2177,11 @@ async function runBt() {
     setTxt("btWr",res.winrate+"%");setTxt("btAvg",(res.avg_return>=0?"+":"")+res.avg_return+"%");setTxt("btDd","-"+res.max_drawdown+"%");setTxt("btPf",res.profit_factor+"x");
     setTxt("btTotal",res.total_trades+"筆");setTxt("btWl",res.wins+" / "+res.losses);setTxt("btBest","+"+res.best_return+"%");setTxt("btWorst",res.worst_return+"%");
     addCls("btWr",res.winrate>=60?"up":res.winrate<45?"down":"flat");addCls("btAvg",res.avg_return>0?"up":"down");
+    var bb=d.benchmark||res.benchmark||{},bEl=$I("btBench");
+    if(bEl){var pc=function(v){return v==null?"—":((v>=0?"+":"")+v+"%");};
+      bEl.innerHTML="同期比較（已扣手續費、稅、滑價）：策略 "+pc(bb.strategy_total_return_pct)+"　買進持有本股 "+pc(bb.buy_hold_return_pct)+"　買進持有 0050 "+pc(bb.benchmark_0050_return_pct)
+        +(bb.period_start?"<br>期間 "+bb.period_start+" ～ "+bb.period_end+"；隔日開盤進場、交易不重疊":"")
+        +((res.warnings||[]).length?"<br>⚠️ "+res.warnings.join("<br>⚠️ "):"");}
     var tbEl=$I("btTrades");if(tbEl)tbEl.innerHTML=(d.trades||[]).map(function(t){return'<tr class="'+(t.win?"win":"loss")+'"><td>'+t.date+'</td><td>'+f(t.entry_price)+'</td><td>'+f(t.exit_price)+'</td><td class="'+(t.return_pct>=0?"up":"down")+'">'+(t.return_pct>=0?"+":"")+t.return_pct+'%</td><td>'+t.confidence+'</td><td>'+t.signal+'</td></tr>';}).join("");
     if(result)result.style.display="block";
   } catch(e){alert("回測失敗："+e.message);}

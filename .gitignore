@@ -36,3 +36,9 @@ node_modules/
 
 # Log
 *.log
+
+# Claude Code 本機設定（不 commit）
+.claude/settings.local.json
+
+# 回測資料快取
+data_cache/
