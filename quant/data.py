@@ -211,6 +211,24 @@ def load_t86(date: pd.Timestamp) -> pd.Series:
     return _cached(_cache_path("t86", f"{date:%Y%m%d}.pkl"), fetch)
 
 
+def clean_price_breaks(close: pd.DataFrame, open_: pd.DataFrame, limit: float = 0.3):
+    """台股漲跌幅限制 10%，單日 |報酬| > limit 多半是減資換股、資料錯誤或停牌後恢復的跳空。
+
+    把這種日報酬視為 0，重建價格序列（開盤／收盤比維持原樣），避免動能因子與持倉損益被假跳空扭曲。
+    回傳 (close, open, 被修正的筆數)。
+    """
+    r = close.pct_change(fill_method=None)
+    bad = r.abs() > limit
+    r = r.mask(bad, 0.0)
+    first = close.apply(lambda s: s.first_valid_index())
+    growth = (1 + r.fillna(0)).cumprod()
+    base = pd.Series({c: close.at[first[c], c] / growth.at[first[c], c] if first[c] is not None else np.nan
+                      for c in close.columns})
+    new_close = (growth * base).where(close.notna())
+    new_open = (open_ / close * new_close).where(open_.notna())
+    return new_close, new_open, int(bad.sum().sum())
+
+
 # ── 組成回測 panel ────────────────────────────────────────────────────────────
 def build_universe(start: str) -> pd.DataFrame:
     """上市普通股（4 碼、非 0 開頭），包含 start 之後下市的股票。
@@ -273,9 +291,12 @@ def build_panel(start: str, end: str, benchmark: str = "0050", with_inst: bool =
     close = pd.DataFrame(closes).sort_index()
     cal = bench.index.intersection(close.index)   # 以 0050 交易日為準，剔除 Yahoo 偶發的假日資料
     close = close.reindex(cal)
+    close, open_, n_fixed = clean_price_breaks(close, pd.DataFrame(opens).reindex(cal))
+    log(f"price breaks neutralised: {n_fixed}")
     panel = {
+        "price_breaks_fixed": n_fixed,
         "close": close,
-        "open": pd.DataFrame(opens).reindex(cal),
+        "open": open_,
         "volume_value": pd.DataFrame(values).reindex(cal),
         "revenue": revenue.reindex(columns=close.columns),
         "benchmark_close": bench["close"].reindex(cal),

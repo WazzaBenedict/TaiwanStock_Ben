@@ -178,6 +178,7 @@ def build_report(panel: dict, wf: dict, baseline: dict, picks_payload: dict | No
         "",
         "## 4. 限制與注意事項",
         "",
+        f"- 單日漲跌超過 30%（台股漲跌幅限制 10%）視為減資換股或資料錯誤，當日報酬設為 0；共修正 {panel.get('price_breaks_fixed', 0)} 筆。",
         "- 還原股價來自 Yahoo Finance（含息還原）；下市股只有 FinMind 未還原價格（少算股利，對下市股略為不利）。",
         "- 法人買超金額用「買賣超股數 × 還原收盤價」近似；只抓每個月底前 20 個交易日的資料。",
         "- 只含上市（TWSE）股票，不含上櫃。",
@@ -204,6 +205,8 @@ def main():
         panel = data.build_panel("2013-06-01", args.end or datetime.today().strftime("%Y-%m-%d"))
         pickle.dump(panel, open(args.panel, "wb"))
     panel = pickle.load(open(args.panel, "rb"))
+    if "price_breaks_fixed" not in panel:
+        panel["close"], panel["open"], panel["price_breaks_fixed"] = data.clean_price_breaks(panel["close"], panel["open"])
     oos_end = args.end or panel["close"].index[-1].strftime("%Y-%m-%d")
 
     wf = walk_forward(panel, IS_START, IS_END, OOS_START, oos_end)

@@ -171,3 +171,13 @@ def test_app_advanced_backtest_flat_prices_lose_costs():
     tr = sorted(res["trades"], key=lambda t: t["date"])
     assert all(b["date"] >= a["exit_date"] for a, b in zip(tr, tr[1:]))
     assert "benchmark" in res and "buy_hold_return_pct" in res["benchmark"]
+
+
+def test_clean_price_breaks_removes_spike_but_keeps_normal_moves():
+    from quant.data import clean_price_breaks
+    idx = pd.bdate_range("2024-01-01", periods=6)
+    close = pd.DataFrame({"1101": [10, 11, 1100, 11, 12.1, 12.1]}, index=idx, dtype=float)
+    new_close, new_open, n = clean_price_breaks(close, close.copy())
+    assert n == 2
+    r = new_close["1101"].pct_change().dropna().round(6).tolist()
+    assert r == [0.1, 0.0, 0.0, 0.1, 0.0]
