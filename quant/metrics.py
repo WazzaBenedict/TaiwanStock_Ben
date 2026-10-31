@@ -73,3 +73,30 @@ def summarize(result: dict, start=None, end=None) -> dict:
     }
     out.update({f"excess_{k}": v for k, v in excess_stats(eq, bench).items()})
     return out
+
+
+def deflated_sharpe(returns: pd.Series, n_trials: int, trial_sr_var: float) -> dict:
+    """Deflated Sharpe Ratio（Bailey & López de Prado, 2014）。
+
+    returns：每期報酬（例如每日超額報酬）；n_trials：總共試過幾組；
+    trial_sr_var：各組設定「每期」Sharpe 的變異數。
+    回傳 dsr = 在考慮試了 n_trials 次、報酬偏態與峰態後，真實 Sharpe > 0 的機率。
+    """
+    from statistics import NormalDist
+    r = returns.dropna()
+    T = len(r)
+    if T < 3 or r.std() == 0 or n_trials < 1:
+        return {"dsr": float("nan"), "sr": float("nan"), "sr0": float("nan")}
+    sr = r.mean() / r.std()
+    skew = float(r.skew())
+    kurt = float(r.kurt()) + 3.0          # pandas 給的是超額峰態
+    z = NormalDist()
+    emc = 0.5772156649
+    if n_trials > 1 and trial_sr_var > 0:
+        sr0 = np.sqrt(trial_sr_var) * ((1 - emc) * z.inv_cdf(1 - 1 / n_trials)
+                                       + emc * z.inv_cdf(1 - 1 / (n_trials * np.e)))
+    else:
+        sr0 = 0.0
+    denom = np.sqrt(max(1e-12, 1 - skew * sr + (kurt - 1) / 4 * sr ** 2))
+    dsr = z.cdf(float((sr - sr0) * np.sqrt(T - 1) / denom))
+    return {"dsr": dsr, "sr": float(sr), "sr0": float(sr0), "T": T}

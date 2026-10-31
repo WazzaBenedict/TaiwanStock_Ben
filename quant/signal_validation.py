@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+import json
 import pickle
 import sys
 import warnings
@@ -41,12 +42,9 @@ def sample_dates(cal: pd.DatetimeIndex, freq: str, horizon: int) -> list[pd.Time
     return [d for d in ends if pd.Timestamp(START) <= d <= last_ok]
 
 
-def collect(panel: dict, frames: dict[str, pd.DataFrame], dates: list[pd.Timestamp], horizon: int,
-            log=print) -> pd.DataFrame:
+def prepare(frames: dict[str, pd.DataFrame]) -> dict:
+    """每檔股票算一次 App 的技術指標，加上量比與漲跌幅。"""
     app = _app()
-    costs = TaiwanCosts()
-    cfg = BacktestConfig(weights={})
-    rows = []
     prepared = {}
     for sid, df in frames.items():
         if len(df) < 80:
@@ -55,6 +53,16 @@ def collect(panel: dict, frames: dict[str, pd.DataFrame], dates: list[pd.Timesta
         d["vol_ratio"] = d["成交股數"] / d["成交股數"].rolling(20).mean()
         d["chg_pct"] = d["收盤價"].pct_change() * 100
         prepared[sid] = (d, pd.Index(d["日期"]))
+    return prepared
+
+
+def collect(panel: dict, prepared: dict, dates: list[pd.Timestamp], horizon: int,
+            log=print) -> pd.DataFrame:
+    """horizon=0 時只算評分（給回測引擎的 app_score 用），不算未來報酬。"""
+    app = _app()
+    costs = TaiwanCosts()
+    cfg = BacktestConfig(weights={})
+    rows = []
     for k, t in enumerate(dates):
         uni = eligible_universe(panel, t, cfg)
         for sid in uni:
@@ -64,7 +72,7 @@ def collect(panel: dict, frames: dict[str, pd.DataFrame], dates: list[pd.Timesta
             if t not in idx:
                 continue
             pos = idx.get_loc(t)
-            if pos + horizon >= len(d) or pos < 60:
+            if (horizon and pos + horizon >= len(d)) or pos < 60:
                 continue
             row = d.iloc[pos]
             if pd.isna(row.get("MA60")):
@@ -73,6 +81,11 @@ def collect(panel: dict, frames: dict[str, pd.DataFrame], dates: list[pd.Timesta
                                         float(row["chg_pct"]) if pd.notna(row["chg_pct"]) else 0.0,
                                         float(row["vol_ratio"]) if pd.notna(row["vol_ratio"]) else 1.0,
                                         d.iloc[pos - 59: pos + 1])
+            rec = {"date": t, "stock_id": sid, "confidence": ai.get("confidence") or 0,
+                   "technical_score": ai.get("technical_score"), "signal": ai.get("signal")}
+            if not horizon:
+                rows.append(rec)
+                continue
             ep = d.iloc[pos + 1]["開盤價"]
             xp = d.iloc[pos + horizon]["收盤價"]
             if not (pd.notna(ep) and ep > 0 and pd.notna(xp)):
@@ -80,9 +93,8 @@ def collect(panel: dict, frames: dict[str, pd.DataFrame], dates: list[pd.Timesta
             g = xp / ep - 1
             if abs(g) > 1.0:   # 減資或資料錯誤
                 continue
-            rows.append({"date": t, "stock_id": sid, "confidence": ai.get("confidence") or 0,
-                         "technical_score": ai.get("technical_score"), "signal": ai.get("signal"),
-                         "gross": g, "net": xp * (1 - costs.sell_rate(False)) / (ep * (1 + costs.buy_rate)) - 1})
+            rows.append({**rec, "gross": g,
+                         "net": xp * (1 - costs.sell_rate(False)) / (ep * (1 + costs.buy_rate)) - 1})
         if k % 50 == 0:
             log(f"{horizon}d: {k}/{len(dates)} dates, {len(rows)} obs")
     return pd.DataFrame(rows)
@@ -159,8 +171,7 @@ def render(results: dict) -> str:
     return "\n".join(lines)
 
 
-def main():
-    panel = pickle.load(open(data.CACHE_DIR / "panel_base_clean.pkl", "rb"))
+def load_frames() -> dict[str, pd.DataFrame]:
     uni = data.build_universe("2013-06-01")
     frames = {}
     for r in uni.itertuples():
@@ -169,18 +180,45 @@ def main():
             df = pd.read_pickle(f)
             if not df.empty:
                 frames[r.stock_id] = df
+    return frames
+
+
+def app_score_tables(panel: dict, prepared: dict, dates: list[pd.Timestamp]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """每個月底、流動性候選池內每檔股票的 App 評分與訊號（index=打分日, columns=stock_id）。"""
+    obs = collect(panel, prepared, dates, 0)
+    score = obs.pivot(index="date", columns="stock_id", values="confidence")
+    signal = obs.pivot(index="date", columns="stock_id", values="signal")
+    return score, signal
+
+
+def write_json(results: dict) -> None:
+    keys = ["ic_mean", "ic_t", "ic_pos", "n_dates", "n_obs", "q_spread", "q_spread_t", "buy_net", "buy_vs_0050",
+            "buy_beat_0050", "n_buy"]
+    js = {name: {k: float(r[k]) for k in keys} for name, r in results.items()}
+    (ROOT / "reports" / "signal_validation.json").write_text(json.dumps(js, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def main():
+    panel = pickle.load(open(data.CACHE_DIR / "panel_base_clean.pkl", "rb"))
+    prepared = prepare(load_frames())
     cal = panel["close"].index
     results = {}
     for name, freq, h in [("5 個交易日（App 回測預設，每週打分）", "W", 5), ("20 個交易日（每月打分）", "M", 20)]:
         dates = sample_dates(cal, freq, h)
-        obs = collect(panel, frames, dates, h)
+        obs = collect(panel, prepared, dates, h)
         obs.to_pickle(data.CACHE_DIR / f"signal_obs_{h}.pkl")
         results[name] = summarize(obs, bench_returns(panel, dates, h))
     out = ROOT / "reports" / "signal_validation.md"
     out.parent.mkdir(exist_ok=True)
     out.write_text(render(results), encoding="utf-8")
+    write_json(results)
     for k, r in results.items():
-        print(k, "IC", round(r["ic_mean"], 4), "t", round(r["ic_t"], 2), "buy_vs_0050", r["buy_vs_0050"])
+        print("IC", round(r["ic_mean"], 4), "t", round(r["ic_t"], 2), "buy_vs_0050", r["buy_vs_0050"], flush=True)
+    # 給回測引擎用的月底 App 評分表
+    me = [d for d in sample_dates(cal, "M", 0) if d <= cal[-1]] + [cal[-1]]
+    score, signal = app_score_tables(panel, prepared, sorted(set(me)))
+    pickle.dump({"app_score": score, "app_signal": signal}, open(data.CACHE_DIR / "app_scores.pkl", "wb"))
+    print("app score table", score.shape, flush=True)
 
 
 if __name__ == "__main__":

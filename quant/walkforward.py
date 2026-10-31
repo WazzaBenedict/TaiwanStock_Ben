@@ -16,6 +16,14 @@ FACTOR_NAMES = ["momentum_12_1", "momentum_6_1", "low_vol", "revenue_yoy", "inst
 TOP_N_GRID = [10, 20, 30]
 
 
+def load_spec(path=None) -> dict:
+    """讀事前登錄的設定（quant/spec.json）。"""
+    import json
+    from pathlib import Path
+    path = Path(path or Path(__file__).with_name("spec.json"))
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 def config_grid(factors=FACTOR_NAMES, top_ns=TOP_N_GRID) -> list[dict]:
     """每個因子權重 0 或 1（至少一個非 0）× 持股數。5 因子 × 3 種持股數 = 93 組。"""
     grid = []
@@ -43,12 +51,12 @@ def walk_forward(panel: dict, is_start: str, is_end: str, oos_start: str, oos_en
         res = run_backtest(panel, cfg, cache)
         ins = summarize(res, is_start, is_end)
         oos = summarize(res, oos_start, oos_end)
-        rows.append({"id": i, "factors": label(g["weights"]), "top_n": g["top_n"],
+        rows.append({"id": i, "config_id": g.get("id", f"G{i:02d}"), "factors": label(g["weights"]), "top_n": g["top_n"],
                      **{f"is_{k}": v for k, v in ins.items()}, **{f"oos_{k}": v for k, v in oos.items()}})
         results.append(res)
         if i % 10 == 0:
             log(f"config {i + 1}/{len(grid)}")
     table = pd.DataFrame(rows)
     best = int(table.sort_values(f"is_{select_by}", ascending=False).iloc[0]["id"])
-    return {"table": table, "best_id": best, "best": results[best], "n_configs": len(grid),
+    return {"table": table, "best_id": best, "best": results[best], "results": results, "n_configs": len(grid),
             "select_by": select_by, "grid": grid}

@@ -298,3 +298,12 @@ def test_rank_normalize_is_bounded_and_ordered():
     r = rank_normalize(pd.Series([1.0, 1000.0, 2.0, np.nan]))
     assert r.max() < 0.5 and r.min() > -0.5
     assert r.idxmax() == 1 and len(r) == 3
+
+
+def test_deflated_sharpe_penalises_many_trials():
+    from quant.metrics import deflated_sharpe
+    rng = np.random.default_rng(3)
+    r = pd.Series(rng.normal(0.0005, 0.01, 1500))
+    one = deflated_sharpe(r, 1, 0.0)["dsr"]
+    many = deflated_sharpe(r, 100, 0.03 ** 2)["dsr"]
+    assert 0 <= many < one <= 1

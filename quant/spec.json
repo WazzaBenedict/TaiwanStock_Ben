@@ -1,0 +1,31 @@
+{
+  "title": "台股月調整多因子回測：事前登錄規格",
+  "registered_at": "2026-11-01",
+  "disclosure": "登錄前曾做過一次探索性 walk-forward（4 個因子各開/關 × 持股 10/20/30 = 45 組，舊版 z-score 與成本設定），看過那 45 組的樣本外結果：樣本內第一名（6-1 動能 + 營收年增 / 30 檔）樣本外年化 26.9% vs 0050 26.9%，Sharpe 0.91 vs 1.20，沒有贏。該次結果記錄在 reports/trials_log.csv。因此本次的樣本外不是完全沒看過的資料，計算 deflated Sharpe 時試驗次數以 45 + 10 = 55 計。",
+  "in_sample": ["2015-01-01", "2020-12-31"],
+  "out_of_sample": ["2021-01-01", "latest"],
+  "selection_rule": "只用樣本內，取月超額報酬（策略 − 0050）資訊比率最高的一組；樣本外只跑一次，不再調整",
+  "pass_rule": "樣本外扣成本後年化報酬與 Sharpe 都高於 0050，且月超額報酬 t 值 ≥ 1，且 deflated Sharpe 機率 ≥ 0.95；否則不上線選股功能",
+  "universe": "上市普通股（含期間內下市者），每月取 20 日平均成交金額 ≥ 5,000 萬元中前 300 名",
+  "rebalance": "每月最後一個交易日收盤打分，下一交易日開盤成交，等權",
+  "costs": {"fee": "0.1425% 買賣各一次，每筆最低 20 元，資金 100 萬元", "tax": "賣出 0.3%", "slippage": "依 20 日均成交金額分級：≥10 億 0.1%、≥3 億 0.2%、≥1 億 0.3%、其餘 0.5%"},
+  "normalization": "候選池內百分位排名，等權相加",
+  "configs": [
+    {"id": "C01", "weights": {"app_score": 1}, "top_n": 20, "note": "App 現有技術面評分：只取 BUY 訊號（評分 ≥75 且無過熱/假突破/RR 足夠），依評分取前 20，不足則持有現金"},
+    {"id": "C02", "weights": {"momentum_12_1": 1}, "top_n": 20},
+    {"id": "C03", "weights": {"low_vol": 1}, "top_n": 20},
+    {"id": "C04", "weights": {"revenue_yoy": 1}, "top_n": 20},
+    {"id": "C05", "weights": {"inst_flow": 1}, "top_n": 20},
+    {"id": "C06", "weights": {"momentum_12_1": 1, "revenue_yoy": 1}, "top_n": 20},
+    {"id": "C07", "weights": {"momentum_12_1": 1, "low_vol": 1}, "top_n": 20},
+    {"id": "C08", "weights": {"momentum_12_1": 1, "revenue_yoy": 1, "inst_flow": 1}, "top_n": 20},
+    {"id": "C09", "weights": {"momentum_12_1": 1, "low_vol": 1, "revenue_yoy": 1, "inst_flow": 1}, "top_n": 20},
+    {"id": "C10", "weights": {"momentum_12_1": 1, "low_vol": 1, "revenue_yoy": 1, "inst_flow": 1}, "top_n": 10}
+  ],
+  "robustness_checks_not_used_for_selection": [
+    "被選中設定改用固定 0.3% 單邊滑價",
+    "被選中設定排除 2330 台積電（0050 基準不變）",
+    "基準二：候選池 300 檔等權（月調整、同樣扣成本）",
+    "逐年報酬（含 2022 年）"
+  ]
+}
