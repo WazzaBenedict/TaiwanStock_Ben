@@ -608,11 +608,11 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 
   <!-- TW AI Signal -->
   <div id="aiBadge" class="ai-block ai-watch">
-    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em">🤖 AI 策略訊號（技術面）</div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em">📐 技術面策略訊號（規則式評分）</div>
     <div style="display:flex;gap:14px;flex-wrap:wrap">
       <div style="min-width:120px">
         <div id="aiLabel" class="ai-label">👀 WATCH</div>
-        <div id="aiConf" class="ai-conf">信心 — / 100</div>
+        <div id="aiConf" class="ai-conf" title="規則式技術面評分，不是預測模型；全市場驗證見 reports/signal_validation.md">技術面評分 — / 100</div>
         <div style="height:5px;background:#172946;border-radius:3px;margin-top:8px;overflow:hidden"><div id="confBar" class="conf-fill" style="width:0%"></div></div>
         <div id="tradeStatusBadge" class="ts-badge ts-WATCH" style="margin-top:8px"></div>
       </div>
@@ -803,7 +803,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
         <div class="bt-item"><div class="bt-lbl">最差</div><div class="bt-val" id="btWorst">—</div></div>
       </div>
       <div id="btBench" style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin:8px 0"></div>
-      <table class="bt-trades"><thead><tr><th>日期</th><th>入場</th><th>出場</th><th>報酬</th><th>信心</th><th>訊號</th></tr></thead><tbody id="btTrades"></tbody></table>
+      <table class="bt-trades"><thead><tr><th>日期</th><th>入場</th><th>出場</th><th>報酬</th><th>評分</th><th>訊號</th></tr></thead><tbody id="btTrades"></tbody></table>
     </div>
   </div>
 </div><!-- /p-learn -->
@@ -1701,7 +1701,7 @@ async function scanAlerts(silent) {
     var alerts=d.alerts||[],sentLine=d.sent_line||[],checked=d.checked||ids.length,lineOk=d.line_enabled,dur=d.duration_seconds||0;
     var txt;
     if(!alerts.length)txt="✅ 掃描完成 "+checked+" 檔（"+dur+"s）\n目前自選股沒有符合條件的買點。";
-    else{var lines=alerts.map(function(a){return"📈 "+dsn(a.stock_id,a.stock_name)+"  信心："+a.confidence+"/100\n   "+(a.summary||"");});txt="📊 掃描 "+checked+" 檔（"+dur+"s），發現 "+alerts.length+" 個買點\n\n"+lines.join("\n\n");if(sentLine.length)txt+="\n\n✅ LINE 已推播："+sentLine.join("、");else if(!lineOk)txt+="\n（LINE 未設定）";}
+    else{var lines=alerts.map(function(a){return"📈 "+dsn(a.stock_id,a.stock_name)+"  技術面評分："+a.confidence+"/100\n   "+(a.summary||"");});txt="📊 掃描 "+checked+" 檔（"+dur+"s），發現 "+alerts.length+" 個買點\n\n"+lines.join("\n\n");if(sentLine.length)txt+="\n\n✅ LINE 已推播："+sentLine.join("、");else if(!lineOk)txt+="\n（LINE 未設定）";}
     if(!silent&&el){el.className="scan-result ok";el.textContent=txt;el.style.display="block";}
     return{txt:txt,alerts:alerts,sentLine:sentLine,checked:checked};
   } catch(e) {if(wakeT)clearTimeout(wakeT);if(!silent&&el){el.className="scan-result fail";el.textContent="❌ "+(e.message||"掃描失敗");el.style.display="block";}return null;}
@@ -1992,7 +1992,7 @@ function renderStock(d) {
 function renderAI(ai) {
   LAST_TW_AI=ai||LAST_TW_AI;
   var badge=$I("aiBadge");if(badge)badge.className="ai-block "+(ai.signal==="BUY"?"ai-buy":ai.signal==="AVOID"?"ai-avoid":"ai-watch");
-  setTxt("aiLabel",sigIcon(ai.signal||"WATCH"));setTxt("aiConf","信心 "+(ai.confidence||0)+" / 100");
+  setTxt("aiLabel",sigIcon(ai.signal||"WATCH"));setTxt("aiConf","技術面評分 "+(ai.confidence||0)+" / 100");
   var barEl=$I("confBar");if(barEl){barEl.style.width=(ai.confidence||0)+"%";barEl.style.background=(ai.confidence||0)>=75?"var(--up)":(ai.confidence||0)>=55?"var(--yellow)":"var(--down)";}
   setTxt("aiEp",ai.entry_price!=null?f(ai.entry_price):"—");setTxt("aiTp",ai.target_price!=null?f(ai.target_price):"—");setTxt("aiSl",ai.stop_loss!=null?f(ai.stop_loss):"—");
   var rrEl=$I("aiRr");if(rrEl){if(ai.risk_reward_ratio!=null){rrEl.textContent=ai.risk_reward_ratio+"x";rrEl.className="aiq-val "+((ai.risk_reward_ratio>=1.5)?"up":"down");}else{rrEl.textContent="—";rrEl.className="aiq-val";}}
@@ -2091,7 +2091,7 @@ function render4D(a4,news,container,aiSig) {
   var html='<div style="background:#0d1728;border:2px solid rgba(251,191,36,.3);border-radius:12px;padding:14px;margin-bottom:12px">'+
     '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:8px">🤖 四面向綜合交易建議</div>'+
     '<div style="display:flex;gap:12px;flex-wrap:wrap">'+
-    '<div style="min-width:120px"><div class="ai-label">'+sigIcon(ai.signal||"WATCH")+'</div><div class="ai-conf">信心 '+conf+' / 100</div>'+
+    '<div style="min-width:120px"><div class="ai-label">'+sigIcon(ai.signal||"WATCH")+'</div><div class="ai-conf">技術面評分 '+conf+' / 100</div>'+
     '<div style="height:5px;background:#172946;border-radius:3px;margin-top:8px;overflow:hidden"><div style="width:'+conf+'%;height:100%;background:'+barC+';border-radius:3px;transition:width .6s"></div></div></div>'+
     '<div style="flex:1;min-width:180px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:8px">'+
     '<div class="aiq"><div class="aiq-lbl">入場</div><div class="aiq-val">'+(ai.entry_price!=null?f(ai.entry_price):"—")+'</div></div>'+
@@ -2123,7 +2123,7 @@ function render4D(a4,news,container,aiSig) {
 
 function renderNews(news) {
   if(!news||!news.length)return'<div style="color:var(--muted);font-family:var(--mono);font-size:12px;padding:8px">暫無即時新聞資料</div>';
-  return news.map(function(n){var cls=n.sentiment==="利多"?"s-bull":n.sentiment==="利空"?"s-bear":"s-neu";return'<div class="news-item"><a href="'+n.link+'" target="_blank" rel="noopener">'+n.title+'</a><div class="news-meta"><span class="stag '+cls+'">'+n.sentiment+'</span><span>'+fmtD(n.pub_date)+'</span></div></div>';}).join("");
+  return news.map(function(n){var cls=n.sentiment==="利多"?"s-bull":n.sentiment==="利空"?"s-bear":"s-neu";var href=/^https?:\/\//i.test(String(n.link||""))?esc(n.link):"#";return'<div class="news-item"><a href="'+href+'" target="_blank" rel="noopener noreferrer">'+esc(n.title)+'</a><div class="news-meta"><span class="stag '+cls+'">'+esc(n.sentiment)+'</span><span>'+fmtD(n.pub_date)+'</span></div></div>';}).join("");
 }
 
 // ── TW Macro ───────────────────────────────────────────────────────
@@ -2825,9 +2825,12 @@ function allJournal(){return (JOURNAL.tw||[]).concat(JOURNAL.us||[]);}
 function tradeKey(t){return (t.market||'tw')+":"+String(t.symbol||t.stock_id||t.id)+":"+String(t.closed_at||t.exit_date||t.created_at||'');}
 function calcTrade(t){
   var entry=Number(t.avg_price||t.entry_price||t.buy_price), exitp=Number(t.exit_price||t.sell_price), shares=Number(t.shares||1), stop=Number(t.stop_loss), target=Number(t.target_price);
-  var pnl=null,pct=null,rm=null;if(Number.isFinite(entry)&&Number.isFinite(exitp)){pnl=(exitp-entry)*shares;pct=entry?(exitp-entry)/entry*100:null;if(Number.isFinite(stop)&&entry>stop)rm=(exitp-entry)/(entry-stop);} 
+  var pnl=null,pct=null,rm=null,gross=null,fees=null;if(Number.isFinite(entry)&&Number.isFinite(exitp)){gross=(exitp-entry)*shares;fees=0;
+    // 台股：手續費 0.1425%（每筆最低 20 元）買賣各一次、賣出證交稅 0.3%（ETF 0.1%）
+    if((t.market||'tw')==='tw'){var sym=String(t.stock_id||t.symbol||''),fee=function(a){return a>0?Math.max(20,a*0.001425):0;};fees=fee(entry*shares)+fee(exitp*shares)+exitp*shares*(/^00/.test(sym)?0.001:0.003);}
+    pnl=gross-fees;pct=entry?pnl/(entry*shares)*100:null;if(Number.isFinite(stop)&&entry>stop)rm=(exitp-entry)/(entry-stop);} 
   var ed=t.entry_date||t.created_at, xd=t.exit_date||t.closed_at, days=null;try{if(ed&&xd)days=Math.max(0,Math.round((new Date(xd)-new Date(ed))/86400000));}catch(e){}
-  return Object.assign({},t,{pnl:pnl==null?null:Number(pnl.toFixed(2)),return_pct:pct==null?null:Number(pct.toFixed(2)),r_multiple:rm==null?null:Number(rm.toFixed(2)),hold_days:days,win:pnl!=null&&pnl>0,hit_target:Number.isFinite(target)&&Number.isFinite(exitp)&&exitp>=target,hit_stop:Number.isFinite(stop)&&Number.isFinite(exitp)&&exitp<=stop});
+  return Object.assign({},t,{pnl:pnl==null?null:Number(pnl.toFixed(2)),pnl_gross:gross==null?null:Number(gross.toFixed(2)),fees_and_tax:fees==null?null:Number(fees.toFixed(2)),return_pct:pct==null?null:Number(pct.toFixed(2)),r_multiple:rm==null?null:Number(rm.toFixed(2)),hold_days:days,win:pnl!=null&&pnl>0,hit_target:Number.isFinite(target)&&Number.isFinite(exitp)&&exitp>=target,hit_stop:Number.isFinite(stop)&&Number.isFinite(exitp)&&exitp<=stop});
 }
 function journalSummary(){
   var rows=allJournal().map(calcTrade), closed=rows.filter(function(t){return t.pnl!=null;});var total=closed.length,wins=closed.filter(function(t){return t.pnl>0;});
