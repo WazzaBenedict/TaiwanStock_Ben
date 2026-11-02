@@ -1,56 +1,62 @@
-phase,config,factors,top_n,is_cagr,is_sharpe,is_excess_info_ratio,oos_cagr,oos_sharpe,oos_bench_cagr,oos_bench_sharpe
-exploratory (before registration),E00,revenue_yoy,10,0.0689,0.4157,-0.2040,0.1929,0.7379,0.2690,1.1990
-exploratory (before registration),E01,revenue_yoy,20,0.0691,0.4252,-0.3002,0.3018,1.0685,0.2690,1.1990
-exploratory (before registration),E02,revenue_yoy,30,0.1162,0.6334,-0.0524,0.3149,1.1383,0.2690,1.1990
-exploratory (before registration),E03,low_vol,10,0.0615,0.6867,-0.6941,0.1132,1.0854,0.2690,1.1990
-exploratory (before registration),E04,low_vol,20,0.0409,0.4521,-0.8791,0.1234,1.1359,0.2690,1.1990
-exploratory (before registration),E05,low_vol,30,0.0519,0.5410,-0.8553,0.1238,1.0754,0.2690,1.1990
-exploratory (before registration),E06,low_vol+revenue_yoy,10,0.1131,0.9495,-0.2304,0.1190,0.7538,0.2690,1.1990
-exploratory (before registration),E07,low_vol+revenue_yoy,20,0.0897,0.8278,-0.4661,0.1496,1.0292,0.2690,1.1990
-exploratory (before registration),E08,low_vol+revenue_yoy,30,0.0779,0.7407,-0.5718,0.1513,1.0859,0.2690,1.1990
-exploratory (before registration),E09,momentum_6_1,10,0.1396,0.5778,0.1606,0.2411,0.7548,0.2690,1.1990
-exploratory (before registration),E10,momentum_6_1,20,0.1370,0.6163,0.1159,0.2669,0.8442,0.2690,1.1990
-exploratory (before registration),E11,momentum_6_1,30,0.1308,0.6216,0.0745,0.2403,0.8031,0.2690,1.1990
-exploratory (before registration),E12,momentum_6_1+revenue_yoy,10,0.2026,0.8026,0.3132,0.3527,1.0091,0.2690,1.1990
-exploratory (before registration),E13,momentum_6_1+revenue_yoy,20,0.1581,0.7166,0.1791,0.3557,1.0859,0.2690,1.1990
-exploratory (before registration),E14,momentum_6_1+revenue_yoy,30,0.1532,0.7239,0.1498,0.2690,0.9069,0.2690,1.1990
-exploratory (before registration),E15,momentum_6_1+low_vol,10,0.0695,0.5165,-0.4607,0.0983,0.6320,0.2690,1.1990
-exploratory (before registration),E16,momentum_6_1+low_vol,20,0.1186,0.9002,-0.1713,0.1587,1.0623,0.2690,1.1990
-exploratory (before registration),E17,momentum_6_1+low_vol,30,0.0965,0.7744,-0.3727,0.1917,1.2689,0.2690,1.1990
-exploratory (before registration),E18,momentum_6_1+low_vol+revenue_yoy,10,0.0757,0.5001,-0.2917,0.1491,0.6620,0.2690,1.1990
-exploratory (before registration),E19,momentum_6_1+low_vol+revenue_yoy,20,0.1254,0.8253,-0.0908,0.1810,0.8653,0.2690,1.1990
-exploratory (before registration),E20,momentum_6_1+low_vol+revenue_yoy,30,0.1090,0.7736,-0.2295,0.2228,1.0972,0.2690,1.1990
-exploratory (before registration),E21,momentum_12_1,10,0.0527,0.3274,-0.1299,0.1884,0.6484,0.2690,1.1990
-exploratory (before registration),E22,momentum_12_1,20,0.0761,0.4125,-0.1124,0.2342,0.7814,0.2690,1.1990
-exploratory (before registration),E23,momentum_12_1,30,0.0988,0.5029,-0.0625,0.2448,0.8227,0.2690,1.1990
-exploratory (before registration),E24,momentum_12_1+revenue_yoy,10,0.0647,0.3705,-0.1217,0.3084,0.9195,0.2690,1.1990
-exploratory (before registration),E25,momentum_12_1+revenue_yoy,20,0.1319,0.6273,0.0611,0.2550,0.8693,0.2690,1.1990
-exploratory (before registration),E26,momentum_12_1+revenue_yoy,30,0.0979,0.5160,-0.0898,0.2776,0.9359,0.2690,1.1990
-exploratory (before registration),E27,momentum_12_1+low_vol,10,0.0906,0.6333,-0.3591,0.1104,0.6334,0.2690,1.1990
-exploratory (before registration),E28,momentum_12_1+low_vol,20,0.1027,0.8074,-0.3083,0.1630,1.0155,0.2690,1.1990
-exploratory (before registration),E29,momentum_12_1+low_vol,30,0.0839,0.6982,-0.5308,0.1950,1.2160,0.2690,1.1990
-exploratory (before registration),E30,momentum_12_1+low_vol+revenue_yoy,10,0.1041,0.6328,-0.1640,0.1397,0.6168,0.2690,1.1990
-exploratory (before registration),E31,momentum_12_1+low_vol+revenue_yoy,20,0.0979,0.6743,-0.2883,0.1815,0.8252,0.2690,1.1990
-exploratory (before registration),E32,momentum_12_1+low_vol+revenue_yoy,30,0.0845,0.6319,-0.4313,0.2116,1.0203,0.2690,1.1990
-exploratory (before registration),E33,momentum_12_1+momentum_6_1,10,0.1531,0.6208,0.1878,0.3294,0.9175,0.2690,1.1990
-exploratory (before registration),E34,momentum_12_1+momentum_6_1,20,0.1173,0.5493,0.0407,0.2909,0.8922,0.2690,1.1990
-exploratory (before registration),E35,momentum_12_1+momentum_6_1,30,0.1372,0.6380,0.0996,0.2478,0.8214,0.2690,1.1990
-exploratory (before registration),E36,momentum_12_1+momentum_6_1+revenue_yoy,10,0.1136,0.5171,0.0628,0.2900,0.8554,0.2690,1.1990
-exploratory (before registration),E37,momentum_12_1+momentum_6_1+revenue_yoy,20,0.1005,0.5025,-0.0289,0.3300,0.9890,0.2690,1.1990
-exploratory (before registration),E38,momentum_12_1+momentum_6_1+revenue_yoy,30,0.1250,0.6090,0.0380,0.2585,0.8607,0.2690,1.1990
-exploratory (before registration),E39,momentum_12_1+momentum_6_1+low_vol,10,0.0963,0.4689,0.0103,0.2764,0.8431,0.2690,1.1990
-exploratory (before registration),E40,momentum_12_1+momentum_6_1+low_vol,20,0.1448,0.6893,0.1117,0.2185,0.7630,0.2690,1.1990
-exploratory (before registration),E41,momentum_12_1+momentum_6_1+low_vol,30,0.0883,0.5078,-0.2188,0.2338,0.8541,0.2690,1.1990
-exploratory (before registration),E42,momentum_12_1+momentum_6_1+low_vol+revenue_yoy,10,0.1526,0.6791,0.1585,0.2278,0.7608,0.2690,1.1990
-exploratory (before registration),E43,momentum_12_1+momentum_6_1+low_vol+revenue_yoy,20,0.1343,0.6738,0.0518,0.2738,0.9283,0.2690,1.1990
-exploratory (before registration),E44,momentum_12_1+momentum_6_1+low_vol+revenue_yoy,30,0.1031,0.5819,-0.1504,0.2508,0.9122,0.2690,1.1990
-registered 2026-11-01,C01,app_score,20,-0.0303,-0.0616,-0.7145,-0.0395,-0.0535,0.2690,1.1990
-registered 2026-11-01,C02,momentum_12_1,20,0.0555,0.3403,-0.1730,0.2378,0.7877,0.2690,1.1990
-registered 2026-11-01,C03,low_vol,20,0.0148,0.1937,-1.1384,0.1126,1.0412,0.2690,1.1990
-registered 2026-11-01,C04,revenue_yoy,20,0.0744,0.4407,-0.2344,0.3190,1.1089,0.2690,1.1990
-registered 2026-11-01,C05,inst_flow,20,-0.0323,-0.1396,-1.6798,0.1210,0.7524,0.2690,1.1990
-registered 2026-11-01,C06,momentum_12_1+revenue_yoy,20,0.0923,0.4792,-0.0890,0.3529,1.0754,0.2690,1.1990
-registered 2026-11-01,C07,momentum_12_1+low_vol,20,0.1080,0.8696,-0.3571,0.1919,1.0889,0.2690,1.1990
-registered 2026-11-01,C08,momentum_12_1+revenue_yoy+inst_flow,20,0.0571,0.3625,-0.3241,0.2306,0.8345,0.2690,1.1990
-registered 2026-11-01,C09,momentum_12_1+low_vol+revenue_yoy+inst_flow,20,0.0692,0.5110,-0.6515,0.1666,0.8787,0.2690,1.1990
-registered 2026-11-01,C10,momentum_12_1+low_vol+revenue_yoy+inst_flow,10,0.0643,0.4727,-0.5834,0.0956,0.5613,0.2690,1.1990
+phase,config,factors,top_n,is_cagr,is_sharpe,is_excess_info_ratio,oos_cagr,oos_sharpe,oos_bench_cagr,oos_bench_sharpe,trial,id,params,full_cagr,full_sharpe,round
+exploratory (before registration),E00,revenue_yoy,10.0,0.0689,0.4157,-0.204,0.1929,0.7379,0.269,1.199,,,,,,
+exploratory (before registration),E01,revenue_yoy,20.0,0.0691,0.4252,-0.3002,0.3018,1.0685,0.269,1.199,,,,,,
+exploratory (before registration),E02,revenue_yoy,30.0,0.1162,0.6334,-0.0524,0.3149,1.1383,0.269,1.199,,,,,,
+exploratory (before registration),E03,low_vol,10.0,0.0615,0.6867,-0.6941,0.1132,1.0854,0.269,1.199,,,,,,
+exploratory (before registration),E04,low_vol,20.0,0.0409,0.4521,-0.8791,0.1234,1.1359,0.269,1.199,,,,,,
+exploratory (before registration),E05,low_vol,30.0,0.0519,0.541,-0.8553,0.1238,1.0754,0.269,1.199,,,,,,
+exploratory (before registration),E06,low_vol+revenue_yoy,10.0,0.1131,0.9495,-0.2304,0.119,0.7538,0.269,1.199,,,,,,
+exploratory (before registration),E07,low_vol+revenue_yoy,20.0,0.0897,0.8278,-0.4661,0.1496,1.0292,0.269,1.199,,,,,,
+exploratory (before registration),E08,low_vol+revenue_yoy,30.0,0.0779,0.7407,-0.5718,0.1513,1.0859,0.269,1.199,,,,,,
+exploratory (before registration),E09,momentum_6_1,10.0,0.1396,0.5778,0.1606,0.2411,0.7548,0.269,1.199,,,,,,
+exploratory (before registration),E10,momentum_6_1,20.0,0.137,0.6163,0.1159,0.2669,0.8442,0.269,1.199,,,,,,
+exploratory (before registration),E11,momentum_6_1,30.0,0.1308,0.6216,0.0745,0.2403,0.8031,0.269,1.199,,,,,,
+exploratory (before registration),E12,momentum_6_1+revenue_yoy,10.0,0.2026,0.8026,0.3132,0.3527,1.0091,0.269,1.199,,,,,,
+exploratory (before registration),E13,momentum_6_1+revenue_yoy,20.0,0.1581,0.7166,0.1791,0.3557,1.0859,0.269,1.199,,,,,,
+exploratory (before registration),E14,momentum_6_1+revenue_yoy,30.0,0.1532,0.7239,0.1498,0.269,0.9069,0.269,1.199,,,,,,
+exploratory (before registration),E15,momentum_6_1+low_vol,10.0,0.0695,0.5165,-0.4607,0.0983,0.632,0.269,1.199,,,,,,
+exploratory (before registration),E16,momentum_6_1+low_vol,20.0,0.1186,0.9002,-0.1713,0.1587,1.0623,0.269,1.199,,,,,,
+exploratory (before registration),E17,momentum_6_1+low_vol,30.0,0.0965,0.7744,-0.3727,0.1917,1.2689,0.269,1.199,,,,,,
+exploratory (before registration),E18,momentum_6_1+low_vol+revenue_yoy,10.0,0.0757,0.5001,-0.2917,0.1491,0.662,0.269,1.199,,,,,,
+exploratory (before registration),E19,momentum_6_1+low_vol+revenue_yoy,20.0,0.1254,0.8253,-0.0908,0.181,0.8653,0.269,1.199,,,,,,
+exploratory (before registration),E20,momentum_6_1+low_vol+revenue_yoy,30.0,0.109,0.7736,-0.2295,0.2228,1.0972,0.269,1.199,,,,,,
+exploratory (before registration),E21,momentum_12_1,10.0,0.0527,0.3274,-0.1299,0.1884,0.6484,0.269,1.199,,,,,,
+exploratory (before registration),E22,momentum_12_1,20.0,0.0761,0.4125,-0.1124,0.2342,0.7814,0.269,1.199,,,,,,
+exploratory (before registration),E23,momentum_12_1,30.0,0.0988,0.5029,-0.0625,0.2448,0.8227,0.269,1.199,,,,,,
+exploratory (before registration),E24,momentum_12_1+revenue_yoy,10.0,0.0647,0.3705,-0.1217,0.3084,0.9195,0.269,1.199,,,,,,
+exploratory (before registration),E25,momentum_12_1+revenue_yoy,20.0,0.1319,0.6273,0.0611,0.255,0.8693,0.269,1.199,,,,,,
+exploratory (before registration),E26,momentum_12_1+revenue_yoy,30.0,0.0979,0.516,-0.0898,0.2776,0.9359,0.269,1.199,,,,,,
+exploratory (before registration),E27,momentum_12_1+low_vol,10.0,0.0906,0.6333,-0.3591,0.1104,0.6334,0.269,1.199,,,,,,
+exploratory (before registration),E28,momentum_12_1+low_vol,20.0,0.1027,0.8074,-0.3083,0.163,1.0155,0.269,1.199,,,,,,
+exploratory (before registration),E29,momentum_12_1+low_vol,30.0,0.0839,0.6982,-0.5308,0.195,1.216,0.269,1.199,,,,,,
+exploratory (before registration),E30,momentum_12_1+low_vol+revenue_yoy,10.0,0.1041,0.6328,-0.164,0.1397,0.6168,0.269,1.199,,,,,,
+exploratory (before registration),E31,momentum_12_1+low_vol+revenue_yoy,20.0,0.0979,0.6743,-0.2883,0.1815,0.8252,0.269,1.199,,,,,,
+exploratory (before registration),E32,momentum_12_1+low_vol+revenue_yoy,30.0,0.0845,0.6319,-0.4313,0.2116,1.0203,0.269,1.199,,,,,,
+exploratory (before registration),E33,momentum_12_1+momentum_6_1,10.0,0.1531,0.6208,0.1878,0.3294,0.9175,0.269,1.199,,,,,,
+exploratory (before registration),E34,momentum_12_1+momentum_6_1,20.0,0.1173,0.5493,0.0407,0.2909,0.8922,0.269,1.199,,,,,,
+exploratory (before registration),E35,momentum_12_1+momentum_6_1,30.0,0.1372,0.638,0.0996,0.2478,0.8214,0.269,1.199,,,,,,
+exploratory (before registration),E36,momentum_12_1+momentum_6_1+revenue_yoy,10.0,0.1136,0.5171,0.0628,0.29,0.8554,0.269,1.199,,,,,,
+exploratory (before registration),E37,momentum_12_1+momentum_6_1+revenue_yoy,20.0,0.1005,0.5025,-0.0289,0.33,0.989,0.269,1.199,,,,,,
+exploratory (before registration),E38,momentum_12_1+momentum_6_1+revenue_yoy,30.0,0.125,0.609,0.038,0.2585,0.8607,0.269,1.199,,,,,,
+exploratory (before registration),E39,momentum_12_1+momentum_6_1+low_vol,10.0,0.0963,0.4689,0.0103,0.2764,0.8431,0.269,1.199,,,,,,
+exploratory (before registration),E40,momentum_12_1+momentum_6_1+low_vol,20.0,0.1448,0.6893,0.1117,0.2185,0.763,0.269,1.199,,,,,,
+exploratory (before registration),E41,momentum_12_1+momentum_6_1+low_vol,30.0,0.0883,0.5078,-0.2188,0.2338,0.8541,0.269,1.199,,,,,,
+exploratory (before registration),E42,momentum_12_1+momentum_6_1+low_vol+revenue_yoy,10.0,0.1526,0.6791,0.1585,0.2278,0.7608,0.269,1.199,,,,,,
+exploratory (before registration),E43,momentum_12_1+momentum_6_1+low_vol+revenue_yoy,20.0,0.1343,0.6738,0.0518,0.2738,0.9283,0.269,1.199,,,,,,
+exploratory (before registration),E44,momentum_12_1+momentum_6_1+low_vol+revenue_yoy,30.0,0.1031,0.5819,-0.1504,0.2508,0.9122,0.269,1.199,,,,,,
+registered 2026-11-01,C01,app_score,20.0,-0.0303,-0.0616,-0.7145,-0.0395,-0.0535,0.269,1.199,,,,,,
+registered 2026-11-01,C02,momentum_12_1,20.0,0.0555,0.3403,-0.173,0.2378,0.7877,0.269,1.199,,,,,,
+registered 2026-11-01,C03,low_vol,20.0,0.0148,0.1937,-1.1384,0.1126,1.0412,0.269,1.199,,,,,,
+registered 2026-11-01,C04,revenue_yoy,20.0,0.0744,0.4407,-0.2344,0.319,1.1089,0.269,1.199,,,,,,
+registered 2026-11-01,C05,inst_flow,20.0,-0.0323,-0.1396,-1.6798,0.121,0.7524,0.269,1.199,,,,,,
+registered 2026-11-01,C06,momentum_12_1+revenue_yoy,20.0,0.0923,0.4792,-0.089,0.3529,1.0754,0.269,1.199,,,,,,
+registered 2026-11-01,C07,momentum_12_1+low_vol,20.0,0.108,0.8696,-0.3571,0.1919,1.0889,0.269,1.199,,,,,,
+registered 2026-11-01,C08,momentum_12_1+revenue_yoy+inst_flow,20.0,0.0571,0.3625,-0.3241,0.2306,0.8345,0.269,1.199,,,,,,
+registered 2026-11-01,C09,momentum_12_1+low_vol+revenue_yoy+inst_flow,20.0,0.0692,0.511,-0.6515,0.1666,0.8787,0.269,1.199,,,,,,
+registered 2026-11-01,C10,momentum_12_1+low_vol+revenue_yoy+inst_flow,10.0,0.0643,0.4727,-0.5834,0.0956,0.5613,0.269,1.199,,,,,,
+,,,,0.04117649151477476,0.36859255507481076,,,,,,56.0,T1,"{""months"": 10}",0.09980054421352569,0.7114507636905727,overlay-2026-11-02
+,,,,0.043535950530206646,0.31291998853571007,,,,,,57.0,T2,"{""months"": 10}",0.12467222306599335,0.6444138973670948,overlay-2026-11-02
+,,,,0.005543435458100321,0.1312169531119924,,,,,,58.0,T3,"{""ma"": 200}",0.10728925238101805,0.5787657979258056,overlay-2026-11-02
+,,,,0.02289170076005642,0.21492217081323725,,,,,,59.0,T4,"{""months"": 12}",0.11882392203214431,0.6044498617378881,overlay-2026-11-02
+,,,,0.09376920519763376,0.5279160555990857,,,,,,60.0,T5,"{""window"": 21}",0.15350635011742608,0.7909385653836378,overlay-2026-11-02
+,,,,0.010999380276599746,0.1504665872460996,,,,,,61.0,T6,"{""ma"": 200, ""window"": 20}",0.08490249540348382,0.5586034442627014,overlay-2026-11-02
