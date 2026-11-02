@@ -150,7 +150,7 @@ def test_card_negative_ev_never_says_setup():
     card = build_card("2330", df, setup)
     assert card["history"]["n"] > 0
     if card["history"]["avg_ret_pct"] <= 0:
-        assert card["status"] == "NEGATIVE_EV"
+        assert card["status"] == "NEGATIVE_EV" and card["actionable"] is False
     assert card["random_control"]["runs"] > 0
 
 
@@ -160,6 +160,7 @@ def test_no_history_is_never_setup():
     setup.iloc[-1] = True
     card = build_card("2330", df, setup)
     assert card["history"]["n"] == 0 and card["status"] == "UNVERIFIED"
+    assert card["actionable"] is False   # 沒有歷史可驗證 → 價位收合
 
 
 def test_open_below_stop_cancels_order():

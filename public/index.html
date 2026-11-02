@@ -163,14 +163,14 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .tp2-lbl{font-size:12px;color:var(--muted)}
 .tp2-val{font-family:var(--mono);font-size:22px;font-weight:700;letter-spacing:.01em}
 .tp2-sub{font-size:12px;color:var(--muted)}
-.tp2-copy{min-width:44px;min-height:44px;border-radius:8px;border:1px solid var(--line);background:#172946;color:var(--text,#e2e8f0);font-size:12px;cursor:pointer}
+.tp2-copy{flex-shrink:0;white-space:nowrap;min-width:52px;min-height:44px;border-radius:8px;border:1px solid var(--line);background:#172946;color:var(--text,#e2e8f0);font-size:12px;cursor:pointer}
 .tp2-sell{margin:10px 0 0;padding-left:18px;font-size:13px;line-height:1.7}
 .tp2-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:10px}
 .tp2-stat{background:#0a1322;border:1px solid var(--line);border-radius:8px;padding:6px 8px}
 .tp2-stat b{display:block;font-family:var(--mono);font-size:15px}
 .tp2-cap{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--muted)}
 .tp2-cap input{width:120px;min-height:40px;font-size:14px}
-.tp2 details summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-size:13px;color:var(--cyan)}
+.tp2 details summary{cursor:pointer;min-height:44px;font-weight:600;display:flex;align-items:center;font-size:13px;color:var(--cyan)}
 .tp2-gate{text-align:center;padding:10px 4px}
 .tp2-gate button{min-height:44px;padding:0 16px;margin-top:8px}
 /* ── K-line ──────────────────────────────────────────────────────── */
@@ -1910,7 +1910,7 @@ var TP2_LAST=null;
 function tp2Get(k,d){try{var v=localStorage.getItem(k);return v==null?d:v;}catch(e){return d;}}
 function tp2Set(k,v){try{localStorage.setItem(k,v);}catch(e){}}
 function tp2Ack(){try{return sessionStorage.getItem("tp2_ack")==="1";}catch(e){return false;}}
-function tp2Copy(v){try{navigator.clipboard.writeText(String(v));toast("已複製 "+v,"ok");}catch(e){toast("無法複製，請手動輸入 "+v,"warn");}}
+function tp2Copy(v){var live=$I("tp2Live");try{navigator.clipboard.writeText(String(v));if(live)live.textContent="已複製 "+v;toast("已複製 "+v,"ok");}catch(e){if(live)live.textContent="無法複製，請手動輸入 "+v;}}
 function tp2Fmt(n){return n==null||isNaN(Number(n))?"—":Number(n).toLocaleString("zh-TW",{maximumFractionDigits:2});}
 function tp2MD(s){return s?s.slice(5).replace("-","/"):"—";}
 async function loadTradePlanV2(id){
@@ -1929,8 +1929,8 @@ async function loadTradePlanV2(id){
 function renderTradePlanV2(d){
   var card=$I("tp2Card");if(!card)return;
   var p=d.plan,h=d.history||{},rc=d.random_control||{};
-  var head='<div class="tp2-head"><span class="tp2-title">交易計畫 · '+esc(d.stock_id)+' '+esc(d.stock_name||"")+'</span><span class="tp2-chip '+esc(d.status)+'">'+esc(d.status_text)+'</span></div>';
-  var warn='<div class="tp2-warn">⚠ '+esc(d.label)+'。下單前請自行判斷，最壞情況是停損價被跳空跌破。</div>';
+  var head='<div class="tp2-head"><span class="tp2-title">交易計畫 · '+esc(d.stock_id)+' '+esc(d.stock_name||"")+(h.n?' <span class="tp2-sub">（歷史 '+h.n+' 筆）</span>':'')+'</span><span class="tp2-chip '+esc(d.status)+'">'+esc(d.status_text)+'</span></div>';
+  var warn='<div class="tp2-warn">⚠ '+esc(d.label)+'。最壞情況是停損價被跳空跌破。</div>';
   if(!tp2Ack()){
     card.innerHTML=head+warn+'<div class="tp2-gate"><div class="tp2-sub">這些價位來自固定規則，還沒有證據顯示它能贏過 0050。</div><button class="primary" id="tp2AckBtn">我了解，顯示價位</button></div>';
     var b=$I("tp2AckBtn");if(b)b.onclick=function(){try{sessionStorage.setItem("tp2_ack","1");}catch(e){}renderTradePlanV2(d);};
@@ -1939,34 +1939,32 @@ function renderTradePlanV2(d){
   if(!p){card.innerHTML=head+warn;return;}
   function row(lbl,val,sub){return '<div class="tp2-row"><div><div class="tp2-lbl">'+lbl+'</div><div class="tp2-val">'+tp2Fmt(val)+'</div>'+(sub?'<div class="tp2-sub">'+sub+'</div>':'')+'</div><button class="tp2-copy" aria-label="複製'+lbl+' '+val+'" onclick="tp2Copy('+val+')">複製</button></div>';}
   var pos=p.position,posHtml;
-  if(pos&&pos.shares>0){posHtml='<div class="tp2-row"><div><div class="tp2-lbl">建議股數（單筆最多虧總資金 '+pos.risk_pct_of_capital+'%）</div><div class="tp2-val">'+(pos.lots?pos.lots+' 張 ':'')+(pos.odd_shares?pos.odd_shares+' 股':'')+'</div><div class="tp2-sub">約 '+tp2Fmt(pos.amount)+' 元；打到停損約虧 '+tp2Fmt(pos.risk_amount)+' 元'+(pos.min_fee_warning?'；'+esc(pos.min_fee_warning):'')+'</div></div></div>';}
-  else{posHtml='<div class="tp2-sub" style="margin-top:4px">輸入總資金可算出建議股數。</div>';}
-  var actionable=(d.status==="SETUP"||d.status==="UNVERIFIED");
-  var buy='<ul class="tp2-sell" style="list-style:none;padding-left:0;margin-top:6px">'+(p.buy_rules||[]).map(function(s){return'<li>• '+esc(s)+'</li>';}).join("")+'</ul>';
+  if(pos&&pos.shares>0){
+    var parts=[];if(pos.lots)parts.push(pos.lots+' 張（整股下單）');if(pos.odd_shares)parts.push('零股 '+pos.odd_shares+' 股（需用零股下單）');
+    posHtml='<div class="tp2-row"><div><div class="tp2-lbl">建議數量（打到停損最多虧總資金 '+pos.risk_pct_of_capital+'%）</div><div class="tp2-val" style="font-size:18px">'+parts.join(' + ')+'</div><div class="tp2-sub">'+(parts.length>1?'要分兩筆委託；':'')+'約 '+tp2Fmt(pos.amount)+' 元；打到停損約虧 '+tp2Fmt(pos.risk_amount)+' 元'+(pos.min_fee_warning?'；'+esc(pos.min_fee_warning):'')+'</div></div></div>';
+  }else{posHtml='<div class="tp2-sub" style="margin-top:4px">輸入總資金可算出建議股數。</div>';}
+  var cap='<div class="tp2-cap"><label for="tp2Cap">總資金</label><input id="tp2Cap" type="number" inputmode="numeric" min="0" step="10000" value="'+(Number(tp2Get("tp2_capital","0"))||"")+'" placeholder="例如 500000"><label for="tp2Risk">單筆風險 %</label><input id="tp2Risk" type="number" inputmode="decimal" min="0.25" max="5" step="0.25" value="'+(Number(tp2Get("tp2_risk","1"))||1)+'" style="width:70px"><button class="ghost sm" id="tp2CapBtn" style="min-height:44px">重算</button></div>';
   var grid='<div class="tp2-grid">'+
-    row("限價買進（▼ 掛單價，不追高）",p.entry,"有效到 "+tp2MD(p.valid_until)+" 收盤，沒成交就取消")+
-    row("停損（跌破就賣）",p.stop,"風險 "+p.risk_pct+"% / 股")+
-    row("目標價（+2R 賣出）",p.target,"保本觸發價 "+tp2Fmt(p.breakeven_trigger))+
-    posHtml+'</div>';
-  var sell='<div class="tp2-lbl" style="margin-top:10px">什麼時候賣（先到先出）</div><ol class="tp2-sell">'+(p.sell_rules||[]).map(function(s){return'<li>'+esc(s)+'</li>';}).join("")+'</ol>';
+    row("限價買進（不追高）",p.entry,"有效到 "+esc(p.valid_until_md||p.valid_until)+" 收盤，沒成交就取消；開盤已低於停損就不買")+
+    row("停損（跌破就賣）",p.stop,"每股風險 "+p.risk_pct+"%")+
+    row("目標價（+2R 賣出）",p.target,"收盤站上 "+tp2Fmt(p.breakeven_trigger)+" 後停損移到成本")+
+    posHtml+cap+'</div><div id="tp2Live" class="tp2-sub" aria-live="polite" style="min-height:16px"></div>';
+  var sell='<div class="tp2-lbl" style="margin-top:6px">什麼時候賣（先到先出）</div><ol class="tp2-sell">'+(p.sell_rules||[]).map(function(s){return'<li>'+esc(s)+'</li>';}).join("")+'</ol>';
   var stats='';
   if(h.n){
-    var ci=h.avg_ret_ci95_pct?' （95% 區間 '+h.avg_ret_ci95_pct[0]+'% ~ '+h.avg_ret_ci95_pct[1]+'%）':'';
+    var ci=h.avg_ret_ci95_pct?'95% 區間 '+h.avg_ret_ci95_pct[0]+'% ~ '+h.avg_ret_ci95_pct[1]+'%':'筆數太少，不算區間';
     stats='<div class="tp2-lbl" style="margin-top:10px">同一套規則在此股過去的成績（已扣成本'+(h.sample_ok?'':'，<b style="color:var(--yellow)">樣本不足，只能參考</b>')+'）</div><div class="tp2-stats">'+
-      '<div class="tp2-stat">交易筆數<b>'+h.n+'</b></div>'+
-      '<div class="tp2-stat">勝率 / 平均 R<b>'+h.win_rate+'% / '+h.avg_r+'R</b></div>'+
-      '<div class="tp2-stat">每筆平均<b>'+h.avg_ret_pct+'%</b><span class="tp2-sub">'+ci+'</span></div>'+
+      '<div class="tp2-stat">規則每筆平均<b>'+h.avg_ret_pct+'%</b><span class="tp2-sub">'+ci+'</span></div>'+
       '<div class="tp2-stat">隨機進場對照<b>'+(rc.runs?rc.avg_ret_pct+'%':'—')+'</b><span class="tp2-sub">同樣出場規則'+(rc.avg_n?'、約 '+rc.avg_n+' 筆':'')+'</span></div>'+
+      '<div class="tp2-stat">勝率 / 平均 R<b>'+h.win_rate+'% / '+h.avg_r+'R</b></div>'+
+      '<div class="tp2-stat">最多連虧<b>'+h.max_consec_losses+' 筆</b><span class="tp2-sub">平均持有 '+h.avg_days+' 天</span></div>'+
       '<div class="tp2-stat">規則累積<b>'+h.total_ret_pct+'%</b><span class="tp2-sub">持有 '+(h.exposure_pct==null?'—':h.exposure_pct+'%')+' 的時間</span></div>'+
-      '<div class="tp2-stat">同期 0050<b>'+(h.bench_0050_pct==null?'—':h.bench_0050_pct+'%')+'</b><span class="tp2-sub">一直持有、未含息</span></div>'+
-      '<div class="tp2-stat">最多連虧<b>'+h.max_consec_losses+' 筆</b></div>'+
-      '<div class="tp2-stat">平均持有<b>'+h.avg_days+' 天</b></div></div>';
+      '<div class="tp2-stat">同期 0050<b>'+(h.bench_0050_pct==null?'—':h.bench_0050_pct+'%')+'</b><span class="tp2-sub">一直持有、未含息</span></div></div>';
   }else{stats='<div class="tp2-sub" style="margin-top:10px">此股近幾年沒有觸發過這套規則，沒有歷史成績可看。</div>';}
-  var cap='<div class="tp2-cap"><label for="tp2Cap">總資金</label><input id="tp2Cap" type="number" inputmode="numeric" min="0" step="10000" value="'+(Number(tp2Get("tp2_capital","0"))||"")+'" placeholder="例如 500000"><label for="tp2Risk">單筆風險 %</label><input id="tp2Risk" type="number" inputmode="decimal" min="0.25" max="5" step="0.25" value="'+(Number(tp2Get("tp2_risk","1"))||1)+'" style="width:70px"><button class="ghost sm" id="tp2CapBtn" style="min-height:44px">重算</button></div>';
+  var levels=grid+sell;
+  if(!d.actionable){levels='<details><summary>查看參考價位（'+esc(d.status_text)+'，不建議照此下單）</summary>'+levels+'</details>';}
   var more='<details><summary>規則細節與限制</summary><div class="tp2-sub" style="line-height:1.7">計畫依 '+esc(p.as_of)+' 收盤計算。'+(d.caveats||[]).map(function(c){return'<div>• '+esc(c)+'</div>';}).join("")+'</div></details>';
-  var levels=grid+buy+sell;
-  if(!actionable){levels='<details><summary>查看參考價位（'+esc(d.status_text)+'，不建議照此下單）</summary>'+levels+'</details>';}
-  card.innerHTML=head+warn+levels+stats+cap+more;
+  card.innerHTML=head+warn+levels+stats+more;
   var cb=$I("tp2CapBtn");if(cb)cb.onclick=function(){var c=$I("tp2Cap"),k=$I("tp2Risk");tp2Set("tp2_capital",c&&c.value?c.value:"0");tp2Set("tp2_risk",k&&k.value?k.value:"1");loadTradePlanV2(d.stock_id);};
 }
 
@@ -2093,7 +2091,7 @@ function renderAI(ai) {
   setTxt("aiEp",ai.entry_price!=null?f(ai.entry_price):"—");setTxt("aiTp",ai.target_price!=null?f(ai.target_price):"—");setTxt("aiSl",ai.stop_loss!=null?f(ai.stop_loss):"—");
   var rrEl=$I("aiRr");if(rrEl){if(ai.risk_reward_ratio!=null){rrEl.textContent=ai.risk_reward_ratio+"x";rrEl.className="aiq-val "+((ai.risk_reward_ratio>=1.5)?"up":"down");}else{rrEl.textContent="—";rrEl.className="aiq-val";}}
   setTxt("aiSummary",ai.summary||"—");
-  var tsEl=$I("tradeStatusBadge");if(tsEl){var ts=ai.trade_status||"WATCH";var tsL={"BUY_NOW":"條件符合（未驗證）","BUY_PULLBACK":"⏳ 等回檔","WATCH":"👀 觀望","AVOID":"不符合"};tsEl.textContent=tsL[ts]||ts;tsEl.className="ts-badge ts-"+ts;}
+  var tsEl=$I("tradeStatusBadge");if(tsEl){var ts=ai.trade_status||"WATCH";var tsL={"BUY_NOW":"舊評分偏多（看交易計畫卡）","BUY_PULLBACK":"⏳ 等回檔","WATCH":"👀 觀望","AVOID":"不符合"};tsEl.textContent=tsL[ts]||ts;tsEl.className="ts-badge ts-"+ts;}
   var esEl=$I("entryStatusBadge");if(esEl){var es=ai.entry_status||"";if(es){esEl.innerHTML='<span class="es-'+es+'">'+(ai.entry_status_text||es)+'</span>';}else esEl.innerHTML="";}
   var aeEl=$I("aiEntry");if(aeEl)aeEl.innerHTML=(ai.entry_reason||[]).length?(ai.entry_reason.map(function(r){return'<div class="reason" style="color:var(--down)">✅ '+r+'</div>';}).join("")):'<div class="reason">—</div>';
   var arEl=$I("aiRisk");if(arEl)arEl.innerHTML=(ai.risk_reason||[]).length?(ai.risk_reason.map(function(r){return'<div class="reason" style="color:var(--up)">⚠️ '+r+'</div>';}).join("")):'<div class="reason" style="color:var(--muted)">暫無明顯風險</div>';

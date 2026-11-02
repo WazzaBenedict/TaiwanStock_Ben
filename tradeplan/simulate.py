@@ -166,8 +166,8 @@ def summarize(trades: list[dict]) -> dict:
 
 
 def random_entry_control(df: pd.DataFrame, n_trades: int, rules: PlanRules = PlanRules(),
-                         costs: Costs = Costs(), etf: bool = False, runs: int = 40,
-                         seed: int = 7, start: int = 60) -> dict:
+                         costs: Costs = Costs(), etf: bool = False, runs: int = 200,
+                         seed: int = 7, start: int = 60, rule_avg: float | None = None) -> dict:
     """隨機挑與規則「實際成交筆數」一樣多的進場日、同一段期間（第 start 根起）、同一套出場規則，
     當作「沒有選股能力」的對照組。"""
     if df is None or len(df) < start + 10 or n_trades <= 0:
@@ -185,7 +185,10 @@ def random_entry_control(df: pd.DataFrame, n_trades: int, rules: PlanRules = Pla
             counts.append(len(tr))
     if not means:
         return {"runs": 0}
-    return {"runs": len(means), "avg_n": round(float(np.mean(counts)), 1),
+    out_p = None
+    if rule_avg is not None:   # 經驗 p 值：隨機進場平均 ≥ 規則平均的比例
+        out_p = round((1 + sum(m >= rule_avg for m in means)) / (len(means) + 1), 3)
+    return {"runs": len(means), "avg_n": round(float(np.mean(counts)), 1), "p_value": out_p,
             "avg_ret_pct": round(float(np.mean(means)) * 100, 2),
             "p10_pct": round(float(np.percentile(means, 10)) * 100, 2),
             "p90_pct": round(float(np.percentile(means, 90)) * 100, 2)}

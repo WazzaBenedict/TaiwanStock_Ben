@@ -23,6 +23,15 @@ def _bdays_after(as_of: str, n: int) -> str:
     return (pd.Timestamp(as_of) + pd.offsets.BDay(n)).strftime("%Y-%m-%d")
 
 
+_WD = "一二三四五六日"
+
+
+def md(date: str) -> str:
+    """2026-11-05 → 11/05（四）"""
+    t = pd.Timestamp(date)
+    return f"{t:%m/%d}（{_WD[t.weekday()]}）"
+
+
 def bench_return(bench: pd.DataFrame | None, start: str, end: str) -> float | None:
     if bench is None or bench.empty:
         return None
@@ -41,7 +50,8 @@ def build_card(stock_id: str, df: pd.DataFrame, setup: pd.Series, bench: pd.Data
     plan = make_plan(df, rules, etf)
     trades = simulate(df, setup, rules, costs, etf)
     hist = summarize(trades)
-    control = random_entry_control(df, hist["n"], rules, costs, etf) if hist["n"] else {"runs": 0}
+    control = (random_entry_control(df, hist["n"], rules, costs, etf, rule_avg=hist["avg_ret_pct"] / 100)
+               if hist["n"] else {"runs": 0})
     if hist["n"]:
         hist["bench_0050_pct"] = bench_return(bench, hist["first_date"], hist["last_date"])
         span = max(1, len(pd.bdate_range(hist["first_date"], hist["last_date"])))
@@ -50,7 +60,8 @@ def build_card(stock_id: str, df: pd.DataFrame, setup: pd.Series, bench: pd.Data
 
     # 狀態：只有「樣本夠、扣成本後 95% 區間下緣 > 0、且贏過隨機進場的第 90 百分位」才叫條件符合
     ci = hist.get("avg_ret_ci95_pct")
-    verified = bool(hist.get("sample_ok") and ci and ci[0] > 0 and control.get("runs")
+    matched = bool(control.get("runs") and abs(control["avg_n"] - hist["n"]) <= 0.2 * hist["n"])
+    verified = bool(hist.get("sample_ok") and ci and ci[0] > 0 and matched
                     and hist["avg_ret_pct"] > control.get("p90_pct", float("inf")))
     if not plan:
         status, status_text = "NO_PLAN", "資料不足，無法產生計畫"
@@ -61,20 +72,23 @@ def build_card(stock_id: str, df: pd.DataFrame, setup: pd.Series, bench: pd.Data
     elif not verified:
         status, status_text = "UNVERIFIED", "條件出現，但證據不足"
     else:
-        status, status_text = "SETUP", "條件符合"
+        # 仍是樣本內、單一股票的結果；全市場樣本外驗證（第 3 期）通過前不說「條件符合」
+        status, status_text = "SETUP", "歷史條件符合（樣本內）"
+
+    actionable = status == "SETUP" or (status == "UNVERIFIED" and hist["n"] > 0 and hist.get("avg_r", 0) > 0)
+    if status == "UNVERIFIED" and not actionable:
+        status_text = "條件出現，但沒有足夠歷史可驗證" if not hist["n"] else "條件出現，但規則歷史為負，不建議"
 
     if plan:
         plan["valid_until"] = _bdays_after(plan["as_of"], rules.entry_valid_days)
         plan["time_exit_by"] = _bdays_after(plan["as_of"], rules.entry_valid_days + rules.max_hold_days)
-        plan["buy_rules"] = [
-            f"掛限價 {plan['entry']} 買進，不追高；約 {plan['valid_until']} 收盤前沒成交就取消",
-            f"開盤已低於停損 {plan['stop']} 就不買（計畫失效）",
-        ]
+        plan["valid_until_md"] = md(plan["valid_until"])
+        plan["time_exit_md"] = md(plan["time_exit_by"])
         plan["sell_rules"] = [
             f"跌破停損 {plan['stop']} 就賣（開盤跳空跌破則開盤賣）",
             f"漲到目標 {plan['target']}（+{rules.target_r:g}R）賣出",
-            f"收盤站上 {plan['breakeven_trigger']}（+1R）後，停損上移到進場價；之後停損 = 最高收盤 − {rules.trail_atr:g}×ATR",
-            f"持有滿 {rules.max_hold_days} 個交易日還沒出場，當天收盤賣（約 {plan['time_exit_by']} 前）",
+            f"收盤站上 {plan['breakeven_trigger']}（+1R）後，停損上移到進場價；之後停損 = 最高收盤 − {rules.trail_atr:g}×ATR，每天收盤後更新",
+            f"成交後第 {rules.max_hold_days} 個交易日收盤還沒出場就賣（最晚約 {plan['time_exit_md']}）",
         ]
         if capital:
             plan["position"] = position_size(capital, risk_pct, plan["entry"], plan["stop"], costs, etf)
@@ -82,7 +96,7 @@ def build_card(stock_id: str, df: pd.DataFrame, setup: pd.Series, bench: pd.Data
 
     return {
         "stock_id": stock_id, "etf": etf, "label": RESEARCH_LABEL,
-        "status": status, "status_text": status_text, "setup_today": setup_today,
+        "status": status, "status_text": status_text, "setup_today": setup_today, "actionable": actionable,
         "plan": plan, "history": hist, "random_control": control,
         "recent_trades": trades[-8:][::-1], "rules": rules.as_dict(), "caveats": CAVEATS,
     }
