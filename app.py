@@ -22,6 +22,10 @@ if DEV_MODE: ALLOWED_ORIGINS = ["*"]
 app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS,
     allow_credentials=not DEV_MODE, allow_methods=["GET","POST","OPTIONS"], allow_headers=["*"])
 
+# Day-trade research tools (台股時光機): see daytrade/
+from daytrade.api import router as daytrade_router
+app.include_router(daytrade_router)
+
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
 LINE_TO_ID               = os.getenv("LINE_TO_ID", "")
 ENABLE_LINE_ALERTS       = os.getenv("ENABLE_LINE_ALERTS", "false").lower() == "true"
@@ -43,6 +47,9 @@ US_HISTORY_FILE    = BASE_DIR / "us_signal_history.json"
 US_MASTER_FILE     = BASE_DIR / "us_stock_master.json"
 
 FINMIND_BASE  = "https://api.finmindtrade.com/api/v4/data"
+FINMIND_TOKEN = os.getenv("FINMIND_TOKEN", "")
+# A token raises FinMind's quota (anonymous ~300 req/hr); minute bars need a paid tier.
+FINMIND_HEADERS = {"Authorization": f"Bearer {FINMIND_TOKEN}"} if FINMIND_TOKEN else {}
 TWSE_NAME_URL = "https://www.twse.com.tw/rwd/zh/api/basic"
 TWSE_MIS_URL  = "https://mis.twse.com.tw/stock/api/getStockInfo.jsp"
 LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push"
@@ -960,7 +967,7 @@ async def fetch_fundamental_data(sid:str)->dict:
     try:
         async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as cl:
             try:
-                r=await cl.get(FINMIND_BASE,params={"dataset":"TaiwanStockMonthRevenue","data_id":sid,
+                r=await cl.get(FINMIND_BASE,headers=FINMIND_HEADERS,params={"dataset":"TaiwanStockMonthRevenue","data_id":sid,
                     "start_date":(ed-timedelta(days=120)).strftime("%Y-%m-%d"),"end_date":ed.strftime("%Y-%m-%d")})
                 if r.status_code not in(402,403,429) and r.status_code==200:
                     rows=r.json().get("data",[])

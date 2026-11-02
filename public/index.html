@@ -468,6 +468,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <button class="nav-tab" data-page="p-plans">📌 交易追蹤</button>
   <button class="nav-tab" data-page="p-positions">💼 持倉管理</button>
   <button class="nav-tab" data-page="p-journal">📘 交易日誌</button>
+  <button class="nav-tab" data-page="p-timemachine">⏳ 時光機</button>
   <button class="nav-tab" data-page="p-account">👤 帳戶</button>
 </nav>
 
@@ -900,6 +901,87 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 </div><!-- /p-journal -->
 
 <!-- ═══ TW Account Page ═══ -->
+<!-- ══ 台股時光機 (day-trade replay, daytrade/timemachine.py) ══ -->
+<div class="page" id="p-timemachine">
+  <div class="section">
+    <div class="section-title"><div class="section-title-left">⏳ 台股時光機 <span class="d-badge">研究／模擬，非投資建議</span></div></div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px">
+      用這檔股票過去 60 個交易日的 5 分 K，把當天剩下的走勢重播 1 萬次，算出先碰停利、先碰停損的機率，並扣掉手續費、0.15% 當沖稅與滑價。
+      只做「先買後賣」。不填進場價時，系統用「開盤區間突破」規則自動產生計畫。模擬不是預測，多數散戶當沖長期是虧的。
+    </div>
+    <div class="row tm-form" style="gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <input id="tmId" placeholder="股票代號 如 2330" maxlength="7"/>
+      <input id="tmDate" type="date"/>
+      <input id="tmEntry" type="number" step="0.01" placeholder="進場價（選填）"/>
+      <input id="tmTime" placeholder="進場時間 10:15"/>
+      <input id="tmStop" type="number" step="0.01" placeholder="停損價"/>
+      <input id="tmTarget" type="number" step="0.01" placeholder="停利價"/>
+    </div>
+    <div class="row tm-form" style="gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <label>開盤區間 <select id="tmOrb"><option value="15">15 分</option><option value="30">30 分</option></select></label>
+      <label>停利 R <input id="tmR" type="number" value="1" step="0.5" min="0.5" max="5" style="width:60px"/></label>
+      <label>股數 <input id="tmShares" type="number" value="1000" step="1000" min="1" style="width:80px"/></label>
+      <label>手續費折扣 <input id="tmDisc" type="number" value="0.6" step="0.05" min="0" max="1" style="width:60px"/></label>
+      <label>滑價(檔) <select id="tmSlip"><option>0</option><option selected>1</option><option>2</option></select></label>
+      <button class="ghost sm" id="btnTm">執行 1 萬次重播</button>
+    </div>
+    <div id="tmMsg" style="font-family:var(--mono);font-size:12px;color:var(--muted)"></div>
+    <div id="tmOut" style="display:none"></div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:10px">方法改寫自 Jake Schincariol 的 trader-timemachine（MIT 授權）。</div>
+  </div>
+  <style>
+    .tm-form input,.tm-form select{background:#0d1728;border:1px solid var(--line);border-radius:7px;color:var(--text);padding:7px 10px;font-family:var(--mono);font-size:13px;outline:none}
+    .tm-form input:not([style*=width]){width:130px}
+    .tm-form label{font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px}
+    .tm-bar{display:flex;height:22px;border-radius:6px;overflow:hidden;margin:8px 0;font-family:var(--mono);font-size:11px;color:#06101f;font-weight:700}
+    .tm-bar div{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden}
+    .tm-kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:8px 0}
+    .tm-kv div{background:#0d1728;border:1px solid var(--line);border-radius:8px;padding:8px}
+    .tm-kv b{display:block;font-size:16px;color:var(--text)} .tm-kv span{font-size:11px;color:var(--muted);font-family:var(--mono)}
+    .tm-verdict{border-left:3px solid var(--cyan);padding:6px 10px;margin:8px 0;font-size:13px;line-height:1.7}
+  </style>
+  <script>
+  (function(){
+    function v(id){var e=document.getElementById(id);return e?e.value.trim():"";}
+    function lastWeekday(){var d=new Date();d.setDate(d.getDate()-1);while(d.getDay()===0||d.getDay()===6)d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);}
+    function init(){
+      var dt=document.getElementById("tmDate"); if(dt&&!dt.value) dt.value=lastWeekday();
+      var b=document.getElementById("btnTm"); if(b) b.addEventListener("click",runTm);
+    }
+    async function runTm(){
+      var msg=document.getElementById("tmMsg"),out=document.getElementById("tmOut");
+      var q={stock_id:v("tmId"),date:v("tmDate"),orb_minutes:v("tmOrb"),target_r:v("tmR"),shares:v("tmShares"),fee_discount:v("tmDisc"),slip_ticks:v("tmSlip")};
+      if(!/^\d{4,6}[A-Z]?$/.test(q.stock_id)||!q.date){msg.textContent="請輸入股票代號與日期";return;}
+      if(v("tmEntry")){q.entry=v("tmEntry");q.stop=v("tmStop");q.target=v("tmTarget");q.entry_time=v("tmTime");
+        if(!q.stop||!q.target||!q.entry_time){msg.textContent="手動計畫需要進場價、進場時間、停損與停利";return;}}
+      msg.textContent="抓取分 K 並重播中…第一次抓 60 天資料可能要 1 分鐘";out.style.display="none";
+      try{
+        var r=await apiFetch(API+"/api/daytrade/timemachine?"+new URLSearchParams(q).toString(),{},120000);
+        var d=await r.json(); if(!r.ok){msg.textContent="⚠ "+(d.detail||("錯誤 "+r.status));return;}
+        msg.textContent=""; render(d);
+      }catch(e){msg.textContent="⚠ "+e.message;}
+    }
+    function render(d){
+      var p=d.plan,m=d.mc,h=d.history,a=d.actual_day,out=document.getElementById("tmOut");
+      var pct=function(x){return x.toFixed(1)+"%";};
+      var html='<div style="font-family:var(--mono);font-size:12px;margin:6px 0">'+esc(p.stock_id)+" "+esc(p.date)+"　"+(p.source==="orb"?"開盤區間突破 自動計畫":"手動計畫")+
+        "　進場 "+p.entry+" @"+esc(p.entry_time)+"　停損 "+p.stop+"　停利 "+p.target+"（"+p.target_r+"R）　"+p.shares+" 股　來回成本約 "+p.round_trip_cost_pct+"%</div>";
+      html+='<div class="tm-bar"><div style="width:'+m.target_first+'%;background:#3ddc97">停利 '+pct(m.target_first)+'</div><div style="width:'+m.neither+'%;background:#8aa0bf">收盤 '+pct(m.neither)+'</div><div style="width:'+m.stop_first+'%;background:#ff6b6b">停損 '+pct(m.stop_first)+'</div></div>';
+      html+='<div class="tm-kv">'+
+        '<div><b>'+pct(m.profitable_after_costs)+'</b><span>扣成本後賺錢的比例</span></div>'+
+        '<div><b>'+m.avg_net_r.toFixed(3)+'R</b><span>扣成本後平均每筆</span></div>'+
+        '<div><b>'+m.exit_median+'</b><span>出場價中位數（90%: '+m.exit_p5+'–'+m.exit_p95+'）</span></div>'+
+        '<div><b>'+(h.trades?h.avg_net_r.toFixed(3)+"R":"—")+'</b><span>歷史實際 '+(h.trades||0)+' 筆 / '+h.sessions+' 天</span></div>'+
+        '<div><b>'+(a.net_pnl>=0?"+":"")+a.net_pnl+'</b><span>當天實際（'+esc(a.outcome)+'，'+a.net_r+'R）</span></div></div>';
+      html+=d.verdict.map(function(s){return '<div class="tm-verdict">'+esc(s)+'</div>';}).join("");
+      html+='<div style="font-family:var(--mono);font-size:11px;color:var(--muted)">'+m.replays+' 次重播，seed '+m.seed+'，樣本 '+esc(d.pool.from)+' ~ '+esc(d.pool.to)+'。'+esc(d.disclaimer)+'</div>';
+      out.innerHTML=html; out.style.display="block";
+    }
+    if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
+  })();
+  </script>
+</div>
+
 <div class="page" id="p-account">
   <div id="accountGuest">
     <div class="account-card">
