@@ -46,7 +46,8 @@ class SwingConfig:
     start: str | None = None
     end: str | None = None
     random_seed: int | None = None             # 隨機對照：從同一合格池（同樣的候選數）隨機排序
-    blocked: frozenset = frozenset()           # {(sid, 進場日)}：H4 檢查「錯過最好的交易」
+    blocked: dict = field(default_factory=dict)  # {(sid, 進場日): 出場日}：H4「錯過最好的交易」，槽位空著放 0050
+    distress_haircut: float = 0.5              # 下市前 20 日跌 > 50% 的下市股，出場價再打折（破產/全額交割的保守處理）
     costs: TaiwanCosts = field(default_factory=TaiwanCosts)
 
 
@@ -114,9 +115,17 @@ def run_swing(ctx: Context, cfg: SwingConfig) -> dict:
     to_sell: dict[str, str] = {}
     to_buy: list[str] = []
     eq, trades = [], []
+    phantom: list = []
     skip_chase = skip_limit = 0
     tot_cost = 0.0
     prev = None
+
+    def distressed(sid):
+        lv = ctx.last_valid.get(sid)
+        if lv is None:
+            return False
+        s_ = close[sid].loc[:lv].dropna()
+        return len(s_) > 20 and s_.iloc[-1] / s_.iloc[-21] < 0.5
 
     def stock_cost(amount, side, sid, d):
         return costs.order_cost(amount * K, side, slippage=_slip(ctx, sid, d)) / K * m
@@ -152,6 +161,8 @@ def run_swing(ctx: Context, cfg: SwingConfig) -> dict:
             elif prev is not None and ctx.open_limit(sid, d, prev)[1]:
                 continue
             c = stock_cost(p["val"], "sell", sid, d) + (p["val"] * 0.005 * m if why == "delist" else 0.0)
+            if why == "delist" and distressed(sid):
+                c += (p["val"] - c) * cfg.distress_haircut
             cash += p["val"] - c
             tot_cost += c
             trades.append({"sid": sid, "entry_day": p["entry_day"], "exit_day": d, "days": p["held"],
@@ -159,13 +170,18 @@ def run_swing(ctx: Context, cfg: SwingConfig) -> dict:
             pos.pop(sid)
             to_sell.pop(sid)
         # 買
+        phantom[:] = [(s_, e) for s_, e in phantom if d < e]
         nav = cash + etf + sum(p["val"] for p in pos.values())
-        free = cfg.max_positions - len(pos)
+        free = cfg.max_positions - len(pos) - len(phantom)
         for sid, cap_px in to_buy:
             if free <= 0:
                 break
             o = open_.at[d, sid]
-            if pd.isna(o) or sid in pos or (sid, d) in cfg.blocked:
+            if pd.isna(o) or sid in pos or any(s_ == sid and d < e for s_, e in phantom):
+                continue
+            if (sid, d) in cfg.blocked and o <= cap_px and not ctx.open_limit(sid, d, prev)[0]:
+                phantom.append((sid, cfg.blocked[(sid, d)]))   # 假裝錯過：槽位被佔、資金留在 0050
+                free -= 1
                 continue
             if o > cap_px:
                 skip_chase += 1
@@ -234,7 +250,7 @@ def run_swing(ctx: Context, cfg: SwingConfig) -> dict:
             if why:
                 to_sell[sid] = why
         # 收盤後：選股
-        free = cfg.max_positions - len(pos) + len(to_sell)
+        free = cfg.max_positions - len(pos) + len(to_sell) - len(phantom)
         if free > 0 and (not cfg.regime or bool(ctx.regime_on.at[d])):
             score = cfg.score_fn(ctx, d) if cfg.score_fn is not None else pd.Series(dtype=float)
             liq = ctx.avg_value20.loc[d]
@@ -372,7 +388,7 @@ def blend_with_core(sat: pd.Series, core: pd.Series, w_core: float = 0.6) -> pd.
         if month is not None and d.month != month:
             tot = a + b
             shift = abs(a / tot - w_core)
-            nav *= 1 - shift * 0.006
+            nav *= 1 - shift * 0.009    # 兩邊都要交易：賣/買個股（含 0.3% 稅與滑價）+ 買/賣 0050
             a, b = w_core * nav, (1 - w_core) * nav
         month = d.month
         a *= 1 + rc.at[d]

@@ -40,13 +40,30 @@ def bench_eq(ctx: Context, days: pd.DatetimeIndex) -> pd.Series:
 
 
 def load_selection_panel():
-    end = pd.Timestamp.today().strftime("%Y-%m-%d")
-    return data.build_panel("2013-06-01", end, with_inst=False)
+    end = "2026-10-31"     # 與家用電腦 data_cache 的檔名一致（避免重新下載）
+    return data.build_panel("2013-06-01", end, with_inst=False, break_mode="up_only", bench_df=clean_0050())
 
 
 def load_holdout_panel():
-    f = data.CACHE_DIR / "panel_2004-01-01_2013-12-31.pkl"
-    return pickle.load(open(f, "rb"))
+    """從快取重建（不用 backfill 存的 pickle，因為它用的是舊版 legacy 斷點處理）。"""
+    return data.build_panel("2004-01-01", "2013-12-31", with_inst=False, break_mode="up_only", bench_df=clean_0050())
+
+
+def clean_0050() -> pd.DataFrame:
+    """0050 含息還原日線：2009-07 前 FinMind（除權息還原），之後 Yahoo；ETF 資料斷點已清理。"""
+    from .overlay_study import load_data
+    return load_data()["core"]
+
+
+def check_frozen():
+    frozen = SPEC.get("frozen_commit")
+    if not frozen:
+        raise SystemExit("spec 尚未寫入 frozen_commit：保留期不能跑。")
+    dirty = subprocess.run(["git", "status", "--porcelain", "--", "quant"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+    diff = subprocess.run(["git", "diff", "--quiet", frozen, "HEAD", "--", "quant/swing.py", "quant/swing_study.py",
+                           "quant/data.py", "quant/costs.py", "quant/metrics.py", "quant/overlay.py"], cwd=ROOT).returncode
+    if dirty or diff != 0:
+        raise SystemExit(f"程式碼與凍結版本 {frozen[:10]} 不同或工作目錄不乾淨：拒絕執行保留期。")
 
 
 def run_system(ctx, sid, start, end=None, **over):
@@ -72,7 +89,9 @@ def evaluate(ctx, sid, start, end=None, full=False, log=print) -> dict:
            "avg_days": float(tr["days"].mean()) if len(tr) else np.nan,
            "exit_reasons": tr["reason"].value_counts().to_dict() if len(tr) else {},
            "excess": excess_stats(eq, b), "beats": beats(stats(eq), stats(b))}
-    yr_n = tr.groupby(pd.to_datetime(tr["entry_day"]).dt.year).size() if len(tr) else pd.Series(dtype=int)
+    yrs = range(eq.index[0].year, eq.index[-1].year + 1)
+    yr_n = (tr.groupby(pd.to_datetime(tr["entry_day"]).dt.year).size() if len(tr) else pd.Series(dtype=int)).reindex(yrs, fill_value=0)
+    out["trades_by_year"] = {int(k): int(v) for k, v in yr_n.items()}
     out["min_trades_per_year"] = int(yr_n.min()) if len(yr_n) else 0
     ys = eq.resample("YE").last().pct_change()
     ys.iloc[0] = eq.resample("YE").last().iloc[0] / eq.iloc[0] - 1
@@ -92,10 +111,14 @@ def evaluate(ctx, sid, start, end=None, full=False, log=print) -> dict:
     for q in (0.01, 0.05):
         k = max(1, int(round(len(tr) * q)))
         top = tr.nlargest(k, "ret")
-        blocked = frozenset(zip(top["sid"], pd.to_datetime(top["entry_day"])))
+        blocked = {(r_.sid, pd.Timestamp(r_.entry_day)): pd.Timestamp(r_.exit_day) for r_ in top.itertuples()}
         e3 = run_system(ctx, sid, start, end, blocked=blocked)["equity"]
         out[f"minus_top{int(q * 100)}pct"] = stats(e3)
         out[f"minus_top{int(q * 100)}pct_beats_sharpe"] = stats(e3)["sharpe"] > out["bench"]["sharpe"]
+    # 警示：同樣選股、固定持有 20 日（檢查停損/停利是否帶來價值）
+    e5 = run_system(ctx, sid, start, end, stop_atr=None, trail_atr=None, exit_fn=None, time_stop_if_loss=None,
+                    max_hold=20)["equity"]
+    out["fixed20"] = stats(e5)
     # H3：隨機選股對照
     rs = []
     for i in range(N_RANDOM):
@@ -178,6 +201,7 @@ def holdout(system: str, log=print):
     f = ROOT / "reports" / "swing_holdout.json"
     if f.exists():
         raise SystemExit("保留期已經跑過一次，依規格不得重跑（刪除檔案重跑等於違反事前登錄）。")
+    check_frozen()
     panel = load_holdout_panel()
     ctx = Context(panel)
     start, end = SPEC["periods"]["holdout"]
@@ -239,7 +263,10 @@ def report_md(out) -> str:
         L.append(f"- Deflated Sharpe（N={N_TRIALS}）：{f2(f.get('dsr'))}")
         L.append(f"- 月超額 t 值：{f2(f['excess']['t_stat'])}")
         L.append(f"- 因不追高跳過的訊號：{f['skip_chase']} 次；開盤漲停買不到：{f['skip_limit']} 次")
+        L.append(f"- 同樣選股、固定持有 20 日：年化 {pct(f['fixed20']['cagr'])}、Sharpe {f2(f['fixed20']['sharpe'])}（停損/停利{'有' if f['stats']['sharpe'] > f['fixed20']['sharpe'] else '沒有'}帶來價值）")
+        L.append(f"- 每年交易筆數：{f['trades_by_year']}")
         L.append(f"- 出場原因：{f['exit_reasons']}\n")
+        L.append("揭露：未排除處置股/全額交割股（無歷史名單，偏樂觀）；不追高跳過的訊號只計次數、未算反事實報酬；假設可買零股；隨機對照 200 次（第 95 百分位有抽樣誤差）；下市前 20 日跌逾 50% 的下市股出場價再打 5 折。\n")
         L.append("## 逐年\n\n| 年 | 系統 | 0050 | 差 |\n|---|---:|---:|---:|")
         for y, (a, bb) in f["yearly"].items():
             L.append(f"| {y} | {pct(a)} | {pct(bb)} | {pct(a - bb)} |")

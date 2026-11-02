@@ -50,7 +50,44 @@ class OverlayCosts:
 
 
 # ── 資料 ─────────────────────────────────────────────────────────────────────
-def clean_etf(df: pd.DataFrame, thresh: float = 0.15, log=None) -> pd.DataFrame:
+def _limit_thresh(d) -> float:
+    """台股漲跌幅：2015-06-01 前 7%、之後 10%；超過「限制 + 0.5%」的日報酬一定是資料問題。"""
+    return 0.075 if pd.Timestamp(d) < pd.Timestamp("2015-06-01") else 0.105
+
+
+def clean_lev(df: pd.DataFrame, core: pd.DataFrame, tol: float = 0.08, log=None) -> pd.DataFrame:
+    """00631L：只有當日報酬偏離「2 × 0050 當日報酬」超過 tol 時才視為資料錯誤（真實的 ±20% 不會被誤修）。"""
+    df = df[["open", "close"]].astype(float).copy()
+    df = df[df["close"] > 0]
+    c, o = df["close"].values.copy(), df["open"].values.copy()
+    rc = core["close"].pct_change().reindex(df.index).fillna(0).values
+    notes = []
+    for i in range(1, len(c)):
+        r = c[i] / c[i - 1] - 1
+        if abs(r - 2 * rc[i]) > tol:
+            r_next = c[i + 1] / c[i] - 1 if i + 1 < len(c) else 0.0
+            rc_next = rc[i + 1] if i + 1 < len(c) else 0.0
+            if i + 1 < len(c) and abs(r_next - 2 * rc_next) > tol and np.sign(r_next) != np.sign(r):
+                notes.append(f"bad bar {df.index[i].date()} ({r:+.1%} vs 0050 {rc[i]:+.1%})")
+                c[i] = c[i - 1] * (1 + 2 * rc[i])
+                o[i] = c[i - 1]
+            else:
+                ratio = c[i] / (c[i - 1] * (1 + 2 * rc[i]))
+                notes.append(f"split/break {df.index[i].date()} ×{ratio:.4f}")
+                c[:i] *= ratio
+                o[:i] *= ratio
+    prev = np.r_[c[0], c[:-1]]
+    bad_o = ~(o > 0) | (np.abs(o / prev - 1) > 0.25)
+    o[bad_o] = prev[bad_o]
+    if log:
+        for m in notes:
+            log(m)
+    out = pd.DataFrame({"open": o, "close": c}, index=df.index)
+    out.attrs["clean_notes"] = notes
+    return out
+
+
+def clean_etf(df: pd.DataFrame, thresh: float | None = None, log=None) -> pd.DataFrame:
     """修 ETF 日線的資料斷點（台股 ETF 單日漲跌受 7%/10% 限制，超過 thresh 必為資料問題）：
     - open ≤ 0 或缺 → 用前收
     - 單一壞 K 棒（今日跳 > thresh、隔日反向跳回）→ 以前收取代該日
@@ -63,11 +100,13 @@ def clean_etf(df: pd.DataFrame, thresh: float = 0.15, log=None) -> pd.DataFrame:
     o, c = df["open"].values.copy(), df["close"].values.copy()
     n = len(c)
     i = 1
+    idx = df.index
     while i < n:
         r = c[i] / c[i - 1] - 1
-        if abs(r) > thresh:
+        th = thresh if thresh is not None else _limit_thresh(idx[i])
+        if abs(r) > th:
             r_next = c[i + 1] / c[i] - 1 if i + 1 < n else 0.0
-            if abs(r_next) > thresh and np.sign(r_next) != np.sign(r):
+            if abs(r_next) > th and np.sign(r_next) != np.sign(r):
                 notes.append(f"bad bar {df.index[i].date()} ({r:+.1%})")
                 c[i] = c[i - 1]
                 o[i] = c[i - 1]
@@ -78,7 +117,7 @@ def clean_etf(df: pd.DataFrame, thresh: float = 0.15, log=None) -> pd.DataFrame:
                 o[:i] *= ratio
         i += 1
     prev = np.r_[c[0], c[:-1]]
-    bad_o = ~(o > 0) | (np.abs(o / c - 1) > thresh)
+    bad_o = ~(o > 0) | (np.abs(o / c - 1) > (thresh or 0.15))
     o[bad_o] = prev[bad_o]
     if bad_o.any():
         notes.append(f"open fixed on {int(bad_o.sum())} days")

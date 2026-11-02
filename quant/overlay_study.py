@@ -45,6 +45,9 @@ def load_data() -> dict:
     end = pd.Timestamp.today().strftime("%Y-%m-%d")
     yh = qdata.load_price_yahoo("0050", "2003-01-01", end)[["open", "close"]].astype(float).dropna()
     core, source = yh, "Yahoo"
+    # Yahoo 0050 只從 2009 起，且 2009 上半年 K 棒有誤（單日 16%、數月不動）：2009-07 以前一律用 FinMind
+    SPLICE = pd.Timestamp("2009-07-01")
+    yh = yh.loc[SPLICE:]
     if yh.empty or yh.index[0] > pd.Timestamp("2004-01-31"):
         # Yahoo 前段缺：用 FinMind 未還原價 + 除權息還原補到 Yahoo 起點前
         fm = load_etf_finmind("0050", "2003-01-01", end)
@@ -61,7 +64,8 @@ def load_data() -> dict:
     core = clean_etf(core, log=notes.append)
     try:
         lev_actual = qdata.load_price_yahoo("00631L", "2014-10-01", end)[["open", "close"]].astype(float).dropna()
-        lev_actual = clean_etf(lev_actual, log=lambda m: notes.append("00631L " + m))
+        from .overlay import clean_lev
+        lev_actual = clean_lev(lev_actual, core, log=lambda m: notes.append("00631L " + m))
     except Exception:  # noqa: BLE001
         lev_actual = pd.DataFrame()
     return {"core": core, "lev_actual": lev_actual, "core_source": source, "clean_notes": notes}
