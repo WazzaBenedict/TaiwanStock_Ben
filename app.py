@@ -3484,6 +3484,16 @@ def api_debug_trade_journal():
 # ══════════════════════════════════════════════════════════════════════════════
 # HEALTH
 # ══════════════════════════════════════════════════════════════════════════════
+@app.get("/")
+def root():
+    # 讓直接打開後端網址時不會看到 404（以前常被誤會成「後端掛了」）
+    return{"status":"ok","service":"TaiwanStock_Ben API","version":"12.9.2",
+           "health":"/health","docs":"/docs","time":datetime.now().isoformat()}
+
+@app.head("/")
+def root_head():
+    return None
+
 @app.get("/health")
 def health():
     return{"status":"ok","version":"12.9.2","frontend_expected":"12.9.2","time":datetime.now().isoformat(),
