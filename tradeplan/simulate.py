@@ -42,7 +42,7 @@ def simulate(df: pd.DataFrame, setup: pd.Series, rules: PlanRules = PlanRules(),
     atr = atr14(df).values
     ma5 = df["收盤價"].rolling(5).mean().values
     n = len(df)
-    buy_k, sell_k = 1 + costs.buy_rate(), 1 - costs.sell_rate(etf)
+    ck = (costs, etf)   # 成本依每筆成交價算（1 張，含最低手續費）
 
     trades: list[dict] = []
     order = None   # {"lv":..., "expire": idx}
@@ -65,7 +65,7 @@ def simulate(df: pd.DataFrame, setup: pd.Series, rules: PlanRules = PlanRules(),
                 elif d - pos["i"] + 1 >= rules.max_hold_days:
                     exit_px, reason = c[d], "時間出場"
             if exit_px is not None:
-                trades.append(_close(pos, d, exit_px, reason, dates, buy_k, sell_k))
+                trades.append(_close(pos, d, exit_px, reason, dates, ck))
                 pos = None
             else:
                 _update_stop(pos, c[d], atr[d], rules)
@@ -86,7 +86,7 @@ def simulate(df: pd.DataFrame, setup: pd.Series, rules: PlanRules = PlanRules(),
                        "target": lv["target"], "r": lv["entry"] - lv["stop"], "entry": lv["entry"],
                        "be": False, "hi_close": c[d], "stop_kind": "停損", "setup_date": order["date"]}
                 if l[d] <= pos["stop"]:          # 進場當天就跌破停損
-                    trades.append(_close(pos, d, min(pos["stop"], fill), "停損", dates, buy_k, sell_k))
+                    trades.append(_close(pos, d, min(pos["stop"], fill), "停損", dates, ck))
                     pos = None
                 else:
                     _update_stop(pos, c[d], atr[d], rules)
@@ -115,9 +115,10 @@ def _update_stop(pos: dict, close: float, atr: float, rules: PlanRules) -> None:
             pos["stop_kind"] = "保本出場" if new <= pos["entry"] + 1e-9 else "移動停利"
 
 
-def _close(pos, d, px, reason, dates, buy_k, sell_k) -> dict:
-    cost_in = pos["fill"] * buy_k
-    proceeds = px * sell_k
+def _close(pos, d, px, reason, dates, ck) -> dict:
+    costs, etf = ck
+    cost_in = pos["fill"] * (1 + costs.buy_rate(float(pos["fill"])))
+    proceeds = px * (1 - costs.sell_rate(etf, float(px)))
     risk = max(pos["fill"] - pos["stop0"], 1e-9)
     return {"setup_date": pos["setup_date"], "entry_date": dates[pos["i"]], "exit_date": dates[d],
             "entry": round(float(pos["fill"]), 2), "exit": round(float(px), 2),

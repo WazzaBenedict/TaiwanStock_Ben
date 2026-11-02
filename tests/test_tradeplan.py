@@ -124,8 +124,12 @@ def test_position_size():
     p = position_size(1_000_000, 0.01, 100.0, 95.0)
     assert 1700 < p["shares"] < 2000 and p["lots"] == 1
     assert p["risk_amount"] <= 10_000
+    # 零股電子下單低消 1 元：小額不會被 20 元低消吃掉
     small = position_size(30_000, 0.01, 100.0, 95.0)
-    assert "min_fee_warning" in small
+    assert small["odd_shares"] > 0 and "min_fee_warning" not in small and small["buy_fee"] <= 5
+    # 低價股剛好 1 張：整股低消 20 元占比偏高 → 提醒
+    cheap = position_size(10_000, 0.05, 5.0, 4.6)
+    assert cheap["lots"] == 1 and "min_fee_warning" in cheap
 
 
 def test_make_plan_and_card_status():

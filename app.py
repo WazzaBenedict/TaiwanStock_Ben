@@ -1,7 +1,7 @@
 """
 V12.9.2 Multi-Portfolio Watchlist Manager
 架構：TW Engine / US Engine / Shared Engine（三層分離）
-版本：13.1.0
+版本：13.2.0
 """
 import os, re, asyncio, json, time, hashlib
 from datetime import datetime, timedelta
@@ -13,7 +13,7 @@ from authz import require_writer
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="V12.9.2 Multi-Portfolio Watchlist Manager", version="13.1.0")
+app = FastAPI(title="V12.9.2 Multi-Portfolio Watchlist Manager", version="13.2.0")
 _raw = os.getenv("ALLOWED_ORIGINS",
     "http://localhost:5500,http://127.0.0.1:5500,"
     "https://taiwanstock-ben.web.app,https://taiwanstock-ben.firebaseapp.com")
@@ -25,6 +25,7 @@ app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS,
 
 # Day-trade research tools (台股時光機): see daytrade/
 from daytrade.api import router as daytrade_router
+from twcosts import net_return as _tw_net_return, broker as _tw_broker, is_etf as _tw_is_etf
 app.include_router(daytrade_router)
 
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
@@ -661,7 +662,7 @@ def get_stock_name(sid: str, api_name: str | None=None) -> str:
 # TW LEARNING / WEIGHTS
 # ══════════════════════════════════════════════════════════════════════════════
 TW_DEFAULT_WEIGHTS={"technical":0.35,"fundamental":0.25,"chip":0.25,"news":0.15,
-    "risk":0.10,"macro":0.05,"updated_at":"","version":"13.1.0","last_reason":"預設權重"}
+    "risk":0.10,"macro":0.05,"updated_at":"","version":"13.2.0","last_reason":"預設權重"}
 TW_WEIGHT_LIMITS={"technical":(0.20,0.45),"fundamental":(0.10,0.35),"chip":(0.10,0.40),"news":(0.05,0.25)}
 
 def _rjf(path,default):
@@ -1060,7 +1061,7 @@ def compute_4d_ai_signal(ov,fu,te,ch,nw,latest_row,cp,macro=None)->dict:
 # ══════════════════════════════════════════════════════════════════════════════
 # TW CORE ANALYSIS
 # ══════════════════════════════════════════════════════════════════════════════
-def _calc_winrate(df:pd.DataFrame)->dict:
+def _calc_winrate(df:pd.DataFrame,etf=False)->dict:
     if df.empty: return{"winrate":0,"trials":0,"wins":0}
     req=[c for c in["MA5","MA20","MA60","RSI","MACD","Signal"] if c in df.columns]
     df2=df.dropna(subset=req) if req else df
@@ -1072,8 +1073,9 @@ def _calc_winrate(df:pd.DataFrame)->dict:
         pos=df2.index.get_loc(idx)
         if pos+5<len(df2):
             trials+=1
-            if df2.iloc[pos+5]["收盤價"]>df2.iloc[pos]["收盤價"]: wins+=1
-    return{"winrate":round(wins/trials*100,1) if trials else 0,"trials":trials,"wins":wins}
+            # V13.2：扣元大電子下單手續費＋證交稅後仍賺錢才算贏
+            if _tw_net_return(float(df2.iloc[pos]["收盤價"]),float(df2.iloc[pos+5]["收盤價"]),etf)>0: wins+=1
+    return{"winrate":round(wins/trials*100,1) if trials else 0,"trials":trials,"wins":wins,"after_costs":True}
 
 def _calc_vol_info(df:pd.DataFrame)->dict:
     if df.empty: return{"latest_volume":0,"avg_volume_20d":0,"ratio":1.0,"alert":False}
@@ -1105,7 +1107,7 @@ async def _analyze_stock_lite(stock_id:str, macro:dict|None=None) -> dict:
             if len(df)>=2: pc=float(df.iloc[-2]["收盤價"]); change=round(price-pc,2); chgp=round(change/pc*100,2) if pc else None
         cp=price or 0.0; ai=fai.copy()
         if not df.empty and cp>0:
-            df=compute_all_indicators(df); latest=df.iloc[-1]; wr=_calc_winrate(df); vi=_calc_vol_info(df)
+            df=compute_all_indicators(df); latest=df.iloc[-1]; wr=_calc_winrate(df,_tw_is_etf(stock_id)); vi=_calc_vol_info(df)
             ai=build_tw_ai_signal(latest,cp,wr,macro,chgp or 0,vi.get("ratio",1.0),df)
         elif cp>0:
             ai=_empty_ai("WATCH","歷史資料不足，無法完整分析")
@@ -1238,7 +1240,7 @@ async def _analyze_stock_mobile_tech(stock_id: str) -> dict:
                 macro = await asyncio.wait_for(fetch_macro_context(), timeout=3)
             except Exception:
                 macro = {}
-            ai = build_tw_ai_signal(latest, cp, _calc_winrate(df), macro, chgp or 0, vol_ratio, df)
+            ai = build_tw_ai_signal(latest, cp, _calc_winrate(df,_tw_is_etf(stock_id)), macro, chgp or 0, vol_ratio, df)
             ai["score_quality"] = "mobile_technical"
             ai["summary"] = "手機技術快判：" + (ai.get("summary") or "已完成主要技術判斷。")
             score = _mobile_score_payload(ai)
@@ -1286,7 +1288,7 @@ async def _analyze_stock_core(stock_id:str) -> dict:
         chg=float(latest["收盤價"]-prev["收盤價"])
         chgp=round(chg/float(prev["收盤價"])*100,2) if float(prev["收盤價"]) else 0
         cp=float(rt["price"]) if rt and rt.get("price") is not None else float(latest["收盤價"])
-        wr=_calc_winrate(df); vi=_calc_vol_info(df)
+        wr=_calc_winrate(df,_tw_is_etf(stock_id)); vi=_calc_vol_info(df)
         try: macro=await asyncio.wait_for(fetch_macro_context(),timeout=6)
         except: macro={"usd_twd":None,"dxy":None,"risk_note":"","macro_adj":0}
         ai=build_tw_ai_signal(latest,cp,wr,macro,chgp,vi.get("ratio",1.0),df)
@@ -2306,7 +2308,7 @@ async def _scan_market_sentiment() -> dict:
     _sc_cache=result; _sc_ts=time.time(); return result
 
 # TW backtest (preserved)
-def advanced_backtest(df,holding_days=5,min_score=75):
+def advanced_backtest(df,holding_days=5,min_score=75,etf=False,fee_discount=None):
     empty={"total_trades":0,"wins":0,"losses":0,"winrate":0,"avg_return":0,"best_return":0,"worst_return":0,"max_drawdown":0,"profit_factor":0,"sharpe_ratio":0,"trades":[]}
     if df.empty: return empty
     df=df.copy().reset_index(drop=True); df=compute_all_indicators(df)
@@ -2320,9 +2322,10 @@ def advanced_backtest(df,holding_days=5,min_score=75):
         wr={"winrate":0,"trials":0,"wins":0}
         ai=build_tw_ai_signal(row,cur,wr,{},0,1.0,None)
         if (ai.get("confidence") or 0)<min_score: continue
-        ep=float(df.iloc[i+holding_days]["收盤價"]); rp=round((ep-cur)/cur*100,2)
+        ep=float(df.iloc[i+holding_days]["收盤價"])
+        rp=round(_tw_net_return(cur,ep,etf,_tw_broker(fee_discount))*100,2)   # V13.2：扣元大成本（1 張）
         trades.append({"date":row["日期"].strftime("%Y-%m-%d"),"entry_price":cur,"exit_price":ep,
-                       "return_pct":rp,"win":ep>cur,"confidence":ai.get("confidence",0),"signal":ai.get("signal","WATCH")})
+                       "return_pct":rp,"gross_return_pct":round((ep-cur)/cur*100,2),"win":rp>0,"confidence":ai.get("confidence",0),"signal":ai.get("signal","WATCH")})
         equity*=(1+rp/100); peak=max(peak,equity); dd=(peak-equity)/peak*100; max_dd=max(max_dd,dd)
     total=len(trades); wins=sum(1 for t in trades if t["win"])
     rets=[t["return_pct"] for t in trades]
@@ -2332,7 +2335,8 @@ def advanced_backtest(df,holding_days=5,min_score=75):
            "winrate":round(wins/total*100,1) if total else 0,"avg_return":round(avg_r,2),
            "best_return":round(max(rets),2) if rets else 0,"worst_return":round(min(rets),2) if rets else 0,
            "max_drawdown":round(max_dd,2),"profit_factor":round(gain/loss,2) if loss else 0,
-           "sharpe_ratio":round(avg_r/std_r,2) if std_r>0 else 0,"trades":list(reversed(trades))[:20]}
+           "sharpe_ratio":round(avg_r/std_r,2) if std_r>0 else 0,"trades":list(reversed(trades))[:20],
+           "after_costs":True,"costs":_tw_broker(fee_discount).describe()}
 
 # TW LINE helpers
 def _lc(): return bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID and ENABLE_LINE_ALERTS)
@@ -2628,13 +2632,14 @@ async def check_alerts(body:WatchlistBody):
 # API — TW Backtest & Learning
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/api/backtest/{stock_id}")
-async def run_backtest(stock_id:str,lookback_days:int=400,holding_days:int=5,min_score:int=75):
+async def run_backtest(stock_id:str,lookback_days:int=400,holding_days:int=5,min_score:int=75,
+                       fee_discount:float|None=Query(None,gt=0,le=1)):
     if not re.match(r"^\d{4,6}$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
     df,_=await fetch_tw_history(stock_id,lookback_days)
     an=await _fname(stock_id); sname=get_stock_name(stock_id,an)
-    result=advanced_backtest(df,holding_days=holding_days,min_score=min_score)
+    result=advanced_backtest(df,holding_days=holding_days,min_score=min_score,etf=_tw_is_etf(stock_id),fee_discount=fee_discount)
     return{"stock_id":stock_id,"stock_name":sname,
-           "params":{"lookback_days":lookback_days,"holding_days":holding_days,"min_score":min_score},
+           "params":{"lookback_days":lookback_days,"holding_days":holding_days,"min_score":min_score,"fee_discount":_tw_broker(fee_discount).fee_discount},
            "result":{k:v for k,v in result.items() if k!="trades"},"trades":result["trades"]}
 
 @app.get("/api/learning/weights")
@@ -2798,15 +2803,15 @@ def _suggest_learning_weights(payload: dict) -> dict:
 
 @app.post("/api/learning/summary", dependencies=[Depends(require_writer)])
 def api_learning_summary_v128(payload: dict = Body(default={})):
-    return {"version": "13.1.0", "summary": _learning_summary(payload), "time": datetime.now().isoformat()}
+    return {"version": "13.2.0", "summary": _learning_summary(payload), "time": datetime.now().isoformat()}
 
 @app.post("/api/learning/calibrate", dependencies=[Depends(require_writer)])
 def api_learning_calibrate_v128(payload: dict = Body(default={})):
-    return {"version": "13.1.0", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
+    return {"version": "13.2.0", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
 
 @app.post("/api/learning/suggest-weights", dependencies=[Depends(require_writer)])
 def api_learning_suggest_weights_v128(payload: dict = Body(default={})):
-    return {"version": "13.1.0", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
+    return {"version": "13.2.0", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
 
 @app.post("/api/learning/apply-weights", dependencies=[Depends(require_writer)])
 def api_learning_apply_weights_v128(payload: dict = Body(default={})):
@@ -2815,20 +2820,20 @@ def api_learning_apply_weights_v128(payload: dict = Body(default={})):
     # Only TW backend has server-side scoring weights in this single-file app.
     if market == "tw":
         saved = save_ai_weights(weights)
-        return {"version": "13.1.0", "applied": True, "market": market, "weights": saved, "time": datetime.now().isoformat()}
-    return {"version": "13.1.0", "applied": False, "market": market, "weights": weights,
+        return {"version": "13.2.0", "applied": True, "market": market, "weights": saved, "time": datetime.now().isoformat()}
+    return {"version": "13.2.0", "applied": False, "market": market, "weights": weights,
             "message": "US personal weights are stored per user in Firestore by the frontend.", "time": datetime.now().isoformat()}
 
 @app.get("/api/learning/status")
 def api_learning_status_v128():
     h = load_signal_history()
-    return {"version": "13.1.0", "server_tw_signal_history": _lst(h),
+    return {"version": "13.2.0", "server_tw_signal_history": _lst(h),
             "note": "V12.8 personal learning events are stored in each user's Firestore and sent to /api/learning/summary or /api/learning/calibrate for calculation.",
             "time": datetime.now().isoformat()}
 
 @app.get("/api/debug/learning")
 def api_debug_learning_v128():
-    return {"version": "13.1.0", "engine": "Real AI Learning Engine",
+    return {"version": "13.2.0", "engine": "Real AI Learning Engine",
             "frontend_firestore_paths": ["users/{uid}/ai_learning_events/tw", "users/{uid}/ai_learning_events/us", "users/{uid}/ai_weight_versions/tw", "users/{uid}/ai_weight_versions/us", "users/{uid}/ai_learning_summary/tw", "users/{uid}/ai_learning_summary/us"],
             "apis": ["POST /api/learning/summary", "POST /api/learning/calibrate", "POST /api/learning/suggest-weights", "POST /api/learning/apply-weights", "GET /api/learning/status"],
             "time": datetime.now().isoformat()}
@@ -2979,7 +2984,7 @@ async def us_scan_diversified(pool:str="diversified",symbols:str="",min_score:in
 
 @app.get("/api/debug/recommendation-history")
 def api_debug_recommendation_history():
-    return {"version":"13.1.0","note":"Per-user recommendation history is stored client-side/localStorage or Firestore by the frontend. Backend diversified scan accepts history_symbols to apply novelty/repeat penalties.","fields":["symbol/stock_id","market","scan_category","shown_at","diversity_group","diversified_score"]}
+    return {"version":"13.2.0","note":"Per-user recommendation history is stored client-side/localStorage or Firestore by the frontend. Backend diversified scan accepts history_symbols to apply novelty/repeat penalties.","fields":["symbol/stock_id","market","scan_category","shown_at","diversity_group","diversified_score"]}
 
 @app.get("/api/debug/scan-status")
 def api_scan_status():
@@ -2989,7 +2994,7 @@ def api_scan_status():
         for k,(payload,ts) in list(cache.items())[-12:]:
             out.append({"key":k,"age_seconds":round(now-ts,1),"market":payload.get("market"),"mode":payload.get("scan_mode"),"pool":payload.get("pool"),"classified":payload.get("classified"),"failed":payload.get("failed")})
         return out
-    return {"version":"13.1.0","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
+    return {"version":"13.2.0","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # API — DATA HEALTH / DIAGNOSTICS
@@ -3100,12 +3105,12 @@ async def api_health_full():
 
     payload = {
         "status": "ok" if not errors else "partial",
-        "version": "13.1.0",
-        "frontend_expected": "13.1.0",
+        "version": "13.2.0",
+        "frontend_expected": "13.2.0",
         "time": datetime.now().isoformat(),
         "backend": {
             "title": "V12.9.2 Multi-Portfolio Watchlist Manager",
-            "version": "13.1.0"
+            "version": "13.2.0"
         },
         "line": {
             "configured": bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
@@ -3215,7 +3220,7 @@ async def api_trade_plan_check(
 @app.get("/api/debug/trade-plans")
 def api_debug_trade_plans():
     return {
-        "version": "13.1.0",
+        "version": "13.2.0",
         "storage": "Firestore frontend: users/{uid}/trade_plans/tw and users/{uid}/trade_plans/us",
         "checker": "/api/trade-plan/check",
         "statuses": ["WAITING_ENTRY","ENTERABLE_NOW","ABOVE_ENTRY_ZONE","NEAR_TARGET","NEAR_STOP","STOP_BROKEN","TARGET_REACHED","INVALIDATED","NO_PRICE"],
@@ -3319,7 +3324,7 @@ async def api_position_check(
 @app.get("/api/debug/positions")
 def api_debug_positions():
     return {
-        "version": "13.1.0",
+        "version": "13.2.0",
         "storage": "Firestore frontend: users/{uid}/positions/tw and users/{uid}/positions/us",
         "checker": "/api/position/check",
         "statuses": ["HOLDING_NORMAL","NEAR_TARGET","TARGET_REACHED","NEAR_STOP","STOP_BROKEN","RISK_UP","REVIEW_REQUIRED","NO_PRICE"],
@@ -3443,13 +3448,13 @@ def _build_review_text(total, wins, pnl, avg_r, strategy_stats):
 @app.post("/api/performance/summary")
 def api_performance_summary(payload: dict = Body(default={})):  # frontend sends Firestore journal rows
     trades = payload.get("trades") or payload.get("journal") or []
-    return {"version": "13.1.0", "market": payload.get("market", "all"), "summary": _summarize_trades(trades), "time": datetime.now().isoformat()}
+    return {"version": "13.2.0", "market": payload.get("market", "all"), "summary": _summarize_trades(trades), "time": datetime.now().isoformat()}
 
 @app.post("/api/trade-journal/review")
 def api_trade_journal_review(payload: dict = Body(default={})):
     trades = payload.get("trades") or []
     summary = _summarize_trades(trades)
-    return {"version": "13.1.0", "review": summary.get("review"), "summary": summary, "time": datetime.now().isoformat()}
+    return {"version": "13.2.0", "review": summary.get("review"), "summary": summary, "time": datetime.now().isoformat()}
 
 @app.post("/api/report/summary")
 def api_report_summary(payload: dict = Body(default={})):
@@ -3466,12 +3471,12 @@ def api_report_summary(payload: dict = Body(default={})):
         "",
         summary.get("review") or "",
     ]
-    return {"version": "13.1.0", "report_text": "\n".join(lines), "summary": summary, "time": datetime.now().isoformat()}
+    return {"version": "13.2.0", "report_text": "\n".join(lines), "summary": summary, "time": datetime.now().isoformat()}
 
 @app.get("/api/debug/portfolios")
 def api_debug_portfolios():
     return {
-        "version": "13.1.0",
+        "version": "13.2.0",
         "storage": "Firestore frontend: users/{uid}/portfolios/{portfolio_id}",
         "legacy_watchlists": "users/{uid}/watchlists/tw and users/{uid}/watchlists/us are kept for fallback",
         "features": ["multiple portfolios", "default portfolio migration", "portfolio-specific watchlist", "portfolio scan"],
@@ -3481,7 +3486,7 @@ def api_debug_portfolios():
 @app.get("/api/debug/trade-journal")
 def api_debug_trade_journal():
     return {
-        "version": "13.1.0",
+        "version": "13.2.0",
         "storage": "Firestore frontend: users/{uid}/trade_journal/tw and users/{uid}/trade_journal/us",
         "endpoints": ["/api/performance/summary", "/api/trade-journal/review", "/api/report/summary"],
         "features": ["close position to journal", "R multiple", "strategy performance", "CSV export", "text report"],
@@ -3494,7 +3499,7 @@ def api_debug_trade_journal():
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/health")
 def health():
-    return{"status":"ok","version":"13.1.0","frontend_expected":"13.1.0","time":datetime.now().isoformat(),
+    return{"status":"ok","version":"13.2.0","frontend_expected":"13.2.0","time":datetime.now().isoformat(),
            "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
            "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
            "price_sources":"Yahoo Finance → TWSE Official → FinMind",
@@ -3510,6 +3515,14 @@ def health():
 # ══════════════════════════════════════════════════════════════════════════════
 from zoneinfo import ZoneInfo
 from tradeplan.service import build_card as _tp_build_card
+from tradeplan.costs import Costs as _TPCosts
+from tradeplan.rules import PlanRules as _TPRules
+
+
+@app.get("/api/costs")
+async def api_costs(fee_discount: float | None = Query(None, gt=0, le=1)):
+    """全 App 共用的交易成本模型（元大證券電子下單）與資料來源。"""
+    return _tw_broker(fee_discount).describe()
 
 _tp_cache: dict[str, tuple[dict, float]] = {}
 _tp_bench: dict[str, tuple[pd.DataFrame, float]] = {}
@@ -3552,12 +3565,14 @@ def _tp_clean(df: pd.DataFrame, tpe: datetime, closed: bool) -> pd.DataFrame:
 
 @app.get("/api/v2/tradeplan/{stock_id}")
 async def api_tradeplan_v2(stock_id: str, capital: float | None = Query(None, ge=0),
-                           risk_pct: float = Query(1.0, gt=0, le=5)):
+                           risk_pct: float = Query(1.0, gt=0, le=5),
+                           fee_discount: float | None = Query(None, gt=0, le=1)):
     """交易計畫卡：今天收盤後算出、明天起有效的限價進場、停損、目標與出場規則。"""
     if not re.match(r"^\d{4,6}[A-Z]?$", stock_id): raise HTTPException(400, detail="股票代號格式錯誤")
     tpe = datetime.now(ZoneInfo("Asia/Taipei")).replace(tzinfo=None)
     closed = tpe.hour >= 15
-    key = f"{stock_id}:{tpe:%Y-%m-%d}:{'post' if closed else 'pre'}"
+    _tp_costs = _TPCosts(broker=_tw_broker(fee_discount))
+    key = f"{stock_id}:{tpe:%Y-%m-%d}:{'post' if closed else 'pre'}:{_tp_costs.fee_discount:g}"
     hit = _tp_cache.get(key)
     if hit and time.time() - hit[1] < TP_TTL:
         base = hit[0]
@@ -3581,7 +3596,9 @@ async def api_tradeplan_v2(stock_id: str, capital: float | None = Query(None, ge
                         if bench is not None: _tp_bench.clear(); _tp_bench[bkey] = (bench, time.time())
                     except Exception: bench = None
             setup = await asyncio.to_thread(_tw_setup_mask, df)
-            base = await asyncio.to_thread(_tp_build_card, stock_id, df, setup, bench if stock_id != "0050" else df)
+            base = await asyncio.to_thread(_tp_build_card, stock_id, df, setup, bench if stock_id != "0050" else df,
+                                          None, 0.01, _TPRules(), _tp_costs)
+            base["costs"] = _tp_costs.broker.describe()
             base["data_source"] = src; base["bars"] = len(df)
             base["stock_name"] = get_stock_name(stock_id)
             now = time.time()
@@ -3592,6 +3609,6 @@ async def api_tradeplan_v2(stock_id: str, capital: float | None = Query(None, ge
     if capital and out.get("plan"):
         from tradeplan.rules import position_size
         from tradeplan.costs import is_etf
-        p = out["plan"]; pos = position_size(capital, risk_pct / 100, p["entry"], p["stop"], etf=is_etf(stock_id))
+        p = out["plan"]; pos = position_size(capital, risk_pct / 100, p["entry"], p["stop"], _tp_costs, etf=is_etf(stock_id))
         pos["risk_pct_of_capital"] = risk_pct; p["position"] = pos
     return out

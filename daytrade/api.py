@@ -5,7 +5,7 @@ import re
 
 from fastapi import APIRouter, HTTPException, Query
 
-from .costs import DayTradeCosts
+from .costs import DayTradeCosts, DEFAULT_DISCOUNT
 from .data import DataError
 from . import timemachine as tm
 from . import screener
@@ -25,7 +25,7 @@ def timemachine(
     target_r: float = Query(1.0, gt=0, le=5),
     stop_rule: str = Query("orb_mid", pattern="^(orb_mid|orb_low)$"),
     shares: int = Query(1000, ge=1, le=1_000_000),
-    fee_discount: float = Query(0.6, ge=0, le=1),
+    fee_discount: float = Query(DEFAULT_DISCOUNT, ge=0, le=1),
     slip_ticks: int = Query(1, ge=0, le=5),
     replays: int = Query(10000, ge=100, le=20000),
     seed: int = tm.DEFAULT_SEED,
@@ -53,7 +53,7 @@ def screen(
     top: int = Query(40, ge=10, le=80),
     orb_minutes: int = Query(15, ge=5, le=60),
     target_r: float = Query(1.0, gt=0, le=5),
-    fee_discount: float = Query(0.6, ge=0, le=1),
+    fee_discount: float = Query(DEFAULT_DISCOUNT, ge=0, le=1),
     slip_ticks: int = Query(1, ge=0, le=5),
     refresh: bool = False,
 ):
@@ -75,7 +75,7 @@ def levels(
     orb_minutes: int = Query(15, ge=5, le=60),
     target_r: float = Query(1.0, gt=0, le=5),
     shares: int = Query(1000, ge=1, le=1_000_000),
-    fee_discount: float = Query(0.6, ge=0, le=1),
+    fee_discount: float = Query(DEFAULT_DISCOUNT, ge=0, le=1),
     slip_ticks: int = Query(1, ge=0, le=5),
 ):
     """Today's entry / stop-loss / take-profit for each stock under the opening-range rule."""

@@ -111,23 +111,35 @@ def make_plan(df: pd.DataFrame, rules: PlanRules = PlanRules(), etf: bool = Fals
 
 
 def position_size(capital: float, risk_pct: float, entry: float, stop: float,
-                  costs=None, etf: bool | str = False, min_fee: float = 20.0) -> dict:
-    """依「單筆最多虧總資金的 risk_pct」算股數（整張 + 零股），停損虧損含買賣成本。"""
+                  costs=None, etf: bool | str = False, min_fee: float | None = None) -> dict:
+    """依「單筆最多虧總資金的 risk_pct」算股數（整張 + 零股），停損虧損含元大手續費、證交稅與滑價。"""
     from .costs import Costs
     costs = costs or Costs()
+    b = costs.broker
     if not capital or capital <= 0 or not entry or entry <= stop:
         return {"shares": 0, "lots": 0, "odd_shares": 0, "amount": 0, "risk_amount": 0}
     budget = capital * risk_pct
+
+    def loss(n: int) -> float:   # 買在 entry、停損賣在 stop 的總虧損（元）
+        buy = entry * (1 + costs.slippage)
+        sell = stop * (1 - costs.slippage)
+        return (buy - sell) * n + b.fee(buy, n) + b.fee(sell, n) + b.tax(sell, n, etf)
+
+    def cash(n: int) -> float:
+        buy = entry * (1 + costs.slippage)
+        return buy * n + b.fee(buy, n)
+
     per_share = entry * (1 + costs.buy_rate()) - stop * (1 - costs.sell_rate(etf))
-    shares = int(budget // per_share)
-    shares = min(shares, int(capital // (entry * (1 + costs.buy_rate()))))
+    shares = min(int(budget // per_share), int(capital // (entry * (1 + costs.buy_rate()))))
+    while shares > 0 and (loss(shares) > budget or cash(shares) > capital):
+        shares -= 1
     amount = shares * entry
-    fee_rate = costs.fee_rate * costs.fee_discount
-    fee = max(min_fee, amount * fee_rate) if shares else 0
+    fee = b.fee(entry, shares) if shares else 0
     out = {"shares": shares, "lots": shares // 1000, "odd_shares": shares % 1000,
-           "amount": round(amount), "risk_amount": round(shares * per_share)}
-    if shares and fee / max(amount, 1) > fee_rate * 1.5:
-        out["min_fee_warning"] = f"金額小，最低手續費 {min_fee:.0f} 元約占 {fee / amount * 100:.2f}%"
+           "amount": round(amount), "risk_amount": round(loss(shares)) if shares else 0,
+           "buy_fee": round(fee), "broker": b.name, "fee_discount": b.fee_discount}
+    if shares and fee / max(amount, 1) > b.eff_fee_rate * 1.5:
+        out["min_fee_warning"] = f"金額小，最低手續費 {fee:.0f} 元約占 {fee / amount * 100:.2f}%"
     return out
 
 
