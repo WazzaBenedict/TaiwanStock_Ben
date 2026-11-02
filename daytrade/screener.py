@@ -272,7 +272,7 @@ def plan_levels(bars: list[list[float]], rule: tm.Rule, costs: DayTradeCosts, sh
             px = bars[-1][3]
             pnl = costs.net_pnl(entry, costs.slip(px, "sell"), shares)
             out.update(status="closed_close", exit=round(px, 2), net_pnl=round(pnl),
-                       message="沒碰到停損停利，收盤出場（%.2f），扣成本後 %+d 元。" % (px, pnl))
+                       message="沒碰到停損停利，收盤出場（%.2f），扣成本後 %+d 元。" % (px, round(pnl)))
         elif res == "neither":
             out.update(status="in_trade", last=round(bars[-1][3], 2),
                        message="已在 %s 進場，持有中；碰 %.2f 停損、%.2f 停利，否則 13:25 前出場。"
@@ -280,7 +280,7 @@ def plan_levels(bars: list[list[float]], rule: tm.Rule, costs: DayTradeCosts, sh
         else:
             pnl = costs.net_pnl(entry, sell_net, shares)
             out.update(status="closed_" + res, exit=round(px, 2), net_pnl=round(pnl),
-                       message="已%s出場（%.2f），扣成本後 %+d 元。" % ("停利" if res == "target" else "停損", px, pnl))
+                       message="已%s出場（%.2f），扣成本後 %+d 元。" % ("停利" if res == "target" else "停損", px, round(pnl)))
     e, s_ = out["entry"], out["stop"]
     out["risk_per_lot"] = round((e - s_) * shares + costs.fee(e * shares) * 2 + e * shares * costs.tax_rate)
     out["risk_pct"] = round((e - s_) / e * 100, 2)
