@@ -8,7 +8,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import xml.etree.ElementTree as ET
 import httpx, numpy as np, pandas as pd
-from fastapi import FastAPI, HTTPException, Query, Body
+from fastapi import FastAPI, HTTPException, Query, Body, Depends
+from authz import require_writer
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -539,7 +540,7 @@ def build_tw_ai_signal(row: pd.Series, cp: float, winrate_info: dict,
 
     scan_cat = classify_scan_category(signal,es,tv,overheat,fb,final,ts,market_score,risk_score,conf)
 
-    ts_label = {"BUY_NOW":"✅ BUY NOW","BUY_PULLBACK":"⏳ Wait Pullback","WATCH":"👀 WATCH","AVOID":"🚫 AVOID"}
+    ts_label = {"BUY_NOW":"條件符合（未驗證）","BUY_PULLBACK":"⏳ 等回檔","WATCH":"👀 觀望","AVOID":"不符合"}
     if signal=="BUY" and tv and es=="ENTERABLE" and rr and rr>=1.5:
         trade_status="BUY_NOW"
     elif signal=="BUY": trade_status="BUY_PULLBACK"
@@ -2344,9 +2345,9 @@ async def send_line_message(msg:str)->dict:
 
 def _blm(sid,name,ai,price):
     disp=f"{name} ({sid})" if name and name!=sid else sid
-    ts=ai.get("trade_status","WATCH"); tl={"BUY_NOW":"✅ 可布局","BUY_PULLBACK":"⏳ 等回檔"}.get(ts,ts)
+    ts=ai.get("trade_status","WATCH"); tl={"BUY_NOW":"條件符合（未驗證）","BUY_PULLBACK":"⏳ 等回檔"}.get(ts,ts)
     ep=ai.get('entry_price'); tp=ai.get('target_price'); sl=ai.get('stop_loss')
-    return(f"✅ V12 AI 交易訊號\n股票：{disp}\n狀態：{tl}\n信心：{ai.get('confidence',0)}\n"
+    return(f"✅ V12 AI 交易訊號\n股票：{disp}\n狀態：{tl}\n技術面評分：{ai.get('confidence',0)}\n"
            f"即時價：{price} 入場：{ep or '—'}\n目標：{tp or '—'} 止蝕：{sl or '—'}\n"
            f"RR：{ai.get('risk_reward_ratio') or '—'}x\n{ai.get('summary','')}")
 
@@ -2383,7 +2384,7 @@ async def startup_event():
 async def api_get_watchlist():
     items=_rwl(); return{"watchlist":items,"count":len(items)}
 
-@app.post("/api/watchlist")
+@app.post("/api/watchlist", dependencies=[Depends(require_writer)])
 async def api_post_watchlist(body:WatchlistUpdateBody):
     items=_nwl(body.watchlist); _wwl(items); return{"watchlist":items,"count":len(items),"saved":True}
 
@@ -2575,14 +2576,14 @@ async def tw_scan_diversified(pool:str="diversified",symbols:str="",min_score:in
 # ══════════════════════════════════════════════════════════════════════════════
 # API — LINE
 # ══════════════════════════════════════════════════════════════════════════════
-@app.post("/api/alerts/test")
+@app.post("/api/alerts/test", dependencies=[Depends(require_writer)])
 async def test_line():
     _cc()
     result=await send_line_message("✅ V12 AI Picker Pro - LINE 通知測試成功！")
     if not result["success"]: raise HTTPException(500,detail=result["message"])
     return result
 
-@app.post("/api/alerts/check")
+@app.post("/api/alerts/check", dependencies=[Depends(require_writer)])
 async def check_alerts(body:WatchlistBody):
     t0=time.time(); lo=_lc(); results=[]; now=datetime.now(); sent=[]; errors=[]
     stock_ids=body.watchlist or [item["stock_id"] for item in _rwl()]
@@ -2640,7 +2641,7 @@ def api_learning_history(limit:int=Query(100,ge=1,le=500)):
 @app.get("/api/learning/evaluate")
 async def api_learning_evaluate(): return await evaluate_signal_history()
 
-@app.post("/api/learning/retrain")
+@app.post("/api/learning/retrain", dependencies=[Depends(require_writer)])
 def api_learning_retrain(): return retrain_ai_weights()
 
 
@@ -2800,7 +2801,7 @@ def api_learning_calibrate_v128(payload: dict = Body(default={})):
 def api_learning_suggest_weights_v128(payload: dict = Body(default={})):
     return {"version": "12.9.2", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
 
-@app.post("/api/learning/apply-weights")
+@app.post("/api/learning/apply-weights", dependencies=[Depends(require_writer)])
 def api_learning_apply_weights_v128(payload: dict = Body(default={})):
     market = str((payload or {}).get("market", "tw")).lower()
     weights = (payload or {}).get("weights") or {}
@@ -3495,3 +3496,79 @@ def health():
                        "TW Engine + US Engine + Shared Engine",
                        "6-zone scan output","US Market Context","Symbol Master 200+",
                        "validate_trade_plan","compute_final_score","LINE alerts","Quick/Full AI Scan","Watch Closely zone","scan pool selector","scan cache diagnostics","Trade Plan Center","trade plan status checker","Watchlist UI polish","Portfolio Center","position status checker","smart position alerts","Trade Journal","Performance Review","AI Backtest Learning","Report Center","CSV export","AI Discovery Diversity","Fresh Discovery","repeat_penalty","novelty_score","sector_quota","TW diversity history parity"]}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 交易計畫 v2（tradeplan/）— 進場、停損、停利、何時賣、部位大小 + 規則歷史成績
+# ══════════════════════════════════════════════════════════════════════════════
+from tradeplan.service import build_card as _tp_build_card
+
+_tp_cache: dict[str, tuple[dict, float]] = {}
+TP_TTL = 6 * 3600
+
+
+def _tw_setup_mask(df: pd.DataFrame) -> pd.Series:
+    """逐日重算 App 的 BUY 條件（技術面評分 ≥ 75、未過熱、非假突破），只用當天以前的資料。"""
+    mask = pd.Series(False, index=df.index)
+    if df.empty or len(df) < 61: return mask
+    vol = df["成交股數"].astype(float) if "成交股數" in df.columns else pd.Series(1.0, index=df.index)
+    vr = (vol / vol.rolling(20).mean()).fillna(1.0)
+    chg = (df["收盤價"].pct_change() * 100).fillna(0.0)
+    for i in range(60, len(df)):
+        row = df.iloc[i]; cp = float(row["收盤價"]); hist = df.iloc[: i + 1]
+        ts = compute_technical_score(row, cp, float(vr.iloc[i]), float(chg.iloc[i]), hist)["technical_score"]
+        if ts < 75: continue
+        if detect_overheat(row, cp, float(chg.iloc[i]), hist): continue
+        if detect_false_breakout(row, cp, float(vr.iloc[i]), hist): continue
+        mask.iloc[i] = True
+    return mask
+
+
+def _tp_clean(df: pd.DataFrame, tpe: datetime, closed: bool) -> pd.DataFrame:
+    """補齊缺值、去掉盤中尚未收盤的今日 K 棒（避免用半根 K 算計畫）。"""
+    df = df.copy()
+    df = df[pd.to_numeric(df["收盤價"], errors="coerce").notna()].reset_index(drop=True)
+    for col in ("開盤價", "最高價", "最低價"):
+        if col not in df.columns: df[col] = df["收盤價"]
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(df["收盤價"])
+    if not closed and len(df) and pd.Timestamp(df["日期"].iloc[-1]).date() == tpe.date():
+        df = df.iloc[:-1].reset_index(drop=True)
+    return df
+
+
+@app.get("/api/v2/tradeplan/{stock_id}")
+async def api_tradeplan_v2(stock_id: str, capital: float | None = Query(None, ge=0),
+                           risk_pct: float = Query(1.0, gt=0, le=5)):
+    """交易計畫卡：今天收盤後算出、明天起有效的限價進場、停損、目標與出場規則。"""
+    if not re.match(r"^\d{4,6}[A-Z]?$", stock_id): raise HTTPException(400, detail="股票代號格式錯誤")
+    tpe = datetime.utcnow() + timedelta(hours=8)
+    closed = (tpe.hour, tpe.minute) >= (14, 30)
+    key = f"{stock_id}:{tpe:%Y-%m-%d}:{'post' if closed else 'pre'}"
+    hit = _tp_cache.get(key)
+    if hit and time.time() - hit[1] < TP_TTL:
+        base = hit[0]
+    else:
+        df, src = await fetch_tw_history(stock_id, lookback_days=1100)
+        if df is None or df.empty or len(df) < 80:
+            raise HTTPException(404, detail="歷史資料不足，無法產生交易計畫")
+        df = _tp_clean(df, tpe, closed)
+        if len(df) < 80: raise HTTPException(404, detail="歷史資料不足，無法產生交易計畫")
+        df = compute_all_indicators(df)
+        bench = None
+        if stock_id != "0050":
+            try:
+                bench, _ = await fetch_tw_history("0050", lookback_days=1100)
+                bench = _tp_clean(bench, tpe, closed) if bench is not None and not bench.empty else None
+            except Exception: bench = None
+        setup = await asyncio.to_thread(_tw_setup_mask, df)
+        base = await asyncio.to_thread(_tp_build_card, stock_id, df, setup, bench if stock_id != "0050" else df)
+        base["data_source"] = src; base["bars"] = len(df)
+        base["stock_name"] = get_stock_name(stock_id)
+        _tp_cache[key] = (base, time.time())
+    out = json.loads(json.dumps(base, default=str))
+    if capital and out.get("plan"):
+        from tradeplan.rules import position_size
+        from tradeplan.costs import is_etf
+        p = out["plan"]; pos = position_size(capital, risk_pct / 100, p["entry"], p["stop"], etf=is_etf(stock_id))
+        pos["risk_pct_of_capital"] = risk_pct; p["position"] = pos
+    return out

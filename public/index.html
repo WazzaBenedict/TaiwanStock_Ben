@@ -10,7 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <!-- Lightweight Charts -->
-<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
@@ -140,15 +140,39 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .aiq-lbl{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:2px}
 .aiq-val{font-family:var(--mono);font-size:13px;font-weight:700}
 /* ── Entry status badges ─────────────────────────────────────────── */
-.es-ENTERABLE{background:rgba(0,184,107,.15);color:var(--down);border:1px solid rgba(0,184,107,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:5px}
+.es-ENTERABLE{background:rgba(0,212,255,.1);color:var(--cyan);border:1px solid rgba(0,212,255,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:5px}
 .es-WAIT_PULLBACK{background:rgba(251,191,36,.12);color:var(--yellow);border:1px solid rgba(251,191,36,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:5px}
 .es-TOO_EXTENDED{background:rgba(167,139,250,.12);color:var(--purple);border:1px solid rgba(167,139,250,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:5px}
 .es-BAD_SETUP,.es-NO_DATA{background:rgba(100,116,139,.12);color:var(--muted);border:1px solid var(--line);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:5px}
 .ts-badge{font-family:var(--mono);font-size:11px;font-weight:700;padding:3px 10px;border-radius:6px;display:inline-block}
-.ts-BUY_NOW{background:rgba(0,184,107,.15);color:var(--down)}
+.ts-BUY_NOW{background:rgba(0,212,255,.1);color:var(--cyan)}
 .ts-BUY_PULLBACK{background:rgba(251,191,36,.12);color:var(--yellow)}
 .ts-WATCH{background:rgba(100,116,139,.15);color:var(--muted)}
-.ts-AVOID{background:rgba(232,56,79,.1);color:var(--up)}
+.ts-AVOID{background:rgba(100,116,139,.15);color:var(--muted)}
+/* ── 交易計畫卡 v2 ───────────────────────────────────────────────── */
+.tp2{background:#0d1728;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+.tp2-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.tp2-title{font-size:14px;font-weight:700}
+.tp2-chip{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;border:1px solid}
+.tp2-chip.SETUP{color:var(--cyan);border-color:rgba(0,212,255,.45);background:rgba(0,212,255,.08)}
+.tp2-chip.NOT_TRIGGERED,.tp2-chip.NO_PLAN{color:#cbd5e1;border-color:var(--line);background:rgba(100,116,139,.12)}
+.tp2-chip.NEGATIVE_EV,.tp2-chip.UNVERIFIED{color:var(--yellow);border-color:rgba(251,191,36,.45);background:rgba(251,191,36,.1)}
+.tp2-warn{font-size:12px;color:var(--yellow);background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);border-radius:8px;padding:8px 10px;margin-bottom:10px;line-height:1.6}
+.tp2-grid{display:grid;grid-template-columns:1fr;gap:8px}
+.tp2-row{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#0a1322;border:1px solid var(--line);border-radius:9px;padding:8px 10px;min-height:44px}
+.tp2-lbl{font-size:12px;color:var(--muted)}
+.tp2-val{font-family:var(--mono);font-size:22px;font-weight:700;letter-spacing:.01em}
+.tp2-sub{font-size:12px;color:var(--muted)}
+.tp2-copy{min-width:44px;min-height:44px;border-radius:8px;border:1px solid var(--line);background:#172946;color:var(--text,#e2e8f0);font-size:12px;cursor:pointer}
+.tp2-sell{margin:10px 0 0;padding-left:18px;font-size:13px;line-height:1.7}
+.tp2-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:10px}
+.tp2-stat{background:#0a1322;border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.tp2-stat b{display:block;font-family:var(--mono);font-size:15px}
+.tp2-cap{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--muted)}
+.tp2-cap input{width:120px;min-height:40px;font-size:14px}
+.tp2 details summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-size:13px;color:var(--cyan)}
+.tp2-gate{text-align:center;padding:10px 4px}
+.tp2-gate button{min-height:44px;padding:0 16px;margin-top:8px}
 /* ── K-line ──────────────────────────────────────────────────────── */
 .kline-wrap{width:100%;border-radius:10px;overflow:hidden;background:#0d1728;border:1px solid var(--line);margin-bottom:14px}
 .kline-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;font-family:var(--mono);font-size:11px;color:var(--muted);border-bottom:1px solid var(--line)}
@@ -612,7 +636,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
     <div style="display:flex;gap:14px;flex-wrap:wrap">
       <div style="min-width:120px">
         <div id="aiLabel" class="ai-label">👀 WATCH</div>
-        <div id="aiConf" class="ai-conf">信心 — / 100</div>
+        <div id="aiConf" class="ai-conf">技術面評分 — / 100</div>
         <div style="height:5px;background:#172946;border-radius:3px;margin-top:8px;overflow:hidden"><div id="confBar" class="conf-fill" style="width:0%"></div></div>
         <div id="tradeStatusBadge" class="ts-badge ts-WATCH" style="margin-top:8px"></div>
       </div>
@@ -642,6 +666,9 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
     <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px" id="aiDisc"></div>
     <div style="margin-top:10px"><button class="ghost sm" id="btnSavePlanTw">📌 加入交易追蹤</button></div>
   </div>
+
+  <!-- 交易計畫卡 v2 -->
+  <div id="tp2Card" class="tp2" style="display:none" aria-live="polite"></div>
 
   <!-- TW K-line -->
   <div class="kline-wrap mobile-defer" id="klineWrap" style="display:none">
@@ -802,7 +829,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
         <div class="bt-item"><div class="bt-lbl">最佳</div><div class="bt-val" id="btBest">—</div></div>
         <div class="bt-item"><div class="bt-lbl">最差</div><div class="bt-val" id="btWorst">—</div></div>
       </div>
-      <table class="bt-trades"><thead><tr><th>日期</th><th>入場</th><th>出場</th><th>報酬</th><th>信心</th><th>訊號</th></tr></thead><tbody id="btTrades"></tbody></table>
+      <table class="bt-trades"><thead><tr><th>日期</th><th>入場</th><th>出場</th><th>報酬</th><th>評分</th><th>訊號</th></tr></thead><tbody id="btTrades"></tbody></table>
     </div>
   </div>
 </div><!-- /p-learn -->
@@ -1543,6 +1570,10 @@ function usDisplayName(sym,item){var c=US_WL_CACHE[sym]||{};item=item||US_WL.fin
 async function apiFetch(url,opt,timeout) {
   timeout=timeout||30000;
   var c=new AbortController(),t=setTimeout(function(){c.abort();},timeout);
+  opt=Object.assign({},opt||{});
+  if((opt.method||"GET").toUpperCase()!=="GET"&&currentUser&&currentUser.getIdToken){
+    try{var tok=await currentUser.getIdToken();opt.headers=Object.assign({},opt.headers||{},{"Authorization":"Bearer "+tok});}catch(e){}
+  }
   try{return await fetch(url,Object.assign({},opt,{signal:c.signal}));}
   catch(e){if(e.name==="AbortError"){var err=new Error("請求逾時，Render 可能正在喚醒，請稍後再試。");err.name="TimeoutError";throw err;}throw e;}
   finally{clearTimeout(t);}
@@ -1700,7 +1731,7 @@ async function scanAlerts(silent) {
     var alerts=d.alerts||[],sentLine=d.sent_line||[],checked=d.checked||ids.length,lineOk=d.line_enabled,dur=d.duration_seconds||0;
     var txt;
     if(!alerts.length)txt="✅ 掃描完成 "+checked+" 檔（"+dur+"s）\n目前自選股沒有符合條件的買點。";
-    else{var lines=alerts.map(function(a){return"📈 "+dsn(a.stock_id,a.stock_name)+"  信心："+a.confidence+"/100\n   "+(a.summary||"");});txt="📊 掃描 "+checked+" 檔（"+dur+"s），發現 "+alerts.length+" 個買點\n\n"+lines.join("\n\n");if(sentLine.length)txt+="\n\n✅ LINE 已推播："+sentLine.join("、");else if(!lineOk)txt+="\n（LINE 未設定）";}
+    else{var lines=alerts.map(function(a){return"📈 "+dsn(a.stock_id,a.stock_name)+"  技術面評分："+a.confidence+"/100\n   "+(a.summary||"");});txt="📊 掃描 "+checked+" 檔（"+dur+"s），發現 "+alerts.length+" 檔符合條件（未驗證，僅供研究）\n\n"+lines.join("\n\n");if(sentLine.length)txt+="\n\n✅ LINE 已推播："+sentLine.join("、");else if(!lineOk)txt+="\n（LINE 未設定）";}
     if(!silent&&el){el.className="scan-result ok";el.textContent=txt;el.style.display="block";}
     return{txt:txt,alerts:alerts,sentLine:sentLine,checked:checked};
   } catch(e) {if(wakeT)clearTimeout(wakeT);if(!silent&&el){el.className="scan-result fail";el.textContent="❌ "+(e.message||"掃描失敗");el.style.display="block";}return null;}
@@ -1874,12 +1905,78 @@ async function loadTwFullAnalysis(id,opts){
 }
 
 // ── Main TW search ─────────────────────────────────────────────────
+// ── 交易計畫卡 v2（/api/v2/tradeplan）──────────────────────────────
+var TP2_LAST=null;
+function tp2Get(k,d){try{var v=localStorage.getItem(k);return v==null?d:v;}catch(e){return d;}}
+function tp2Set(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+function tp2Ack(){try{return sessionStorage.getItem("tp2_ack")==="1";}catch(e){return false;}}
+function tp2Copy(v){try{navigator.clipboard.writeText(String(v));toast("已複製 "+v,"ok");}catch(e){toast("無法複製，請手動輸入 "+v,"warn");}}
+function tp2Fmt(n){return n==null||isNaN(Number(n))?"—":Number(n).toLocaleString("zh-TW",{maximumFractionDigits:2});}
+function tp2MD(s){return s?s.slice(5).replace("-","/"):"—";}
+async function loadTradePlanV2(id){
+  var card=$I("tp2Card");if(!card)return;
+  card.style.display="block";card.innerHTML='<div class="tp2-sub">交易計畫計算中…（第一次查詢約需 10–30 秒）</div>';
+  var cap=Number(tp2Get("tp2_capital","0"))||0,risk=Number(tp2Get("tp2_risk","1"))||1;
+  var qs="?risk_pct="+risk+(cap>0?"&capital="+cap:"");
+  try{
+    var r=await apiFetch(API+"/api/v2/tradeplan/"+id+qs,{},45000);
+    var d=await r.json();
+    if(!r.ok)throw new Error(d.detail||("HTTP "+r.status));
+    if(CURRENT_ID!==id)return;
+    TP2_LAST=d;renderTradePlanV2(d);
+  }catch(e){card.innerHTML='<div class="tp2-sub">交易計畫暫時無法取得：'+esc(e.message)+'</div>';}
+}
+function renderTradePlanV2(d){
+  var card=$I("tp2Card");if(!card)return;
+  var p=d.plan,h=d.history||{},rc=d.random_control||{};
+  var head='<div class="tp2-head"><span class="tp2-title">交易計畫 · '+esc(d.stock_id)+' '+esc(d.stock_name||"")+'</span><span class="tp2-chip '+esc(d.status)+'">'+esc(d.status_text)+'</span></div>';
+  var warn='<div class="tp2-warn">⚠ '+esc(d.label)+'。下單前請自行判斷，最壞情況是停損價被跳空跌破。</div>';
+  if(!tp2Ack()){
+    card.innerHTML=head+warn+'<div class="tp2-gate"><div class="tp2-sub">這些價位來自固定規則，還沒有證據顯示它能贏過 0050。</div><button class="primary" id="tp2AckBtn">我了解，顯示價位</button></div>';
+    var b=$I("tp2AckBtn");if(b)b.onclick=function(){try{sessionStorage.setItem("tp2_ack","1");}catch(e){}renderTradePlanV2(d);};
+    return;
+  }
+  if(!p){card.innerHTML=head+warn;return;}
+  function row(lbl,val,sub){return '<div class="tp2-row"><div><div class="tp2-lbl">'+lbl+'</div><div class="tp2-val">'+tp2Fmt(val)+'</div>'+(sub?'<div class="tp2-sub">'+sub+'</div>':'')+'</div><button class="tp2-copy" aria-label="複製'+lbl+' '+val+'" onclick="tp2Copy('+val+')">複製</button></div>';}
+  var pos=p.position,posHtml;
+  if(pos&&pos.shares>0){posHtml='<div class="tp2-row"><div><div class="tp2-lbl">建議股數（單筆最多虧總資金 '+pos.risk_pct_of_capital+'%）</div><div class="tp2-val">'+(pos.lots?pos.lots+' 張 ':'')+(pos.odd_shares?pos.odd_shares+' 股':'')+'</div><div class="tp2-sub">約 '+tp2Fmt(pos.amount)+' 元；打到停損約虧 '+tp2Fmt(pos.risk_amount)+' 元'+(pos.min_fee_warning?'；'+esc(pos.min_fee_warning):'')+'</div></div></div>';}
+  else{posHtml='<div class="tp2-sub" style="margin-top:4px">輸入總資金可算出建議股數。</div>';}
+  var actionable=(d.status==="SETUP"||d.status==="UNVERIFIED");
+  var buy='<ul class="tp2-sell" style="list-style:none;padding-left:0;margin-top:6px">'+(p.buy_rules||[]).map(function(s){return'<li>• '+esc(s)+'</li>';}).join("")+'</ul>';
+  var grid='<div class="tp2-grid">'+
+    row("限價買進（▼ 掛單價，不追高）",p.entry,"有效到 "+tp2MD(p.valid_until)+" 收盤，沒成交就取消")+
+    row("停損（跌破就賣）",p.stop,"風險 "+p.risk_pct+"% / 股")+
+    row("目標價（+2R 賣出）",p.target,"保本觸發價 "+tp2Fmt(p.breakeven_trigger))+
+    posHtml+'</div>';
+  var sell='<div class="tp2-lbl" style="margin-top:10px">什麼時候賣（先到先出）</div><ol class="tp2-sell">'+(p.sell_rules||[]).map(function(s){return'<li>'+esc(s)+'</li>';}).join("")+'</ol>';
+  var stats='';
+  if(h.n){
+    var ci=h.avg_ret_ci95_pct?' （95% 區間 '+h.avg_ret_ci95_pct[0]+'% ~ '+h.avg_ret_ci95_pct[1]+'%）':'';
+    stats='<div class="tp2-lbl" style="margin-top:10px">同一套規則在此股過去的成績（已扣成本'+(h.sample_ok?'':'，<b style="color:var(--yellow)">樣本不足，只能參考</b>')+'）</div><div class="tp2-stats">'+
+      '<div class="tp2-stat">交易筆數<b>'+h.n+'</b></div>'+
+      '<div class="tp2-stat">勝率 / 平均 R<b>'+h.win_rate+'% / '+h.avg_r+'R</b></div>'+
+      '<div class="tp2-stat">每筆平均<b>'+h.avg_ret_pct+'%</b><span class="tp2-sub">'+ci+'</span></div>'+
+      '<div class="tp2-stat">隨機進場對照<b>'+(rc.runs?rc.avg_ret_pct+'%':'—')+'</b><span class="tp2-sub">同樣出場規則'+(rc.avg_n?'、約 '+rc.avg_n+' 筆':'')+'</span></div>'+
+      '<div class="tp2-stat">規則累積<b>'+h.total_ret_pct+'%</b><span class="tp2-sub">持有 '+(h.exposure_pct==null?'—':h.exposure_pct+'%')+' 的時間</span></div>'+
+      '<div class="tp2-stat">同期 0050<b>'+(h.bench_0050_pct==null?'—':h.bench_0050_pct+'%')+'</b><span class="tp2-sub">一直持有、未含息</span></div>'+
+      '<div class="tp2-stat">最多連虧<b>'+h.max_consec_losses+' 筆</b></div>'+
+      '<div class="tp2-stat">平均持有<b>'+h.avg_days+' 天</b></div></div>';
+  }else{stats='<div class="tp2-sub" style="margin-top:10px">此股近幾年沒有觸發過這套規則，沒有歷史成績可看。</div>';}
+  var cap='<div class="tp2-cap"><label for="tp2Cap">總資金</label><input id="tp2Cap" type="number" inputmode="numeric" min="0" step="10000" value="'+(Number(tp2Get("tp2_capital","0"))||"")+'" placeholder="例如 500000"><label for="tp2Risk">單筆風險 %</label><input id="tp2Risk" type="number" inputmode="decimal" min="0.25" max="5" step="0.25" value="'+(Number(tp2Get("tp2_risk","1"))||1)+'" style="width:70px"><button class="ghost sm" id="tp2CapBtn" style="min-height:44px">重算</button></div>';
+  var more='<details><summary>規則細節與限制</summary><div class="tp2-sub" style="line-height:1.7">計畫依 '+esc(p.as_of)+' 收盤計算。'+(d.caveats||[]).map(function(c){return'<div>• '+esc(c)+'</div>';}).join("")+'</div></details>';
+  var levels=grid+buy+sell;
+  if(!actionable){levels='<details><summary>查看參考價位（'+esc(d.status_text)+'，不建議照此下單）</summary>'+levels+'</details>';}
+  card.innerHTML=head+warn+levels+stats+cap+more;
+  var cb=$I("tp2CapBtn");if(cb)cb.onclick=function(){var c=$I("tp2Cap"),k=$I("tp2Risk");tp2Set("tp2_capital",c&&c.value?c.value:"0");tp2Set("tp2_risk",k&&k.value?k.value:"1");loadTradePlanV2(d.stock_id);};
+}
+
 async function doSearch() {
   if(!currentUser) return;
   var inp=$I("sid"),id=inp?inp.value.trim():"";
   if(!/^\d{4,6}$/.test(id)){showErr("請輸入 4~6 位股票代號");return;}
   var box=$I("suggestBox");if(box)box.style.display="none";
   hideErr();CURRENT_ID=id;var btId=$I("btId");if(btId)btId.value=id;
+  loadTradePlanV2(id);
   var d4ES=$I("d4ExpandSection");if(d4ES)d4ES.style.display="none";
   var d4C=$I("d4Container");if(d4C){d4C.classList.remove("open");d4C.innerHTML="";}
   var d4NS=$I("d4NewsSection");if(d4NS)d4NS.style.display="none";
@@ -1991,12 +2088,12 @@ function renderStock(d) {
 function renderAI(ai) {
   LAST_TW_AI=ai||LAST_TW_AI;
   var badge=$I("aiBadge");if(badge)badge.className="ai-block "+(ai.signal==="BUY"?"ai-buy":ai.signal==="AVOID"?"ai-avoid":"ai-watch");
-  setTxt("aiLabel",sigIcon(ai.signal||"WATCH"));setTxt("aiConf","信心 "+(ai.confidence||0)+" / 100");
+  setTxt("aiLabel",sigIcon(ai.signal||"WATCH"));setTxt("aiConf","技術面評分 "+(ai.confidence||0)+" / 100");
   var barEl=$I("confBar");if(barEl){barEl.style.width=(ai.confidence||0)+"%";barEl.style.background=(ai.confidence||0)>=75?"var(--up)":(ai.confidence||0)>=55?"var(--yellow)":"var(--down)";}
   setTxt("aiEp",ai.entry_price!=null?f(ai.entry_price):"—");setTxt("aiTp",ai.target_price!=null?f(ai.target_price):"—");setTxt("aiSl",ai.stop_loss!=null?f(ai.stop_loss):"—");
   var rrEl=$I("aiRr");if(rrEl){if(ai.risk_reward_ratio!=null){rrEl.textContent=ai.risk_reward_ratio+"x";rrEl.className="aiq-val "+((ai.risk_reward_ratio>=1.5)?"up":"down");}else{rrEl.textContent="—";rrEl.className="aiq-val";}}
   setTxt("aiSummary",ai.summary||"—");
-  var tsEl=$I("tradeStatusBadge");if(tsEl){var ts=ai.trade_status||"WATCH";var tsL={"BUY_NOW":"✅ BUY NOW","BUY_PULLBACK":"⏳ 等回檔","WATCH":"👀 觀望","AVOID":"🚫 避開"};tsEl.textContent=tsL[ts]||ts;tsEl.className="ts-badge ts-"+ts;}
+  var tsEl=$I("tradeStatusBadge");if(tsEl){var ts=ai.trade_status||"WATCH";var tsL={"BUY_NOW":"條件符合（未驗證）","BUY_PULLBACK":"⏳ 等回檔","WATCH":"👀 觀望","AVOID":"不符合"};tsEl.textContent=tsL[ts]||ts;tsEl.className="ts-badge ts-"+ts;}
   var esEl=$I("entryStatusBadge");if(esEl){var es=ai.entry_status||"";if(es){esEl.innerHTML='<span class="es-'+es+'">'+(ai.entry_status_text||es)+'</span>';}else esEl.innerHTML="";}
   var aeEl=$I("aiEntry");if(aeEl)aeEl.innerHTML=(ai.entry_reason||[]).length?(ai.entry_reason.map(function(r){return'<div class="reason" style="color:var(--down)">✅ '+r+'</div>';}).join("")):'<div class="reason">—</div>';
   var arEl=$I("aiRisk");if(arEl)arEl.innerHTML=(ai.risk_reason||[]).length?(ai.risk_reason.map(function(r){return'<div class="reason" style="color:var(--up)">⚠️ '+r+'</div>';}).join("")):'<div class="reason" style="color:var(--muted)">暫無明顯風險</div>';
@@ -2090,7 +2187,7 @@ function render4D(a4,news,container,aiSig) {
   var html='<div style="background:#0d1728;border:2px solid rgba(251,191,36,.3);border-radius:12px;padding:14px;margin-bottom:12px">'+
     '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:8px">🤖 四面向綜合交易建議</div>'+
     '<div style="display:flex;gap:12px;flex-wrap:wrap">'+
-    '<div style="min-width:120px"><div class="ai-label">'+sigIcon(ai.signal||"WATCH")+'</div><div class="ai-conf">信心 '+conf+' / 100</div>'+
+    '<div style="min-width:120px"><div class="ai-label">'+sigIcon(ai.signal||"WATCH")+'</div><div class="ai-conf">技術面評分 '+conf+' / 100</div>'+
     '<div style="height:5px;background:#172946;border-radius:3px;margin-top:8px;overflow:hidden"><div style="width:'+conf+'%;height:100%;background:'+barC+';border-radius:3px;transition:width .6s"></div></div></div>'+
     '<div style="flex:1;min-width:180px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:8px">'+
     '<div class="aiq"><div class="aiq-lbl">入場</div><div class="aiq-val">'+(ai.entry_price!=null?f(ai.entry_price):"—")+'</div></div>'+
@@ -2390,7 +2487,7 @@ function renderUSAI(ai) {
   setTxtUS("usAiLabel",usSigIcon(sig));var conf=ai.confidence||0;
   setTxtUS("usAiConf","Confidence "+conf+" / 100");
   var bar=$I("usConfBar");if(bar){bar.style.width=conf+"%";bar.style.background=conf>=75?"#22c55e":conf>=52?"#fbbf24":"#ef4444";}
-  var tsEl=$I("usTradeStatus");if(tsEl){var ts=ai.trade_status||"WATCH";var tsL={"BUY_NOW":"✅ BUY NOW","BUY_PULLBACK":"⏳ Wait Pullback","WATCH":"👀 Watch","AVOID":"🚫 Avoid"};var tsBg=ts==="BUY_NOW"?"rgba(34,197,94,.15)":ts==="BUY_PULLBACK"?"rgba(251,191,36,.12)":"rgba(100,116,139,.15)";var tsFg=ts==="BUY_NOW"?"#22c55e":ts==="BUY_PULLBACK"?"#fbbf24":"#64748b";tsEl.innerHTML='<span style="font-family:var(--mono);font-size:11px;font-weight:700;padding:3px 10px;border-radius:6px;background:'+tsBg+';color:'+tsFg+'">'+(tsL[ts]||ts)+'</span>'+(ai.entry_status?'<span style="font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:4px;background:#172946;color:var(--muted);margin-left:5px">'+(ai.entry_status_text||ai.entry_status)+'</span>':'');}
+  var tsEl=$I("usTradeStatus");if(tsEl){var ts=ai.trade_status||"WATCH";var tsL={"BUY_NOW":"Setup (unverified)","BUY_PULLBACK":"⏳ Wait Pullback","WATCH":"👀 Watch","AVOID":"No setup"};var tsBg=ts==="BUY_NOW"?"rgba(0,212,255,.1)":ts==="BUY_PULLBACK"?"rgba(251,191,36,.12)":"rgba(100,116,139,.15)";var tsFg=ts==="BUY_NOW"?"#00d4ff":ts==="BUY_PULLBACK"?"#fbbf24":"#64748b";tsEl.innerHTML='<span style="font-family:var(--mono);font-size:11px;font-weight:700;padding:3px 10px;border-radius:6px;background:'+tsBg+';color:'+tsFg+'">'+(tsL[ts]||ts)+'</span>'+(ai.entry_status?'<span style="font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:4px;background:#172946;color:var(--muted);margin-left:5px">'+(ai.entry_status_text||ai.entry_status)+'</span>':'');}
   setTxtUS("usAiEp",ai.entry_price!=null?fUS(ai.entry_price,2):"—");
   setTxtUS("usAiTp",ai.target_price!=null?fUS(ai.target_price,2):"—");
   setTxtUS("usAiSl",ai.stop_loss!=null?fUS(ai.stop_loss,2):"—");
