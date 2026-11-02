@@ -106,7 +106,7 @@ def signal_validation_summary() -> list[str]:
         return ["（尚未執行 `python -m quant.signal_validation`）"]
     v = json.loads(f.read_text(encoding="utf-8"))
     return [f"- 持有 {name}：評分與未來報酬的 rank IC 平均 {r['ic_mean']:.3f}（t 值 {r['ic_t']:.2f}）；"
-            f"BUY 訊號 {r['n_buy']:,} 筆扣成本後平均 {pct(r['buy_net'], 2)}，比同期 0050 {pct(r['buy_vs_0050'], 2)}"
+            f"BUY 訊號 {int(r['n_buy']):,} 筆扣成本後平均 {pct(r['buy_net'], 2)}，比同期 0050 {pct(r['buy_vs_0050'], 2)}"
             for name, r in v.items()]
 
 
@@ -128,8 +128,13 @@ def build_report(panel, spec, wf, extra, picks_payload, IS, OOS, oos_end) -> str
                else "沒有通過門檻、沒有穩定贏過 0050。因此 App 不推出「每月選股」，0050 仍是預設的核心部位。**"))
 
     yi, yb, ye = yearly(res["equity"]), yearly(res["benchmark"]), yearly(ew["equity"])
+    diff = (yi - yb).dropna()
+    good_years = [d for d in diff.index if d.year >= int(OOS[0][:4]) and diff[d] > 0]
+    bad_years = [d for d in diff.index if d.year >= int(OOS[0][:4]) and diff[d] <= 0]
     oos_year = int(OOS[0][:4])
-    years = "\n".join(f"| {d.year}{'（樣本外）' if d.year >= oos_year else ''} | {pct(yi[d])} | {pct(yb.get(d, np.nan))} | "
+    last = close.index[-1]
+    partial = f"，至 {last.month} 月" if last.month < 12 else ""
+    years = "\n".join(f"| {d.year}{('（樣本外' + (partial if d.year == last.year else '') + '）') if d.year >= oos_year else ''} | {pct(yi[d])} | {pct(yb.get(d, np.nan))} | "
                       f"{pct(ye.get(d, np.nan))} | {pct(yi[d] - yb.get(d, np.nan))} |" for d in yi.index)
     cfg_rows = "\n".join(
         f"| {r['config_id']}{' ⭐' if r['id'] == wf['best_id'] else ''} | {zh_label(r['factors'])} | {r['top_n']} | "
@@ -154,6 +159,15 @@ def build_report(panel, spec, wf, extra, picks_payload, IS, OOS, oos_end) -> str
         f"- Deflated Sharpe（以 {extra['n_trials']} 次試驗計，對 0050 的每日超額報酬）：樣本內 {num(dsr_is['dsr'])}、"
         f"樣本外 {num(dsr_oos['dsr'])}（需 ≥ 0.95 才算顯著）",
         f"- {len(t)} 組登錄設定在樣本外有 {n_beat_oos} 組同時在年化與 Sharpe 贏 0050；樣本內第一名在樣本外排第 {rank_oos} 名。",
+        "",
+        "**怎麼解讀：**",
+        "",
+        f"- 選出的設定在樣本內就輸給 0050（年化 {pct(ins['cagr'])} vs {pct(ins['bench_cagr'])}）—— 它只是 10 組裡「輸最少」的。",
+        f"- 樣本外年化報酬較高，但波動 {pct(oos['vol'])} vs {pct(oos['bench_vol'])}、最大回撤 {pct(oos['max_drawdown'])} vs "
+        f"{pct(oos['bench_max_drawdown'])}，風險調整後（Sharpe）仍輸 0050；月超額 t 值 {num(oos['excess_t_stat'])}，統計上無法和運氣區分。",
+        f"- 逐年並不穩定：贏 0050 的年份 {'、'.join(str(d.year) for d in good_years) or '無'}；"
+        f"輸的年份 {'、'.join(str(d.year) for d in bad_years) or '無'}。",
+        "- **結論：App 不應提供選股名單；建議以 0050 當核心持股。** 這個策略只能當研究紀錄，不建議實際照做。",
         "",
         "## 1. 事前登錄與試驗紀錄",
         "",
@@ -232,7 +246,9 @@ def build_report(panel, spec, wf, extra, picks_payload, IS, OOS, oos_end) -> str
         "- 月營收以公開資訊觀測站每月彙總表為準；公司事後更正（restatement）的數字會覆蓋原始公告，可能有輕微的前視偏誤。",
         "- 法人買賣超只抓每月底前 20 個交易日；只含上市（TWSE），不含上櫃。",
         "- 滑價為估計值；現金部位不計利息；未計股利所得稅與二代健保補充保費。",
-        "- 2021 年後台積電在 0050 權重極高、表現特別強，分散的多因子組合在這段期間本來就很難贏 0050（見「排除 2330」一列）。",
+        "- 排除 2330 對選出的策略幾乎沒有影響（策略本來就很少持有台積電）；但 2021 年後 0050 的報酬有很大一部分來自台積電，"
+        "分散的多因子組合在這段期間本來就很難在風險調整後贏 0050。",
+        "- 「候選池 300 檔等權」每月依近 20 日成交金額重選，偏向當時的熱門股，表現明顯落後 0050；這也說明「看成交熱度選股」本身不是優勢。",
         "",
     ]
     if picks_payload:
