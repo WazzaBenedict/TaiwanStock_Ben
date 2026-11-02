@@ -69,6 +69,14 @@ def test_parse_yahoo_chart():
     assert parse_yahoo_chart(payload, end_date="2026-10-29") == {}
 
 
+def test_apply_daily_close():
+    from daytrade.data import apply_daily_close
+    bars = [[100.0, 100.0, 100.0, 100.0, 1.0]] * (SESSION_BARS - 1) + [[100.0, 100.0, 100.0, 100.0, 0.0]]
+    s = {"2026-10-30": [list(b) for b in bars]}
+    apply_daily_close(s, {"2026-10-30": 102.0})
+    assert s["2026-10-30"][-1] == [100.0, 102.0, 100.0, 102.0, 0.0]
+
+
 def test_fill_quiet_bars():
     b = [[1, 1, 1, 1, 1]] + [None] * 2 + [[2, 2, 2, 2, 1]] * (SESSION_BARS - 3)
     assert fill_quiet_bars(b)[1] == [1, 1, 1, 1, 0.0]

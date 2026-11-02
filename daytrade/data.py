@@ -222,6 +222,32 @@ def parse_yahoo_chart(payload: dict, end_date: str | None = None) -> dict[str, l
     return out
 
 
+YAHOO_DAILY_URL = "https://query2.finance.yahoo.com/v8/finance/chart/%s?range=6mo&interval=1d"
+
+
+def parse_yahoo_daily_close(payload: dict) -> dict[str, float]:
+    res = ((payload.get("chart") or {}).get("result") or [{}])[0]
+    off = int((res.get("meta") or {}).get("gmtoffset") or 28800)
+    closes = (((res.get("indicators") or {}).get("quote") or [{}])[0]).get("close") or []
+    out = {}
+    for t, c in zip(res.get("timestamp") or [], closes):
+        if c:
+            out[dt.datetime.fromtimestamp(t + off, dt.timezone.utc).date().isoformat()] = float(c)
+    return out
+
+
+def apply_daily_close(sessions: dict, closes: dict[str, float]) -> None:
+    """Make the last bar (13:25-13:30) end at the official daily close: open at the
+    previous bar's close, close at the daily close."""
+    for ds, bars in sessions.items():
+        c = closes.get(ds)
+        if not c:
+            continue
+        pc = bars[-2][3]
+        b = bars[-1]
+        bars[-1] = [pc, max(pc, c, b[1] if b[4] else pc), min(pc, c, b[2] if b[4] else pc), c, b[4]]
+
+
 def load_sessions_yahoo(stock_id: str, end_date: str, timeout: int = 20) -> dict[str, list[list[float]]]:
     """Free fallback: Yahoo keeps about 60 days of 5-minute bars. Tries the TWSE suffix
     (.TW) and then TPEx (.TWO). Unofficial and can lag or have gaps."""
@@ -233,6 +259,13 @@ def load_sessions_yahoo(stock_id: str, end_date: str, timeout: int = 20) -> dict
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 out = parse_yahoo_chart(json.loads(r.read().decode("utf-8")), end_date)
             if out:
+                # Yahoo's past 5-minute days end at the 13:20 bar (the 13:25 bar is null and
+                # the 13:30 auction print is missing), so set the closing auction from the
+                # daily close. One extra request.
+                dreq = urllib.request.Request(YAHOO_DAILY_URL % urllib.parse.quote(stock_id + suffix),
+                                              headers=req.headers)
+                with urllib.request.urlopen(dreq, timeout=timeout) as r:
+                    apply_daily_close(out, parse_yahoo_daily_close(json.loads(r.read().decode("utf-8"))))
                 return out
         except Exception as e:
             last = e
