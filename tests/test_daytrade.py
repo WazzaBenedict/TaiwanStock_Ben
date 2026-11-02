@@ -166,6 +166,13 @@ def test_plan_levels_states():
     assert screener._roc_date("1151030") == "2026-10-30"
 
 
+
+def test_taipei_today():
+    from daytrade.data import taipei_today
+    now = dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=8)
+    assert taipei_today() == now.date()
+
+
 if __name__ == "__main__":
     for k, f in list(globals().items()):
         if k.startswith("test_"):

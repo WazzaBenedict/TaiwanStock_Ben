@@ -31,11 +31,11 @@ from pathlib import Path
 
 try:
     from .costs import DayTradeCosts, round_to_tick, tick_size
-    from .data import CACHE_DIR, SESSION_BARS, DataError, bar_time, fetch_today_yahoo, load_sessions
+    from .data import CACHE_DIR, SESSION_BARS, DataError, bar_time, fetch_today_yahoo, load_sessions, taipei_today
     from . import timemachine as tm
 except ImportError:  # pragma: no cover
     from costs import DayTradeCosts, round_to_tick, tick_size  # type: ignore
-    from data import CACHE_DIR, SESSION_BARS, DataError, bar_time, fetch_today_yahoo, load_sessions  # type: ignore
+    from data import CACHE_DIR, SESSION_BARS, DataError, bar_time, fetch_today_yahoo, load_sessions, taipei_today  # type: ignore
     import timemachine as tm  # type: ignore
 
 UA = {"User-Agent": "Mozilla/5.0 (taiwanstock-daytrade/1.0)"}
@@ -119,7 +119,7 @@ def daytrade_list(date: str) -> set[str]:
 def flagged_lists() -> tuple[set[str], set[str]]:
     # the undated notice list is today's, published after the close: ask for the last
     # few weekdays instead so attention stocks are flagged overnight and intraday
-    end = dt.date.today()
+    end = taipei_today()
     start, k = end, 0
     while k < 3:
         start -= dt.timedelta(days=1)
@@ -298,7 +298,7 @@ def live_levels(stock_ids: list[str], rule: tm.Rule | None = None, costs: DayTra
             out[sid] = {"status": "no_data", "message": "取不到今天的 5 分 K（盤前、休市或資料源延遲）。"}
             continue
         ds, bars = got
-        is_today = ds == dt.date.today().isoformat()
+        is_today = ds == taipei_today().isoformat()
         lv = plan_levels(bars, rule, costs, shares, is_today)
         lv["date"] = ds
         if not is_today:
@@ -314,7 +314,7 @@ def screen(top: int = 40, rule: tm.Rule | None = None, costs: DayTradeCosts | No
            min_range_pct: float = 2.0, pause: float = 0.3, use_cache: bool = True, log=None) -> dict:
     rule = rule or tm.Rule()
     costs = costs or DayTradeCosts()
-    today = dt.date.today().isoformat()
+    today = taipei_today().isoformat()
     cpath = CACHE_DIR / ("screen-%s-%d-%d-%s.json" % (today, top, rule.orb_minutes, rule.target_r))
     if use_cache and cpath.exists():
         return json.loads(cpath.read_text(encoding="utf-8"))
@@ -323,7 +323,7 @@ def screen(top: int = 40, rule: tm.Rule | None = None, costs: DayTradeCosts | No
     if not uni:
         raise DataError("TWSE STOCK_DAY_ALL returned no stocks")
     # the day-trade list is published per trading day; try today, then back up to 5 weekdays
-    dtl, d = set(), dt.date.today()
+    dtl, d = set(), taipei_today()
     for _ in range(6):
         if d.weekday() < 5:
             dtl = daytrade_list(d.isoformat())
