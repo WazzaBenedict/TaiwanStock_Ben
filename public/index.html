@@ -492,6 +492,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
   <button class="nav-tab" data-page="p-plans">📌 交易追蹤</button>
   <button class="nav-tab" data-page="p-positions">💼 持倉管理</button>
   <button class="nav-tab" data-page="p-journal">📘 交易日誌</button>
+  <button class="nav-tab" data-page="p-timemachine">⚡ 當沖</button>
   <button class="nav-tab" data-page="p-account">👤 帳戶</button>
 </nav>
 
@@ -927,6 +928,153 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 </div><!-- /p-journal -->
 
 <!-- ═══ TW Account Page ═══ -->
+<!-- ══ 台股時光機 (day-trade replay, daytrade/timemachine.py) ══ -->
+<div class="page" id="p-timemachine">
+  <div class="section" id="dtScanSection">
+    <div class="section-title"><div class="section-title-left">🎯 當沖候選（先買後賣） <span class="d-badge">扣成本後的歷史成績，非投資建議</span></div>
+      <div class="row" style="gap:6px"><button class="ghost sm" id="btnDtScan">掃描</button><button class="ghost sm" id="btnDtLevels">更新今日價位</button></div></div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:8px">
+      從成交值前 40 名、可現股當沖、非處置股中，挑日內振幅夠大的股票，用「開盤 15 分鐘突破」規則回測近 60 個交易日，
+      扣掉手續費、0.15% 當沖稅與 1 檔滑價，並和同一檔股票「隨機進場」比較。打不贏隨機進場就代表這個規則在這檔沒有優勢。
+    </div>
+    <div id="dtRule" style="font-size:12px;line-height:1.7;margin-bottom:8px"></div>
+    <div id="dtMsg" style="font-family:var(--mono);font-size:12px;color:var(--muted)"></div>
+    <div style="overflow-x:auto"><table class="dt-table" id="dtTable" style="display:none"><thead><tr>
+      <th>股票</th><th>收盤</th><th>日內振幅</th><th>來回成本</th><th>規則筆數</th><th>規則 平均R</th><th>隨機 平均R</th><th>結論</th>
+      <th>今日 進場</th><th>停損</th><th>停利</th><th>狀態</th><th></th></tr></thead><tbody></tbody></table></div>
+    <div id="dtFoot" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px"></div>
+  </div>
+  <style>
+    .dt-table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12px;white-space:nowrap}
+    .dt-table th,.dt-table td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:right}
+    .dt-table th{color:var(--muted);font-weight:600}.dt-table td:first-child,.dt-table th:first-child{text-align:left}
+    .dt-pos{color:#3ddc97}.dt-neg{color:#ff6b6b}.dt-pass{color:#3ddc97;font-weight:700}.dt-fail{color:var(--muted)}
+    .dt-st{font-size:11px;color:var(--muted);text-align:left!important;white-space:normal;min-width:180px}
+  </style>
+  <script>
+  (function(){
+    var rows=[];
+    function fmtR(x){if(x==null)return"—";var c=x>0?"dt-pos":"dt-neg";return'<span class="'+c+'">'+(x>0?"+":"")+x.toFixed(2)+'R</span>';}
+    function draw(levels){
+      var tb=document.querySelector("#dtTable tbody"); if(!tb) return;
+      tb.innerHTML=rows.map(function(r){
+        var L=(levels||{})[r.stock_id]||r._lv||{}; r._lv=L;
+        var f=function(v){return v==null?"—":v;};
+        return '<tr><td>'+esc(r.stock_id)+' '+esc(r.name)+(r.attention?' <span class="dt-neg">注意股</span>':'')+'</td>'+
+          '<td>'+r.close+'</td><td>'+r.avg_range_pct.toFixed(1)+'%</td><td>'+r.round_trip_cost_pct.toFixed(2)+'%</td>'+
+          '<td>'+r.orb.n+'</td><td>'+fmtR(r.orb.avg_net_r)+'</td><td>'+fmtR(r.random.avg_net_r)+'</td>'+
+          '<td class="'+(r.passed?"dt-pass":"dt-fail")+'">'+(r.passed?"通過（只做模擬）":"不建議")+'</td>'+
+          '<td>'+f(L.entry)+(L.entry_is_estimate?"*":"")+'</td><td>'+f(L.stop)+'</td><td>'+f(L.target)+'</td>'+
+          '<td class="dt-st">'+esc(L.message||"按「更新今日價位」")+'</td>'+
+          '<td><button class="ghost sm" data-tm="'+esc(r.stock_id)+'" data-date="'+esc(r.to)+'">時光機</button></td></tr>';
+      }).join("");
+      tb.querySelectorAll("button[data-tm]").forEach(function(b){b.addEventListener("click",function(){
+        var i=document.getElementById("tmId"),d=document.getElementById("tmDate");
+        if(i)i.value=b.dataset.tm; if(d)d.value=b.dataset.date; var go=document.getElementById("btnTm"); if(go)go.click();
+        var t=document.getElementById("tmOut"); if(t)t.scrollIntoView({behavior:"smooth"});});});
+    }
+    async function scan(refresh){
+      var msg=document.getElementById("dtMsg"); msg.textContent="掃描中…第一次每天約需 1 分鐘";
+      try{
+        var r=await apiFetch(API+"/api/daytrade/screen"+(refresh?"?refresh=true":""),{},180000); var d=await r.json();
+        if(!r.ok){msg.textContent="⚠ "+(d.detail||r.status);return;}
+        rows=d.candidates||[]; msg.textContent="分 K 資料到 "+(d.last_session||d.as_of)+"：成交值前 "+d.universe+" 名中，"+rows.length+" 檔波動夠大，"+d.passed+" 檔扣成本後通過。"+(d.notes||[]).join(" ");
+        document.getElementById("dtRule").textContent=d.how_to_trade;
+        document.getElementById("dtFoot").textContent="* 預估進場價（突破後下一根開盤才確定）。"+d.disclaimer+" 略過 "+(d.skipped||[]).length+" 檔。";
+        document.getElementById("dtTable").style.display=rows.length?"table":"none"; draw();
+        if(rows.length) levels();
+      }catch(e){msg.textContent="⚠ "+e.message;}
+    }
+    async function levels(){
+      if(!rows.length) return scan(false);
+      var ids=rows.slice(0,10).map(function(r){return r.stock_id;}).join(",");
+      try{var r=await apiFetch(API+"/api/daytrade/levels?ids="+ids,{},60000); var d=await r.json(); if(r.ok){draw(d.levels);
+        document.getElementById("dtFoot").textContent=document.getElementById("dtFoot").textContent.split(" | ")[0]+" | "+d.data_note;}}catch(e){}
+    }
+    function init(){var a=document.getElementById("btnDtScan"),b=document.getElementById("btnDtLevels");
+      if(a)a.addEventListener("click",function(){scan(false);}); if(b)b.addEventListener("click",levels);}
+    if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
+  })();
+  </script>
+  <div class="section">
+    <div class="section-title"><div class="section-title-left">⏳ 台股時光機 <span class="d-badge">研究／模擬，非投資建議</span></div></div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px">
+      用這檔股票過去 60 個交易日的 5 分 K，把當天剩下的走勢重播 1 萬次，算出先碰停利、先碰停損的機率，並扣掉手續費、0.15% 當沖稅與滑價。
+      只做「先買後賣」。不填進場價時，系統用「開盤區間突破」規則自動產生計畫。模擬不是預測，多數散戶當沖長期是虧的。
+    </div>
+    <div class="row tm-form" style="gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <input id="tmId" placeholder="股票代號 如 2330" maxlength="7"/>
+      <input id="tmDate" type="date"/>
+      <input id="tmEntry" type="number" step="0.01" placeholder="進場價（選填）"/>
+      <input id="tmTime" placeholder="進場時間 10:15"/>
+      <input id="tmStop" type="number" step="0.01" placeholder="停損價"/>
+      <input id="tmTarget" type="number" step="0.01" placeholder="停利價"/>
+    </div>
+    <div class="row tm-form" style="gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <label>開盤區間 <select id="tmOrb"><option value="15">15 分</option><option value="30">30 分</option></select></label>
+      <label>停利 R <input id="tmR" type="number" value="1" step="0.5" min="0.5" max="5" style="width:60px"/></label>
+      <label>股數 <input id="tmShares" type="number" value="1000" step="1000" min="1" style="width:80px"/></label>
+      <label>手續費折扣 <input id="tmDisc" type="number" value="0.6" step="0.05" min="0" max="1" style="width:60px"/></label>
+      <label>滑價(檔) <select id="tmSlip"><option>0</option><option selected>1</option><option>2</option></select></label>
+      <button class="ghost sm" id="btnTm">執行 1 萬次重播</button>
+    </div>
+    <div id="tmMsg" style="font-family:var(--mono);font-size:12px;color:var(--muted)"></div>
+    <div id="tmOut" style="display:none"></div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:10px">方法改寫自 Jake Schincariol 的 trader-timemachine（MIT 授權）。</div>
+  </div>
+  <style>
+    .tm-form input,.tm-form select{background:#0d1728;border:1px solid var(--line);border-radius:7px;color:var(--text);padding:7px 10px;font-family:var(--mono);font-size:13px;outline:none}
+    .tm-form input:not([style*=width]){width:130px}
+    .tm-form label{font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px}
+    .tm-bar{display:flex;height:22px;border-radius:6px;overflow:hidden;margin:8px 0;font-family:var(--mono);font-size:11px;color:#06101f;font-weight:700}
+    .tm-bar div{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden}
+    .tm-kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:8px 0}
+    .tm-kv div{background:#0d1728;border:1px solid var(--line);border-radius:8px;padding:8px}
+    .tm-kv b{display:block;font-size:16px;color:var(--text)} .tm-kv span{font-size:11px;color:var(--muted);font-family:var(--mono)}
+    .tm-verdict{border-left:3px solid var(--cyan);padding:6px 10px;margin:8px 0;font-size:13px;line-height:1.7}
+  </style>
+  <script>
+  (function(){
+    function v(id){var e=document.getElementById(id);return e?e.value.trim():"";}
+    function lastWeekday(){var d=new Date();d.setDate(d.getDate()-1);while(d.getDay()===0||d.getDay()===6)d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);}
+    function init(){
+      var dt=document.getElementById("tmDate"); if(dt&&!dt.value) dt.value=lastWeekday();
+      var b=document.getElementById("btnTm"); if(b) b.addEventListener("click",runTm);
+    }
+    async function runTm(){
+      var msg=document.getElementById("tmMsg"),out=document.getElementById("tmOut");
+      var q={stock_id:v("tmId"),date:v("tmDate"),orb_minutes:v("tmOrb"),target_r:v("tmR"),shares:v("tmShares"),fee_discount:v("tmDisc"),slip_ticks:v("tmSlip")};
+      if(!/^\d{4,6}[A-Z]?$/.test(q.stock_id)||!q.date){msg.textContent="請輸入股票代號與日期";return;}
+      if(v("tmEntry")){q.entry=v("tmEntry");q.stop=v("tmStop");q.target=v("tmTarget");q.entry_time=v("tmTime");
+        if(!q.stop||!q.target||!q.entry_time){msg.textContent="手動計畫需要進場價、進場時間、停損與停利";return;}}
+      msg.textContent="抓取分 K 並重播中…第一次抓 60 天資料可能要 1 分鐘";out.style.display="none";
+      try{
+        var r=await apiFetch(API+"/api/daytrade/timemachine?"+new URLSearchParams(q).toString(),{},120000);
+        var d=await r.json(); if(!r.ok){msg.textContent="⚠ "+(d.detail||("錯誤 "+r.status));return;}
+        msg.textContent=""; render(d);
+      }catch(e){msg.textContent="⚠ "+e.message;}
+    }
+    function render(d){
+      var p=d.plan,m=d.mc,h=d.history,a=d.actual_day,out=document.getElementById("tmOut");
+      var pct=function(x){return x.toFixed(1)+"%";};
+      var html='<div style="font-family:var(--mono);font-size:12px;margin:6px 0">'+esc(p.stock_id)+" "+esc(p.date)+"　"+(p.source==="orb"?"開盤區間突破 自動計畫":"手動計畫")+
+        "　進場 "+p.entry+" @"+esc(p.entry_time)+"　停損 "+p.stop+"　停利 "+p.target+"（"+p.target_r+"R）　"+p.shares+" 股　來回成本約 "+p.round_trip_cost_pct+"%</div>";
+      html+='<div class="tm-bar"><div style="width:'+m.target_first+'%;background:#3ddc97">停利 '+pct(m.target_first)+'</div><div style="width:'+m.neither+'%;background:#8aa0bf">收盤 '+pct(m.neither)+'</div><div style="width:'+m.stop_first+'%;background:#ff6b6b">停損 '+pct(m.stop_first)+'</div></div>';
+      html+='<div class="tm-kv">'+
+        '<div><b>'+pct(m.profitable_after_costs)+'</b><span>扣成本後賺錢的比例</span></div>'+
+        '<div><b>'+m.avg_net_r.toFixed(3)+'R</b><span>扣成本後平均每筆</span></div>'+
+        '<div><b>'+m.exit_median+'</b><span>出場價中位數（90%: '+m.exit_p5+'–'+m.exit_p95+'）</span></div>'+
+        '<div><b>'+(h.trades?h.avg_net_r.toFixed(3)+"R":"—")+'</b><span>歷史實際 '+(h.trades||0)+' 筆 / '+h.sessions+' 天</span></div>'+
+        '<div><b>'+(a.net_pnl>=0?"+":"")+a.net_pnl+'</b><span>當天實際（'+esc(a.outcome)+'，'+a.net_r+'R）</span></div></div>';
+      html+=d.verdict.map(function(s){return '<div class="tm-verdict">'+esc(s)+'</div>';}).join("");
+      html+='<div style="font-family:var(--mono);font-size:11px;color:var(--muted)">'+m.replays+' 次重播，seed '+m.seed+'，樣本 '+esc(d.pool.from)+' ~ '+esc(d.pool.to)+'。'+esc(d.disclaimer)+'</div>';
+      out.innerHTML=html; out.style.display="block";
+    }
+    if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
+  })();
+  </script>
+</div>
+
 <div class="page" id="p-account">
   <div id="accountGuest">
     <div class="account-card">

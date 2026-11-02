@@ -36,3 +36,6 @@ node_modules/
 
 # Log
 *.log
+
+# Day-trade minute-bar cache
+daytrade/cache/
