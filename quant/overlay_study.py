@@ -56,11 +56,15 @@ def load_data() -> dict:
         else:
             core, source = fm, "FinMind（還原）"
     core = core[~core.index.duplicated()]
+    from .overlay import clean_etf
+    notes = []
+    core = clean_etf(core, log=notes.append)
     try:
         lev_actual = qdata.load_price_yahoo("00631L", "2014-10-01", end)[["open", "close"]].astype(float).dropna()
+        lev_actual = clean_etf(lev_actual, log=lambda m: notes.append("00631L " + m))
     except Exception:  # noqa: BLE001
         lev_actual = pd.DataFrame()
-    return {"core": core, "lev_actual": lev_actual, "core_source": source}
+    return {"core": core, "lev_actual": lev_actual, "core_source": source, "clean_notes": notes}
 
 
 def load_etf_finmind(stock_id: str, start: str, end: str) -> pd.DataFrame:
@@ -199,8 +203,9 @@ def splice_leveraged_rates(core, actual, rates):
     syn = pd.DataFrame({"open": lev_open, "close": lev_close})
     if actual is None or len(actual) == 0:
         return syn
-    actual = actual.reindex(core.index).dropna()
-    first = actual.index[0]
+    actual = actual.reindex(core.index)
+    first = actual["close"].first_valid_index()
+    actual = actual.loc[first:].ffill()      # 0050 有交易但 00631L 缺資料的日子沿用前值
     scale = syn.loc[first, "close"] / actual.loc[first, "close"]
     out = syn.copy()
     out.loc[first:, ["open", "close"]] = actual.loc[first:, ["open", "close"]].values * scale
@@ -413,7 +418,7 @@ def main(demo=False):
     passed = chosen is not None and all(gates[chosen].values())
     out = {"bench": B, "results": {k: {kk: vv for kk, vv in r.items() if kk not in ("target", "result")} for k, r in results.items()},
            "eligible_in_sample": eligible, "chosen": chosen, "gates": gates, "passed": passed, "track": track,
-           "core_source": d["core_source"], "data_start": str(core.index[0].date()), "data_end": str(core.index[-1].date())}
+           "core_source": d["core_source"], "clean_notes": d.get("clean_notes", []), "data_start": str(core.index[0].date()), "data_end": str(core.index[-1].date())}
     if demo:
         print(json.dumps({"chosen": chosen, "eligible": eligible, "gates": gates, "passed": passed}, default=str, indent=1))
         return out
@@ -459,6 +464,8 @@ def write_outputs(out, detail, log, results, st):
     L.append("# 第二輪：0050 曝險調整策略能否同時贏 0050（報酬 + Sharpe）\n")
     L.append(f"資料：0050 {out['data_start']} ～ {out['data_end']}（{out['core_source']}）；規格 `quant/overlay_spec.json` 先登錄後跑。\n")
     L.append("> ⚠️ 研究紀錄，非投資建議。回測不保證未來獲利；下單由使用者本人決定。\n")
+    if out.get("clean_notes"):
+        L.append("資料清理（ETF 單日漲跌 > 15% 視為資料斷點）：" + "；".join(out["clean_notes"]) + "\n")
     ch = out["chosen"]
     if out["passed"]:
         L.append(f"**結論：{ch} 通過全部 7 道硬門檻 → 判定「回測通過、前瞻驗證中」。**\n")

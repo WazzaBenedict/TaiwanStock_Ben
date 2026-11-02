@@ -50,6 +50,46 @@ class OverlayCosts:
 
 
 # ── 資料 ─────────────────────────────────────────────────────────────────────
+def clean_etf(df: pd.DataFrame, thresh: float = 0.15, log=None) -> pd.DataFrame:
+    """修 ETF 日線的資料斷點（台股 ETF 單日漲跌受 7%/10% 限制，超過 thresh 必為資料問題）：
+    - open ≤ 0 或缺 → 用前收
+    - 單一壞 K 棒（今日跳 > thresh、隔日反向跳回）→ 以前收取代該日
+    - 分割未還原（單日跳 > thresh 且不回來）→ 之前的價格依比例調整
+    - 開盤偏離當日收盤 > thresh → 開盤改用前收
+    """
+    df = df[["open", "close"]].astype(float).copy()
+    df = df[df["close"] > 0]
+    notes = []
+    o, c = df["open"].values.copy(), df["close"].values.copy()
+    n = len(c)
+    i = 1
+    while i < n:
+        r = c[i] / c[i - 1] - 1
+        if abs(r) > thresh:
+            r_next = c[i + 1] / c[i] - 1 if i + 1 < n else 0.0
+            if abs(r_next) > thresh and np.sign(r_next) != np.sign(r):
+                notes.append(f"bad bar {df.index[i].date()} ({r:+.1%})")
+                c[i] = c[i - 1]
+                o[i] = c[i - 1]
+            else:
+                ratio = c[i] / c[i - 1]
+                notes.append(f"split/break {df.index[i].date()} ×{ratio:.4f}")
+                c[:i] *= ratio
+                o[:i] *= ratio
+        i += 1
+    prev = np.r_[c[0], c[:-1]]
+    bad_o = ~(o > 0) | (np.abs(o / c - 1) > thresh)
+    o[bad_o] = prev[bad_o]
+    if bad_o.any():
+        notes.append(f"open fixed on {int(bad_o.sum())} days")
+    if log and notes:
+        for m in notes:
+            log(m)
+    out = pd.DataFrame({"open": o, "close": c}, index=df.index)
+    out.attrs["clean_notes"] = notes
+    return out
+
+
 def load_etf(stock_id: str, start: str = "2000-01-01", end: str | None = None) -> pd.DataFrame:
     """ETF 還原日線（open, close）。Yahoo 優先；抓不到用 FinMind 未還原價 + 除息還原。"""
     end = end or pd.Timestamp.today().strftime("%Y-%m-%d")
@@ -96,8 +136,10 @@ def splice_leveraged(core: pd.DataFrame, actual: pd.DataFrame | None, cash_rate:
     syn = synth_leveraged(core, cash_rate)
     if actual is None or actual.empty:
         return syn
-    actual = actual.reindex(core.index).dropna()
-    first = actual.index[0]
+    actual = actual.reindex(core.index.intersection(actual.index[actual.index >= actual.index[0]]).union(
+        core.index[core.index >= actual.index[0]])).reindex(core.index)
+    first = actual["close"].first_valid_index()
+    actual = actual.loc[first:].ffill()      # 0050 有交易但 00631L 缺資料的日子沿用前值
     scale = syn.loc[first, "close"] / actual.loc[first, "close"]
     out = syn.copy()
     out.loc[first:, ["open", "close"]] = actual.loc[first:, ["open", "close"]].values * scale

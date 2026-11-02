@@ -65,7 +65,11 @@ class Context:
         self.cal = self.close.index
         self.atr = self.close.diff().abs().rolling(20, min_periods=15).mean()     # ATRc（收盤版 ATR）
         self.avg_value20 = self.value.rolling(20, min_periods=14).mean()
-        b, bo = panel["benchmark_close"], panel["benchmark_open"]
+        from .overlay import clean_etf
+        bdf = clean_etf(pd.DataFrame({"open": panel["benchmark_open"], "close": panel["benchmark_close"]}).dropna())
+        self.bench_notes = bdf.attrs.get("clean_notes", [])
+        bdf = bdf.reindex(self.cal).ffill()
+        b, bo = bdf["close"], bdf["open"]
         self.bclose, self.bopen = b, bo
         self.regime_on = (b > b.rolling(200).mean()).fillna(False)
         self.last_valid = self.close.apply(lambda s: s.last_valid_index())
