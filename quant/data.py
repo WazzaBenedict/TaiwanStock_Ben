@@ -26,6 +26,7 @@ import requests
 FINMIND_URL = "https://api.finmindtrade.com/api/v4/data"
 YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}"
 MOPS_REVENUE_URL = "https://mopsov.twse.com.tw/nas/t21/sii/t21sc03_{roc}_{month}_0.html"
+MOPS_REVENUE_URL_OLD = "https://mopsov.twse.com.tw/nas/t21/sii/t21sc03_{roc}_{month}.html"
 TWSE_T86_URL = "https://www.twse.com.tw/rwd/zh/fund/T86"
 
 CACHE_DIR = Path(os.getenv("QUANT_CACHE_DIR", Path(__file__).resolve().parent.parent / "data_cache"))
@@ -211,15 +212,30 @@ def load_ohlcv(stock_id: str, start: str, end: str, listed: bool = True) -> pd.D
     return _cached(_cache_path("ohlcv", f"{stock_id}_{start}_{end}.pkl"), fetch)
 
 
+_MOPS_ROW_LOOSE = re.compile(r"<td[^>]*>\s*(\d{4})\s*</td>\s*<td[^>]*>[^<]*</td>\s*<td[^>]*>\s*([-\d,]+)\s*</td>")
 _MOPS_ROW = re.compile(r"<td align=center>(\d{4})</td><td align=left>[^<]*</td><td nowrap>\s*([-\d,]+)</td>")
 
 
 def load_revenue_month_mops(year: int, month: int) -> pd.Series:
     """某月份所有上市公司的當月營收（千元），index=stock_id。"""
     def fetch():
-        r = _get(MOPS_REVENUE_URL.format(roc=year - 1911, month=month))
+        roc = year - 1911
+        urls = [MOPS_REVENUE_URL.format(roc=roc, month=month)]
+        if roc < 102:   # IFRS 前（2013 以前）的彙總表沒有 _0 後綴
+            urls = [MOPS_REVENUE_URL_OLD.format(roc=roc, month=month)] + urls
+        last = None
+        for u in urls:
+            try:
+                r = _get(u, retries=2)
+                break
+            except RuntimeError as e:
+                last = e
+        else:
+            raise last
         html = r.content.decode("big5", errors="ignore")
         rows = {sid: float(v.replace(",", "")) for sid, v in _MOPS_ROW.findall(html)}
+        if not rows:
+            rows = {sid: float(v.replace(",", "")) for sid, v in _MOPS_ROW_LOOSE.findall(html)}
         time.sleep(0.5)
         return pd.Series(rows, dtype=float)
     path = _cache_path("mops", f"rev_{year}_{month:02d}.pkl")
@@ -248,14 +264,22 @@ def load_t86(date: pd.Timestamp) -> pd.Series:
     return _cached(_cache_path("t86", f"{date:%Y%m%d}.pkl"), fetch)
 
 
-def clean_price_breaks(close: pd.DataFrame, open_: pd.DataFrame, limit: float = 0.3):
+def clean_price_breaks(close: pd.DataFrame, open_: pd.DataFrame, limit: float = 0.3, mode: str = "legacy"):
     """台股漲跌幅限制 10%，單日 |報酬| > limit 多半是減資換股、資料錯誤或停牌後恢復的跳空。
 
     把這種日報酬視為 0，重建價格序列（開盤／收盤比維持原樣），避免動能因子與持倉損益被假跳空扭曲。
     回傳 (close, open, 被修正的筆數)。
+
+    mode="legacy"：PR #3 的做法（停牌後復牌的跳空也被當成 0、上下跳都中性化）。
+    mode="up_only"：報酬以前一個有效收盤計算（保留停牌期間的漲跌），只中性化「向上」的 > limit 跳空
+    （減資換股多半是向上跳）；向下的大跌一律保留（可能是真的崩跌），對做多策略是保守方向。
     """
-    r = close.pct_change(fill_method=None)
-    bad = r.abs() > limit
+    if mode == "up_only":
+        r = (close / close.ffill().shift(1) - 1).where(close.notna())
+        bad = r > limit
+    else:
+        r = close.pct_change(fill_method=None)
+        bad = r.abs() > limit
     r = r.mask(bad, 0.0)
     first = close.apply(lambda s: s.first_valid_index())
     growth = (1 + r.fillna(0)).cumprod()
@@ -288,7 +312,8 @@ def build_universe(start: str) -> pd.DataFrame:
 
 
 def build_panel(start: str, end: str, benchmark: str = "0050", with_inst: bool = True,
-                inst_days_before_rebalance: int = 20, log=print) -> dict:
+                inst_days_before_rebalance: int = 20, log=print, break_mode: str = "legacy",
+                bench_df: pd.DataFrame | None = None) -> dict:
     """抓全市場資料並組成 factors / engine 需要的 panel。
 
     start 要比回測起點早至少 13 個月，讓 12 個月動能與營收年增率有足夠歷史。
@@ -324,11 +349,11 @@ def build_panel(start: str, end: str, benchmark: str = "0050", with_inst: bool =
         opens[sid], closes[sid], values[sid], volumes[sid] = df["open"], df["close"], df["value"], df["volume"]
         if i % 100 == 0:
             log(f"prices {i}/{len(uni)}")
-    bench = load_price_yahoo(benchmark, start, end)
+    bench = load_price_yahoo(benchmark, start, end) if bench_df is None else bench_df.loc[start:end]
     close = pd.DataFrame(closes).sort_index()
     cal = bench.index.intersection(close.index)   # 以 0050 交易日為準，剔除 Yahoo 偶發的假日資料
     close = close.reindex(cal)
-    close, open_, n_fixed = clean_price_breaks(close, pd.DataFrame(opens).reindex(cal))
+    close, open_, n_fixed = clean_price_breaks(close, pd.DataFrame(opens).reindex(cal), mode=break_mode)
     log(f"price breaks neutralised: {n_fixed}")
     panel = {
         "price_breaks_fixed": n_fixed,
