@@ -32,12 +32,21 @@ class OverlayCosts:
     slip_core: float = 0.0005
     slip_lev: float = 0.001
     mult: float = 1.0           # 成本敏感度（例如 2.0 = 成本加倍）
+    slip_lev_early: float = 0.003           # 00631L 上市初期（含合成期）流動性低
+    early_until: str = "2016-12-31"
 
-    def buy(self, lev: bool) -> float:
-        return (self.fee + (self.slip_lev if lev else self.slip_core)) * self.mult
+    def _slip(self, lev: bool, d=None) -> float:
+        if not lev:
+            return self.slip_core
+        if d is not None and pd.Timestamp(d) <= pd.Timestamp(self.early_until):
+            return self.slip_lev_early
+        return self.slip_lev
 
-    def sell(self, lev: bool) -> float:
-        return (self.fee + self.tax + (self.slip_lev if lev else self.slip_core)) * self.mult
+    def buy(self, lev: bool, d=None) -> float:
+        return (self.fee + self._slip(lev, d)) * self.mult
+
+    def sell(self, lev: bool, d=None) -> float:
+        return (self.fee + self.tax + self._slip(lev, d)) * self.mult
 
 
 # ── 資料 ─────────────────────────────────────────────────────────────────────
@@ -143,8 +152,8 @@ def run_overlay(core: pd.DataFrame, lev: pd.DataFrame, target: pd.Series, *, cas
         if pd.notna(t) and allowed and (prev_day is None or abs(t - e_now) >= band - 1e-12 or (t == 0 and e_now > 0)):
             nc, nl = weights_for(t)
             dc, dl = nc - w_c, nl - w_l
-            cost = (max(dc, 0) * costs.buy(False) + max(-dc, 0) * costs.sell(False)
-                    + max(dl, 0) * costs.buy(True) + max(-dl, 0) * costs.sell(True))
+            cost = (max(dc, 0) * costs.buy(False, d) + max(-dc, 0) * costs.sell(False, d)
+                    + max(dl, 0) * costs.buy(True, d) + max(-dl, 0) * costs.sell(True, d))
             if abs(dc) + abs(dl) > 1e-9:
                 trades += 1
                 turnover += (abs(dc) + abs(dl)) / 2
