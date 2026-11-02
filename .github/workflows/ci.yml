@@ -1,0 +1,31 @@
+name: CI
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt pytest
+      - name: Import app
+        run: python -c "import app; print(len(app.app.routes), 'routes')"
+      - name: Tests
+        run: python -m pytest -q tests/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Frontend JS syntax
+        run: |
+          python - <<'PY'
+          import re
+          s = open("public/index.html", encoding="utf-8").read()
+          js = re.findall(r"<script(?![^>]*src)[^>]*>(.*?)</script>", s, re.S)
+          open("/tmp/inline.js", "w", encoding="utf-8").write("\n;\n".join(js))
+          PY
+          node --check /tmp/inline.js
