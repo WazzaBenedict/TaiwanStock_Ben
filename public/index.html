@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>HERO HQ 台股 AI 英雄指揮中心 V13.0.0</title>
+<title>HERO HQ 台股 AI 英雄指揮中心 V13.1.0</title>
 <meta name="theme-color" content="#0a0e1f"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -555,6 +555,58 @@ button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
 }
 @media(max-width:360px){.hq-floor{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.hq-room,.hq-room:hover,button:hover{transform:none}}
+/* ── V13.1 walking office ─────────────────────────────────────────── */
+.hq-office{position:relative;width:100%;height:600px;border:3px solid var(--ink);border-radius:16px;box-shadow:6px 6px 0 var(--hero-blue);overflow:hidden;margin-bottom:12px;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.of-floor{position:absolute;inset:0;background-color:#1a2147;background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:32px 32px}
+.of-room{position:absolute;border:2px dashed rgba(255,255,255,.18);border-top:6px solid var(--hc);border-radius:10px;background:linear-gradient(180deg,color-mix(in srgb,var(--hc) 16%,transparent),rgba(10,14,31,.35));cursor:pointer;transition:background .15s}
+.of-room:hover,.of-room:focus-visible{background:linear-gradient(180deg,color-mix(in srgb,var(--hc) 30%,transparent),rgba(10,14,31,.3));outline:none}
+.of-room-lbl{position:absolute;left:6px;top:4px;font-size:12px;font-weight:900;color:#fff;text-shadow:1px 1px 0 var(--ink);line-height:1.15;pointer-events:none}
+.of-room-lbl small{display:block;font-family:var(--display);letter-spacing:.08em;font-size:11px;color:var(--hc);font-weight:400}
+.of-desk{position:absolute;left:50%;top:58%;width:46%;height:12%;transform:translateX(-50%);background:#6b4f3a;border:2px solid var(--ink);border-radius:4px;box-shadow:0 4px 0 #3e2c1f;pointer-events:none}
+.of-screen{position:absolute;left:50%;bottom:100%;width:46%;height:150%;transform:translateX(-50%);background:linear-gradient(180deg,var(--hc),#0b1433);border:2px solid var(--ink);border-radius:3px;opacity:.9;animation:ofGlow 3s ease-in-out infinite}
+@keyframes ofGlow{50%{filter:brightness(1.4)}}
+.of-table{position:absolute;width:14%;height:8%;background:#8a6a4f;border:2px solid var(--ink);border-radius:50%;box-shadow:0 4px 0 #4a3626;pointer-events:none}
+.of-coffee,.of-plant{position:absolute;font-size:22px;pointer-events:none;filter:drop-shadow(2px 2px 0 var(--ink))}
+.of-hero{position:absolute;left:0;top:0;width:58px;height:auto;padding:0;margin:0;background:none;border:none;box-shadow:none;min-height:0;cursor:pointer;will-change:transform;transform-origin:50% 100%;transition:none;color:inherit}
+.of-hero:hover{transform:none;box-shadow:none}
+.of-hero svg.hb{display:block;width:58px;height:auto;overflow:visible;filter:drop-shadow(2px 2px 0 rgba(0,0,0,.4))}
+.of-hero.flip svg.hb{transform:scaleX(-1)}
+.of-tag{display:block;margin:-2px auto 0;width:max-content;max-width:90px;font-size:10px;font-weight:900;color:var(--ink);background:var(--hc);border:2px solid var(--ink);border-radius:999px;padding:0 6px;line-height:1.4;white-space:nowrap}
+.of-hero:focus-visible .of-tag{outline:2px solid #fff}
+.of-bubble{position:absolute;left:50%;bottom:calc(100% + 2px);transform:translateX(-50%) scale(.6);opacity:0;width:max-content;max-width:150px;background:#fff;color:#111;font-size:11px;font-weight:700;line-height:1.4;border:2px solid var(--ink);border-radius:10px;padding:4px 7px;pointer-events:none;transition:opacity .2s,transform .2s;white-space:normal;text-align:left}
+.of-bubble:after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);border:6px solid transparent;border-top-color:var(--ink)}
+.of-hero.talk .of-bubble{opacity:1;transform:translateX(-50%) scale(1)}
+.of-hero .lg1,.of-hero .lg2,.of-hero .ar1,.of-hero .ar2{transform-box:fill-box;transform-origin:50% 0}
+.of-hero.walking .lg1{animation:ofStep .42s ease-in-out infinite alternate}
+.of-hero.walking .lg2{animation:ofStep .42s ease-in-out infinite alternate-reverse}
+.of-hero.walking .ar1{animation:ofSwing .42s ease-in-out infinite alternate-reverse}
+.of-hero.walking .ar2{animation:ofSwing .42s ease-in-out infinite alternate}
+.of-hero.walking svg.hb{animation:ofBob .21s ease-in-out infinite alternate}
+.of-hero.walking.flip svg.hb{animation:ofBobF .21s ease-in-out infinite alternate}
+.of-hero:not(.walking) svg.hb{animation:ofIdle 2.4s ease-in-out infinite}
+.of-hero.flip:not(.walking) svg.hb{animation:ofIdleF 2.4s ease-in-out infinite}
+@keyframes ofStep{from{transform:rotate(-22deg)}to{transform:rotate(22deg)}}
+@keyframes ofSwing{from{transform:rotate(-18deg)}to{transform:rotate(18deg)}}
+@keyframes ofBob{from{transform:translateY(0)}to{transform:translateY(-3px)}}
+@keyframes ofBobF{from{transform:scaleX(-1) translateY(0)}to{transform:scaleX(-1) translateY(-3px)}}
+@keyframes ofIdle{50%{transform:translateY(-1.5px)}}
+@keyframes ofIdleF{0%,100%{transform:scaleX(-1)}50%{transform:scaleX(-1) translateY(-1.5px)}}
+.hq-quick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.hq-quick button{display:flex;align-items:center;gap:6px;background:var(--panel2);color:var(--text);border:2px solid var(--hc,var(--line));border-radius:999px;padding:4px 10px 4px 4px;min-height:44px;font-size:13px;box-shadow:2px 2px 0 var(--ink)}
+.hq-quick button .qa{width:30px;height:36px;overflow:hidden;display:flex;align-items:flex-start;justify-content:center}
+.hq-quick button .qa svg{width:30px;height:auto}
+.hero-strip svg.hb{width:38px;height:56px}
+.hq-banner-r svg.hb{width:90px;height:auto}
+@media(max-width:760px){
+  .hq-office{height:560px}
+  .of-hero,.of-hero svg.hb{width:44px}
+  .of-room-lbl{font-size:11px}.of-room-lbl small{font-size:9px}
+  .of-coffee,.of-plant{font-size:18px}
+  .hq-banner-r svg.hb{width:66px}
+}
+@media(min-width:900px){.hq-office{height:640px}.of-hero,.of-hero svg.hb{width:72px}.of-tag{font-size:12px}}
+@media(prefers-reduced-motion:reduce){.of-hero svg.hb,.of-hero .lg1,.of-hero .lg2,.of-hero .ar1,.of-hero .ar2,.of-screen{animation:none!important}}
+
 
 </style>
 </head>
@@ -579,7 +631,7 @@ button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
       使用 Google 帳號登入
     </button>
     <div id="loginError"></div>
-    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:12px">版本 <b class="app-ver">V13.0.0</b></div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:12px">版本 <b class="app-ver">V13.1.0</b></div>
   </div>
 </div>
 
@@ -589,7 +641,7 @@ button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
     <span class="live-dot"></span>
     <span class="hq-brand">HERO<span>HQ</span></span>
     <span class="hq-brand-sub">台股 AI 英雄指揮中心</span>
-    <span class="ver app-ver" title="目前版本">V13.0.0</span>
+    <span class="ver app-ver" title="目前版本">V13.1.0</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="mkt-switcher us-only">
@@ -609,7 +661,7 @@ button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
     </div>
     <div class="version-warn" id="versionWarn"></div>
     <div class="health-grid" id="healthGrid">
-      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V13.0.0</b></div>
+      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V13.1.0</b></div>
       <div class="health-chip"><span>Backend</span><b id="hBackend">—</b></div>
       <div class="health-chip"><span>Firestore</span><b id="hFirestore">待登入</b></div>
       <div class="health-chip"><span>Yahoo</span><b id="hYahoo">—</b></div>
@@ -651,10 +703,12 @@ button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
     <div class="hq-banner-r" id="hqLeadAvatar" aria-hidden="true"></div>
   </div>
   <div class="hq-missions" id="hqMissions"></div>
-  <div class="hq-floor-title"><span>辦公樓層</span><small>點英雄就會出動到他的工作室</small></div>
-  <div class="hq-floor" id="hqFloor"></div>
+  <div class="hq-floor-title"><span>英雄辦公室</span><small>英雄會走來走去；點英雄或工作室就出動</small></div>
+  <div class="hq-office" id="hqOffice" aria-label="英雄辦公室"></div>
+  <div class="hq-floor-title"><span>快速出動</span></div>
+  <div class="hq-quick" id="hqQuick"></div>
   <details class="hq-notes" id="hqNotes">
-    <summary>📰 <b class="app-ver">V13.0.0</b> 更新內容</summary>
+    <summary>📰 <b class="app-ver">V13.1.0</b> 更新內容</summary>
     <ul id="hqNotesList"></ul>
   </details>
   <div class="hq-disclaimer">所有訊號皆為研究／模擬用途，非投資建議；回測已扣交易成本，下單請自行判斷。</div>
@@ -1452,7 +1506,7 @@ button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
 <div class="footer">
   ⚠️ 本工具僅供技術分析學習參考，不構成任何投資建議。台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
   資料來源：TWSE MIS · Yahoo Finance · TWSE Official · FinMind · Google News RSS（均為免費公開）<br>
-  HERO HQ 台股 AI 英雄指揮中心 <span class="app-ver">V13.0.0</span>
+  HERO HQ 台股 AI 英雄指揮中心 <span class="app-ver">V13.1.0</span>
 </div>
 
 <script>
@@ -1465,63 +1519,200 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="13.0.0";
+var FRONTEND_VERSION="13.1.0";
 // 美股功能先收起來（程式碼保留）。要恢復請改成 true。
 var ENABLE_US=false;
 
-// ══ V13.0 HERO HQ — 原創 AI 英雄（不使用任何既有漫畫角色、名稱或標誌）══
+// ══ V13.1 HERO HQ — 會走動的英雄辦公室 ══
+// 角色依常見超級英雄「類型」設計（鋼鐵裝甲、盾牌隊長、雷霆戰士、神祕法師、弓箭手、特務、
+// 合成人、巨力科學家、情報總監），全部是原創造型與名字，不使用任何既有角色的名稱、標誌或服裝設計。
 var RELEASE_NOTES=[
-  "全新「英雄指揮中心」首頁：九位原創 AI 英雄各管一個工作室，點一下就出動",
-  "手機版改成底部導覽列，單手就能切換當沖／交易／追蹤／持倉",
-  "美股功能先收起來，專心台股（資料與程式都保留，之後可再打開）",
-  "版本號顯示在右上角；每次更新都會變，看到新號碼就代表已更新",
-  "當沖、時光機、交易計畫卡等功能與資料全部照舊"
+  "V13.1：總部變成一層開放式辦公室，九位英雄會在各工作室之間走來走去、互相串門子",
+  "英雄依經典超級英雄類型重新設計：裝甲天才、盾牌隊長、雷霆戰士、時空法師、神射手、特務、合成人、巨力博士、情報總監",
+  "點走動中的英雄或他的工作室，就會打開對應功能；下方也有快速出動按鈕",
+  "V13.0：英雄指揮中心首頁、手機底部導覽列、美股功能先收起來、右上角版本號"
 ];
+// room: [col,row] in a 3×3 open-plan floor
 var HEROES=[
-  {id:"volt",page:"p-timemachine",room:"閃擊室 STRIKE ROOM",name:"疾電",code:"VOLT",icon:"⚡",color:"#ffd23f",suit:"#1b2a6b",skin:"#f2c29b",helm:"bolt",
-   role:"當沖候選掃描：今日進場、停損、停利價位"},
-  {id:"argus",page:"p-trade",room:"分析室 INTEL LAB",name:"天眼",code:"ARGUS",icon:"🔍",color:"#4cc9f0",suit:"#0f3d5e",skin:"#d9a27c",helm:"visor",
-   role:"個股分析＋交易計畫卡：進場價、何時賣、股數"},
-  {id:"chrono",page:"p-timemachine",scroll:"tmSection",room:"時空艙 TIME POD",name:"時砂",code:"CHRONO",icon:"⏳",color:"#b197fc",suit:"#2d1b5e",skin:"#f0c8a8",helm:"hood",
-   role:"台股時光機：重播盤中走勢，看規則過去表現"},
-  {id:"swift",page:"p-plans",room:"追蹤站 TRACKING",name:"迅影",code:"SWIFT",icon:"🎯",color:"#2ec4b6",suit:"#123a3a",skin:"#e8b48f",helm:"cowl",
-   role:"交易追蹤：盯住入場區、接近目標或停損"},
-  {id:"bastion",page:"p-positions",room:"防衛室 DEFENSE",name:"鐵壁",code:"BASTION",icon:"🛡️",color:"#e63946",suit:"#4a1018",skin:"#c98b62",helm:"crest",
-   role:"持倉風控：損益、跌破停損警示"},
-  {id:"vanguard",page:"p-market",room:"作戰室 WAR ROOM",name:"鋒將",code:"VANGUARD",icon:"🌐",color:"#ff8c42",suit:"#3b2410",skin:"#f2c29b",helm:"hair",
-   role:"大盤環境、市場情緒與 AI 選股掃描"},
-  {id:"nexus",page:"p-learn",room:"研究所 AI CORE",name:"智核",code:"NEXUS",icon:"🧠",color:"#80ed99",suit:"#163d2a",skin:"#b97a56",helm:"visor",
-   role:"AI 學習：評估信號、調整權重"},
-  {id:"archive",page:"p-journal",room:"檔案室 ARCHIVE",name:"史官",code:"LEDGER",icon:"📘",color:"#f4a261",suit:"#3a2a14",skin:"#e8b48f",helm:"hair",
-   role:"交易日誌：勝率、R 倍數、匯出報告"},
-  {id:"haven",page:"p-account",room:"基地管理 BASE",name:"總管",code:"HAVEN",icon:"👤",color:"#adb5bd",suit:"#2b2f3a",skin:"#d9a27c",helm:"cowl",
-   role:"帳戶、雲端同步與系統狀態"}
+  {id:"volt",page:"p-timemachine",room:"閃擊室",roomEn:"STRIKE",cell:[0,0],name:"疾電",code:"VOLT",icon:"⚡",type:"thunder",
+   color:"#ffd23f",suit:"#5b6b82",skin:"#f2c29b",cape:"#1f8a9e",hair:"#e9c46a",
+   role:"雷霆戰士｜當沖候選：今日進場、停損、停利價位"},
+  {id:"argus",page:"p-trade",room:"分析室",roomEn:"INTEL LAB",cell:[1,0],name:"天眼",code:"ARGUS",icon:"🔍",type:"armor",
+   color:"#4cc9f0",suit:"#1d3557",skin:"#c0c7d1",
+   role:"裝甲天才｜個股分析＋交易計畫卡：進場價、何時賣、股數"},
+  {id:"chrono",page:"p-timemachine",scroll:"tmSection",room:"時空艙",roomEn:"TIME POD",cell:[2,0],name:"時砂",code:"CHRONO",icon:"⏳",type:"mystic",
+   color:"#b197fc",suit:"#3c1f6e",skin:"#f0c8a8",cape:"#d4a017",hair:"#2b2118",
+   role:"時空法師｜台股時光機：重播盤中走勢"},
+  {id:"swift",page:"p-plans",room:"追蹤站",roomEn:"TRACKING",cell:[0,1],name:"迅影",code:"SWIFT",icon:"🎯",type:"archer",
+   color:"#2ec4b6",suit:"#1b4d3e",skin:"#e8b48f",hair:"#6b4423",
+   role:"神射手｜交易追蹤：盯住入場區、目標與停損"},
+  {id:"haven",page:"p-account",room:"指揮中心",roomEn:"COMMAND",cell:[1,1],name:"總管",code:"HAVEN",icon:"👤",type:"director",
+   color:"#adb5bd",suit:"#1c1f26",skin:"#a8734f",hair:"#111",
+   role:"情報總監｜帳戶、雲端同步與系統狀態"},
+  {id:"bastion",page:"p-positions",room:"防衛室",roomEn:"DEFENSE",cell:[2,1],name:"鐵壁",code:"BASTION",icon:"🛡️",type:"shield",
+   color:"#e63946",suit:"#7a1e2b",skin:"#e8b48f",hair:"#c9a227",
+   role:"盾牌隊長｜持倉風控：損益、跌破停損警示"},
+  {id:"vanguard",page:"p-market",room:"情報室",roomEn:"WAR ROOM",cell:[0,2],name:"夜鶯",code:"NIGHTINGALE",icon:"🌐",type:"spy",
+   color:"#ff8c42",suit:"#16161d",skin:"#f2c29b",hair:"#b5452b",
+   role:"王牌特務｜大盤環境、市場情緒與 AI 選股掃描"},
+  {id:"nexus",page:"p-learn",room:"AI 研究所",roomEn:"AI CORE",cell:[1,2],name:"智核",code:"NEXUS",icon:"🧠",type:"synth",
+   color:"#80ed99",suit:"#2a3f5f",skin:"#9fb3c8",cape:"#3d5a80",
+   role:"合成人｜AI 學習：評估信號、調整權重"},
+  {id:"archive",page:"p-journal",room:"檔案室",roomEn:"ARCHIVE",cell:[2,2],name:"巨力博士",code:"TITAN",icon:"📘",type:"titan",
+   color:"#f4a261",suit:"#4a6fa5",skin:"#8fa37a",hair:"#2b2b2b",
+   role:"巨力博士｜交易日誌：勝率、R 倍數、匯出報告"}
 ];
 var HERO_BY_PAGE={};HEROES.forEach(function(h){if(!HERO_BY_PAGE[h.page])HERO_BY_PAGE[h.page]=h;});
 
-function heroSVG(h){
-  var c=h.color,su=h.suit,sk=h.skin,k="#05070f",id="hx"+h.id+Math.random().toString(36).slice(2,6),head="";
-  // helmet / hair shapes — simple original silhouettes
-  if(h.helm==="bolt") head='<path d="M30 40 Q32 18 50 16 Q68 18 70 40 L66 36 Q60 26 50 26 Q40 26 34 36Z" fill="'+su+'" stroke="'+k+'" stroke-width="2.5"/><path d="M70 22 L82 10 L77 24 L88 22 L74 38 L78 26 Z" fill="'+c+'" stroke="'+k+'" stroke-width="2"/><path d="M30 22 L18 10 L23 24 L12 22 L26 38 L22 26 Z" fill="'+c+'" stroke="'+k+'" stroke-width="2"/>';
-  else if(h.helm==="visor") head='<path d="M29 44 Q29 16 50 15 Q71 16 71 44 L71 36 Q50 30 29 36Z" fill="'+su+'" stroke="'+k+'" stroke-width="2.5"/><rect x="31" y="36" width="38" height="10" rx="5" fill="'+c+'" stroke="'+k+'" stroke-width="2.5"/><rect x="35" y="38" width="12" height="3" rx="1.5" fill="#fff" opacity=".8"/>';
-  else if(h.helm==="hood") head='<path d="M24 62 Q22 14 50 12 Q78 14 76 62 L68 60 Q70 28 50 26 Q30 28 32 60Z" fill="'+su+'" stroke="'+k+'" stroke-width="2.5"/><circle cx="50" cy="20" r="4" fill="'+c+'" stroke="'+k+'" stroke-width="2"/>';
-  else if(h.helm==="cowl") head='<path d="M30 46 Q28 16 50 15 Q72 16 70 46 L66 34 Q50 28 34 34Z" fill="'+su+'" stroke="'+k+'" stroke-width="2.5"/><path d="M36 22 L40 10 L44 20Z M64 22 L60 10 L56 20Z" fill="'+su+'" stroke="'+k+'" stroke-width="2"/>';
-  else if(h.helm==="crest") head='<path d="M29 44 Q29 18 50 16 Q71 18 71 44 L67 34 Q50 26 33 34Z" fill="#9aa3b5" stroke="'+k+'" stroke-width="2.5"/><path d="M44 18 Q50 0 56 18Z" fill="'+c+'" stroke="'+k+'" stroke-width="2"/>';
-  else head='<path d="M30 40 Q28 14 52 15 Q74 16 70 38 Q66 26 56 24 Q50 30 40 28 Q34 32 30 40Z" fill="'+su+'" stroke="'+k+'" stroke-width="2.5"/>';
-  var mask=(h.helm==="visor")?'':'<path d="M33 38 Q50 33 67 38 L66 46 Q50 42 34 46Z" fill="'+c+'" stroke="'+k+'" stroke-width="2"/><path d="M38 40 L46 40 L45 43 L39 43Z M54 40 L62 40 L61 43 L55 43Z" fill="#fff"/>';
-  return '<svg viewBox="0 0 100 100" role="img" aria-label="'+h.name+' '+h.code+'">'+
-    '<defs><pattern id="'+id+'" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.2" fill="'+k+'" opacity=".25"/></pattern></defs>'+
-    '<circle cx="50" cy="50" r="48" fill="'+c+'" stroke="'+k+'" stroke-width="3"/><circle cx="50" cy="50" r="46" fill="url(#'+id+')"/>'+
-    '<path d="M14 98 Q16 70 50 66 Q84 70 86 98Z" fill="'+su+'" stroke="'+k+'" stroke-width="2.5"/>'+
-    '<path d="M38 68 L50 80 L62 68" fill="none" stroke="'+c+'" stroke-width="3"/>'+
-    '<circle cx="50" cy="86" r="8" fill="'+c+'" stroke="'+k+'" stroke-width="2"/>'+
-    '<text x="50" y="89.5" text-anchor="middle" font-size="9" font-weight="900" font-family="Arial,sans-serif" fill="'+k+'">'+h.code.charAt(0)+'</text>'+
-    '<rect x="44" y="56" width="12" height="12" fill="'+sk+'" stroke="'+k+'" stroke-width="2"/>'+
-    '<ellipse cx="50" cy="42" rx="19" ry="21" fill="'+sk+'" stroke="'+k+'" stroke-width="2.5"/>'+
-    head+mask+
-    '<path d="M44 54 Q50 57 56 54" fill="none" stroke="'+k+'" stroke-width="2" stroke-linecap="round"/>'+
+// Full-body chibi sprite, viewBox 0 0 60 92. Limbs are in .lg1/.lg2/.ar1/.ar2 so CSS can animate the walk.
+function heroBody(h){
+  var k="#05070f",c=h.color,su=h.suit,sk=h.skin,hr=h.hair||"#222",t=h.type,S=' stroke="'+k+'" stroke-width="2"';
+  var back="",front="",headTop="",face="",emblem="",armL="",armR="",torsoW=26,torsoX=17,bootC=k;
+  // eyes + mouth (default face)
+  face='<ellipse cx="25" cy="21" rx="2" ry="2.6" fill="'+k+'"/><ellipse cx="35" cy="21" rx="2" ry="2.6" fill="'+k+'"/><path d="M26 28 Q30 31 34 28" fill="none" stroke="'+k+'" stroke-width="1.8" stroke-linecap="round"/>';
+  if(t==="thunder"){ // winged silver helm, flowing cape, war hammer
+    back='<path d="M17 34 L43 34 L52 84 L8 84Z" fill="'+h.cape+'"'+S+'/>';
+    headTop='<path d="M17 18 Q18 5 30 5 Q42 5 43 18 Q36 12 30 12 Q24 12 17 18Z" fill="#cfd6df"'+S+'/><path d="M17 14 L6 6 L10 16Z M43 14 L54 6 L50 16Z" fill="#eef2f6"'+S+'/><path d="M17 22 Q14 34 18 40 M43 22 Q46 34 42 40" stroke="'+hr+'" stroke-width="4" fill="none"/>';
+    emblem='<circle cx="25" cy="42" r="3" fill="#cfd6df"'+S+'/><circle cx="35" cy="42" r="3" fill="#cfd6df"'+S+'/><circle cx="25" cy="50" r="3" fill="#cfd6df"'+S+'/><circle cx="35" cy="50" r="3" fill="#cfd6df"'+S+'/>';
+    armR='<rect x="49" y="46" width="3" height="16" fill="#8d6e63"'+S+'/><rect x="43" y="58" width="15" height="9" rx="1.5" fill="#9aa5b1"'+S+'/><path d="M47 60 L52 60 L49 64Z" fill="'+c+'"/>';
+  } else if(t==="armor"){ // full tech armor, glowing chest core, faceplate
+    headTop='<rect x="16" y="6" width="28" height="28" rx="11" fill="'+su+'"'+S+'/><path d="M20 16 L40 16 L38 30 Q30 34 22 30Z" fill="#c0c7d1"'+S+'/>';
+    face='<rect x="22" y="19" width="6" height="2.6" rx="1" fill="'+c+'"/><rect x="32" y="19" width="6" height="2.6" rx="1" fill="'+c+'"/><path d="M26 27 L34 27" stroke="'+k+'" stroke-width="1.5"/>';
+    emblem='<circle cx="30" cy="44" r="5" fill="#e0fbff"'+S+'/><circle cx="30" cy="44" r="8" fill="none" stroke="'+c+'" stroke-width="2" opacity=".7"/><path d="M19 38 L24 36 M41 38 L36 36" stroke="#c0c7d1" stroke-width="2.5"/>';
+    armR='<circle cx="47" cy="56" r="3" fill="#e0fbff" stroke="'+c+'" stroke-width="2"/>';
+    bootC="#c0c7d1";
+  } else if(t==="mystic"){ // high-collar cloak, glowing time amulet, rune circle
+    back='<path d="M15 32 L45 32 L50 84 L10 84Z" fill="#8c1c3a"'+S+'/><path d="M14 30 Q12 18 20 24 L20 34Z M46 30 Q48 18 40 24 L40 34Z" fill="#8c1c3a"'+S+'/>';
+    headTop='<path d="M17 20 Q16 6 30 6 Q44 6 43 20 Q38 10 30 12 Q22 10 17 20Z" fill="'+hr+'"'+S+'/><path d="M18 17 Q17 12 20 11" stroke="#ddd" stroke-width="2" fill="none"/><path d="M42 17 Q43 12 40 11" stroke="#ddd" stroke-width="2" fill="none"/>';
+    face+='<path d="M27 31 Q30 33 33 31" stroke="'+hr+'" stroke-width="2.5" fill="none"/>';
+    emblem='<circle cx="30" cy="40" r="4.5" fill="'+h.cape+'"'+S+'/><circle cx="30" cy="40" r="2" fill="#7cff6b"/><rect x="28" y="44" width="4" height="16" fill="'+h.cape+'"/>';
+    armR='<circle cx="49" cy="58" r="7" fill="none" stroke="#ffb703" stroke-width="2" stroke-dasharray="3 2"/>';
+  } else if(t==="archer"){ // hood mask, quiver, recurve bow
+    back='<rect x="38" y="30" width="7" height="22" rx="2" fill="#6b4423" transform="rotate(20 41 41)"'+S+'/><path d="M40 28 L43 22 M43 29 L47 24" stroke="'+c+'" stroke-width="2"/>';
+    headTop='<path d="M16 22 Q15 5 30 5 Q45 5 44 22 Q38 12 30 13 Q22 12 16 22Z" fill="'+hr+'"'+S+'/>';
+    face='<path d="M19 18 L41 18 L40 24 L20 24Z" fill="'+su+'"/><ellipse cx="25" cy="21" rx="2.2" ry="1.6" fill="#fff"/><ellipse cx="35" cy="21" rx="2.2" ry="1.6" fill="#fff"/><path d="M26 28 Q30 30 34 28" fill="none" stroke="'+k+'" stroke-width="1.8"/>';
+    emblem='<path d="M24 40 L30 46 L36 40" fill="none" stroke="'+c+'" stroke-width="3"/>';
+    armL='<path d="M6 34 Q-2 50 6 66" fill="none" stroke="#6b4423" stroke-width="3"/><path d="M6 34 L6 66" stroke="#ddd" stroke-width="1"/>';
+  } else if(t==="director"){ // long dark coat, headset
+    back='<path d="M15 34 L45 34 L48 82 L12 82Z" fill="#111"'+S+'/>';
+    headTop='<path d="M17 16 Q18 6 30 6 Q42 6 43 16 Q36 11 30 11 Q24 11 17 16Z" fill="'+hr+'"'+S+'/><path d="M16 20 Q16 6 30 6" fill="none" stroke="#555" stroke-width="2"/><rect x="13" y="18" width="5" height="8" rx="2" fill="#333"'+S+'/><path d="M16 26 Q18 30 24 30" stroke="#333" stroke-width="1.5" fill="none"/>';
+    face+='<path d="M24 31 Q30 34 36 31" stroke="#333" stroke-width="2" fill="none"/>';
+    emblem='<path d="M30 34 L30 60" stroke="#444" stroke-width="2"/><rect x="33" y="40" width="6" height="4" fill="'+c+'"/>';
+  } else if(t==="shield"){ // winged-fin helm, round shield with hexagon (no star)
+    headTop='<path d="M16 22 Q15 5 30 5 Q45 5 44 22 L40 18 Q30 12 20 18Z" fill="'+su+'"'+S+'/><path d="M16 16 L10 10 L15 20Z M44 16 L50 10 L45 20Z" fill="#eee"'+S+'/>';
+    emblem='<path d="M30 38 L35 41 L35 47 L30 50 L25 47 L25 41Z" fill="#eee"'+S+'/><path d="M17 52 L43 52" stroke="#eee" stroke-width="3"/>';
+    armL='<circle cx="9" cy="50" r="11" fill="#c1121f"'+S+'/><circle cx="9" cy="50" r="7.5" fill="#eee"'+S+'/><circle cx="9" cy="50" r="4" fill="#1d3557"'+S+'/>';
+  } else if(t==="spy"){ // sleek black suit, long red hair, wrist gauntlets
+    back='<path d="M16 16 Q12 34 18 44 L22 30Z M44 16 Q48 34 42 44 L38 30Z" fill="'+hr+'"'+S+'/>';
+    headTop='<path d="M16 22 Q14 4 30 5 Q46 4 44 22 Q40 10 30 12 Q22 12 16 22Z" fill="'+hr+'"'+S+'/>';
+    emblem='<path d="M17 55 L43 55" stroke="#555" stroke-width="3"/><circle cx="30" cy="55" r="3" fill="'+c+'"'+S+'/>';
+    armL='<rect x="9" y="47" width="9" height="4" fill="'+c+'"/>';armR='<rect x="42" y="47" width="9" height="4" fill="'+c+'"/>';
+  } else if(t==="synth"){ // synthetic: smooth head with circuit lines, short cape
+    back='<path d="M17 34 L43 34 L47 76 L13 76Z" fill="'+h.cape+'"'+S+'/>';
+    headTop='<path d="M22 10 L22 16 L28 16 M38 10 L38 16 L32 16 M30 8 L30 14" stroke="'+c+'" stroke-width="1.6" fill="none"/>';
+    face='<ellipse cx="25" cy="21" rx="2.4" ry="2" fill="'+c+'"/><ellipse cx="35" cy="21" rx="2.4" ry="2" fill="'+c+'"/><path d="M26 28 L34 28" stroke="'+k+'" stroke-width="1.6"/>';
+    emblem='<path d="M30 36 L30 58 M22 44 L38 44" stroke="'+c+'" stroke-width="1.8"/><circle cx="30" cy="44" r="3" fill="'+c+'"/>';
+  } else if(t==="titan"){ // huge strong scientist in torn lab coat
+    torsoW=34;torsoX=13;
+    headTop='<path d="M17 18 Q14 4 30 5 Q46 4 43 18 L38 12 L34 15 L30 10 L26 15 L22 12Z" fill="'+hr+'"'+S+'/>';
+    face='<path d="M22 19 L28 21 M38 19 L32 21" stroke="'+k+'" stroke-width="2"/><ellipse cx="25" cy="22.5" rx="1.8" ry="2" fill="'+k+'"/><ellipse cx="35" cy="22.5" rx="1.8" ry="2" fill="'+k+'"/><rect x="25" y="27" width="10" height="3" rx="1" fill="#fff"'+S+'/>';
+    emblem='<path d="M13 34 L22 34 L19 62 L13 62Z M47 34 L38 34 L41 62 L47 62Z" fill="#f4f4f4"'+S+'/><rect x="35" y="38" width="3" height="6" fill="#2a9d8f"/>';
+  }
+  var arm=function(x,cls,extra){return '<g class="'+cls+'"><rect x="'+x+'" y="34" width="8" height="21" rx="4" fill="'+(t==="armor"?su:(t==="titan"?sk:su))+'"'+S+'/><circle cx="'+(x+4)+'" cy="56" r="3.6" fill="'+(t==="armor"?"#c0c7d1":(t==="spy"||t==="director"?sk:(t==="titan"?sk:"#2b2b2b")))+'"'+S+'/>'+(extra||"")+'</g>';};
+  var leg=function(x,cls){return '<g class="'+cls+'"><rect x="'+x+'" y="58" width="9" height="22" rx="3" fill="'+(t==="titan"?"#5a3d7a":su)+'"'+S+'/><rect x="'+(x-1)+'" y="76" width="11" height="7" rx="3" fill="'+bootC+'"'+S+'/></g>';};
+  var lx=t==="titan"?6:9, rx=t==="titan"?46:43;
+  return '<svg class="hb" viewBox="-4 0 68 92" role="img" aria-label="'+h.name+'">'+
+    '<ellipse cx="30" cy="86" rx="16" ry="3.5" fill="#000" opacity=".35"/>'+
+    back+leg(20,"lg1")+leg(31,"lg2")+
+    arm(lx,"ar1",armL)+
+    '<rect x="'+torsoX+'" y="32" width="'+torsoW+'" height="29" rx="7" fill="'+su+'"'+S+'/>'+emblem+
+    arm(rx,"ar2",armR)+
+    '<rect x="26" y="29" width="8" height="6" fill="'+sk+'"'+S+'/>'+
+    '<circle cx="30" cy="20" r="14" fill="'+sk+'"'+S+'/>'+headTop+face+
     '</svg>';
 }
+function heroSVG(h){return heroBody(h);}
+
+// ── Walking office engine ──────────────────────────────────────────
+var OFFICE={built:false,sprites:[],raf:0,last:0,bubbleT:0};
+var OFFICE_SPOTS=[{x:.5,y:.5,label:"會議桌"},{x:.5,y:.36,label:"咖啡機"},{x:.18,y:.5,label:"白板"},{x:.82,y:.5,label:"窗邊"}];
+function officeRoomRect(cell){ // fractions of the floor, rooms with corridor gaps
+  var gx=.025,gy=.03,w=(1-gx*4)/3,hgt=(1-gy*4)/3;
+  return {x:gx+cell[0]*(w+gx),y:gy+cell[1]*(hgt+gy),w:w,h:hgt};
+}
+function officeDesk(h){var r=officeRoomRect(h.cell);return {x:r.x+r.w*.5,y:r.y+r.h*.72};}
+function officePickTarget(sp){
+  var h=sp.h,r=Math.random(),pt,dwell;
+  if(r<.5){pt=officeDesk(h);pt.x+=(Math.random()-.5)*.06;sp.atDesk=true;dwell=3500+Math.random()*4000;}
+  else if(r<.8){var o=HEROES[Math.floor(Math.random()*HEROES.length)],rr=officeRoomRect(o.cell);pt={x:rr.x+rr.w*(.25+Math.random()*.5),y:rr.y+rr.h*(.5+Math.random()*.35)};sp.atDesk=(o===h);sp.visiting=o;dwell=1800+Math.random()*2500;}
+  else{var s=OFFICE_SPOTS[Math.floor(Math.random()*OFFICE_SPOTS.length)];pt={x:s.x+(Math.random()-.5)*.08,y:s.y+(Math.random()-.5)*.06};sp.atDesk=false;sp.visiting=null;sp.spot=s.label;dwell=1500+Math.random()*2500;}
+  sp.tx=pt.x;sp.ty=pt.y;sp.dwell=dwell;sp.walking=true;
+}
+function buildOffice(){
+  var floor=$I("hqOffice");if(!floor)return;
+  var html='<div class="of-floor"></div>';
+  HEROES.forEach(function(h){
+    var r=officeRoomRect(h.cell);
+    html+='<div class="of-room" style="left:'+(r.x*100)+'%;top:'+(r.y*100)+'%;width:'+(r.w*100)+'%;height:'+(r.h*100)+'%;--hc:'+h.color+'" data-hq-go="'+h.page+'"'+(h.scroll?' data-hq-scroll="'+h.scroll+'"':'')+' role="button" tabindex="0" aria-label="'+h.room+'：'+h.role+'">'+
+      '<span class="of-room-lbl">'+h.icon+' '+h.room+'<small>'+h.roomEn+'</small></span>'+
+      '<span class="of-desk"><span class="of-screen"></span></span></div>';
+  });
+  html+='<div class="of-table" style="left:43%;top:46%"></div><div class="of-coffee" style="left:47.5%;top:30%">☕</div><div class="of-plant" style="left:2%;top:33%">🪴</div><div class="of-plant" style="left:94%;top:66%">🪴</div>';
+  floor.innerHTML=html;
+  OFFICE.sprites=HEROES.map(function(h,i){
+    var el=document.createElement("button");
+    el.className="of-hero";el.type="button";el.style.setProperty("--hc",h.color);
+    el.setAttribute("data-hq-go",h.page);if(h.scroll)el.setAttribute("data-hq-scroll",h.scroll);
+    el.setAttribute("aria-label",h.name+" "+h.code+"："+h.role);
+    el.innerHTML='<span class="of-bubble"></span>'+heroBody(h)+'<span class="of-tag">'+h.name+'</span>';
+    floor.appendChild(el);
+    var d=officeDesk(h);
+    var sp={h:h,el:el,x:d.x,y:d.y,tx:d.x,ty:d.y,dwell:800+i*500,walking:false,face:1,atDesk:true};
+    return sp;
+  });
+  OFFICE.built=true;
+}
+function officeBubble(){
+  var ph=marketPhase(),cands=OFFICE.sprites.filter(function(s){return !s.walking;});
+  if(!cands.length)return;
+  var s=cands[Math.floor(Math.random()*cands.length)],b=s.el.querySelector(".of-bubble");if(!b)return;
+  var txt=s.atDesk?heroLine(s.h,ph):(s.visiting?("找"+s.visiting.name+"討論中…"):(s.spot==="咖啡機"?"先來杯咖啡☕":"休息一下，馬上回座"));
+  b.textContent=txt;s.el.classList.add("talk");
+  setTimeout(function(){s.el.classList.remove("talk");},3200);
+}
+function officePlace(sp,W,H){
+  var px=sp.x*W,py=sp.y*H,sc=.85+sp.y*.3;
+  sp.el.style.transform="translate("+(px)+"px,"+(py)+"px) translate(-50%,-100%) scale("+sc.toFixed(3)+")";
+  sp.el.style.zIndex=String(10+Math.round(sp.y*100));
+  sp.el.classList.toggle("walking",!!sp.walking);
+  sp.el.classList.toggle("flip",sp.face<0);
+}
+function officeTick(ts){
+  OFFICE.raf=0;
+  var page=$I("p-hq"),floor=$I("hqOffice");
+  if(!page||!page.classList.contains("active")||!floor||document.hidden){OFFICE.last=0;return;}
+  var W=floor.clientWidth,H=floor.clientHeight,dt=OFFICE.last?Math.min(.1,(ts-OFFICE.last)/1000):0;OFFICE.last=ts;
+  var reduce=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  OFFICE.sprites.forEach(function(sp){
+    if(reduce){sp.walking=false;officePlace(sp,W,H);return;}
+    if(sp.walking){
+      var dx=(sp.tx-sp.x)*W,dy=(sp.ty-sp.y)*H,dist=Math.sqrt(dx*dx+dy*dy),step=Math.max(38,W*.07)*dt;
+      if(Math.abs(dx)>1)sp.face=dx>0?1:-1;
+      if(dist<=step||dist<1){sp.x=sp.tx;sp.y=sp.ty;sp.walking=false;}
+      else{sp.x+=dx/dist*step/W;sp.y+=dy/dist*step/H;}
+    } else {
+      sp.dwell-=dt*1000;
+      if(sp.dwell<=0)officePickTarget(sp);
+    }
+    officePlace(sp,W,H);
+  });
+  OFFICE.bubbleT-=dt*1000;
+  if(OFFICE.bubbleT<=0){OFFICE.bubbleT=2600+Math.random()*1800;if(!reduce||Math.random()<.5)officeBubble();}
+  officeStart();
+}
+function officeStart(){if(!OFFICE.raf)OFFICE.raf=requestAnimationFrame(officeTick);}
+document.addEventListener("visibilitychange",function(){if(!document.hidden)officeStart();});
+window.addEventListener("resize",function(){officeStart();});
 
 function twNow(){
   var d=new Date();
@@ -1563,7 +1754,7 @@ function renderHQ(){
   var pe=$I("hqPhase");if(pe){pe.textContent=ph.label;pe.className="hq-phase"+(ph.key==="live"||ph.key==="open-soon"?" live":"");}
   var ce=$I("hqClock");if(ce)ce.textContent="台北 "+ph.t.label;
   var be=$I("hqBrief");if(be)be.textContent="指揮官簡報｜"+((PHASE_LINES[ph.key]||{}).brief||"");
-  var la=$I("hqLeadAvatar");if(la&&!la.firstChild)la.innerHTML=heroSVG(HEROES[0]);
+  var la=$I("hqLeadAvatar");if(la&&!la.firstChild)la.innerHTML=heroBody(HEROES[4]);
   var ms=$I("hqMissions");
   if(ms){
     var hot=(ph.key==="pre"||ph.key==="open-soon"||ph.key==="live");
@@ -1574,16 +1765,10 @@ function renderHQ(){
     ];
     ms.innerHTML=missions.map(function(m){return '<button class="hq-mission'+(m.hot?' hot':'')+'" data-hq-go="'+m.page+'"><span class="mi">'+m.icon+'</span><span><b>'+m.t+'</b><small>'+m.d+'</small></span></button>';}).join("");
   }
-  var fl=$I("hqFloor");
-  if(fl){
-    fl.innerHTML=HEROES.map(function(h){
-      return '<div class="hq-room" role="button" tabindex="0" style="--hc:'+h.color+'" data-hq-go="'+h.page+'"'+(h.scroll?' data-hq-scroll="'+h.scroll+'"':'')+'>'+
-        '<div class="hq-room-top"><span>'+h.room+'</span><span class="lamp" title="值勤中"></span></div>'+
-        '<div class="hq-room-body">'+heroSVG(h)+'<div><div class="hq-room-name">'+h.icon+' '+h.name+'</div><div class="hq-room-code">'+h.code+'</div><div class="hq-room-role">'+h.role+'</div></div></div>'+
-        '<div class="hq-bubble">'+heroLine(h,ph)+'</div>'+
-        '<span class="hq-go">出動 ▶</span></div>';
-    }).join("");
-  }
+  if(!OFFICE.built)buildOffice();
+  officeStart();
+  var qk=$I("hqQuick");
+  if(qk&&!qk.firstChild)qk.innerHTML=HEROES.map(function(h){return '<button style="--hc:'+h.color+'" data-hq-go="'+h.page+'"'+(h.scroll?' data-hq-scroll="'+h.scroll+'"':'')+'><span class="qa">'+heroBody(h)+'</span>'+h.icon+' '+h.name+'</button>';}).join("");
   var nl=$I("hqNotesList");if(nl&&!nl.firstChild)nl.innerHTML=RELEASE_NOTES.map(function(x){return "<li>"+x+"</li>";}).join("");
 }
 function renderHeroStrip(pageId){
@@ -1610,7 +1795,7 @@ document.addEventListener("click",function(e){
 });
 document.addEventListener("keydown",function(e){
   if(e.key!=="Enter"&&e.key!==" ")return;
-  var g=e.target&&e.target.classList&&e.target.classList.contains("hq-room")?e.target:null;
+  var g=e.target&&e.target.getAttribute&&e.target.getAttribute("role")==="button"&&e.target.hasAttribute("data-hq-go")?e.target:null;
   if(g){e.preventDefault();goHero(g.getAttribute("data-hq-go"),g.getAttribute("data-hq-scroll"));}
 });
 setInterval(function(){var p=$I("p-hq");if(p&&p.classList.contains("active"))renderHQ();},60000);
