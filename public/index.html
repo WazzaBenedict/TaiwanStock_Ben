@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>V12.0.1 AI Picker Mobile Fast Data</title>
+<title>AIPICKER · 台股 / 美股 AI 選股</title>
+<meta name="theme-color" content="#07101c"/>
 <script src="config.js"></script>
 <!-- Firebase compat SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -391,6 +392,72 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .portfolio-chip b{color:var(--cyan)}
 .portfolio-note{font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.6;margin-top:4px}
 @media(max-width:768px){.portfolio-controls{width:100%}.portfolio-select{width:100%;min-width:0}.portfolio-panel .ghost.sm{flex:1}}
+
+/* ── V12.9.3 UI/UX polish（純版面，不改資料與邏輯）──────────────── */
+:root{--focus:0 0 0 2px rgba(0,212,255,.55)}
+.cc-price,.cc-chg,.aiq-val,.bt-val,.ctx-val,.macro-val,.plan-stat .v,.position-stat .v,.journal-stat .v,#dClose,#dChg,#usPrice,#usChg{font-variant-numeric:tabular-nums}
+html{scroll-behavior:smooth}
+/* 鍵盤操作看得到焦點 */
+button:focus-visible,select:focus-visible,input:focus-visible{outline:none;box-shadow:var(--focus)}
+/* 修正：建議清單的 calc 少了空白而失效 */
+.suggest-box,#usSuggestBox{top:calc(100% + 4px)}
+.search-input-wrap{flex:0 1 280px}
+#sid{width:100%}
+/* 手機快速模式提示：原本沒有樣式，桌機也一直顯示「準備中」 */
+.mobile-speed-box{display:none;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.2);border-radius:9px;padding:6px 10px;margin-bottom:12px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.mobile-speed-box.on{display:flex}
+/* 系統狀態：收合時更精簡，異常時有顏色提示 */
+.system-health{transition:border-color .2s}
+.system-health.compact{padding:6px 12px}
+.system-health.sh-ok #sysHealthShort{color:var(--down)}
+.system-health.sh-warn{border-color:rgba(251,191,36,.45)}.system-health.sh-warn #sysHealthShort{color:var(--yellow)}
+.system-health.sh-bad{border-color:rgba(232,56,79,.45)}.system-health.sh-bad #sysHealthShort{color:var(--up)}
+/* 區塊標題可換行，避免擠成一團 */
+.section-title{flex-wrap:wrap;row-gap:6px}
+.section-title-left{flex-wrap:wrap}
+/* 回到頂端 */
+.to-top{position:fixed;right:16px;bottom:18px;z-index:60;width:42px;height:42px;min-height:0;padding:0;border-radius:50%;background:rgba(13,23,40,.95);color:var(--cyan);border:1px solid var(--line);font-size:18px;box-shadow:0 6px 18px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .2s}
+.to-top.show{opacity:1;pointer-events:auto}
+/* 觸控裝置不做 hover 位移，避免點擊時跳動 */
+@media (hover:none){button:hover,.card-compact:hover,.scan-card:hover,.plan-card:hover,.position-card:hover,.google-btn:hover{transform:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}button:hover{transform:none}}
+
+@media (max-width:768px){
+  body{font-size:13.5px;padding-bottom:calc(56px + env(safe-area-inset-bottom))}
+  .wrap{padding:10px 12px}
+  header{padding:0 12px}
+  .ver{display:none}
+  .clock{font-size:10px;max-width:84px;text-align:right;line-height:1.25}
+  .mkt-btn{padding:6px 11px}
+  .section{padding:12px;margin-bottom:12px}
+  /* iOS 輸入框小於 16px 會自動放大畫面 */
+  input,select,textarea,#sid,#usSymbol{font-size:16px!important}
+  /* 搜尋列置頂，隨時可以查股票 */
+  .search-wrap{position:sticky;top:52px;z-index:40;margin:0 -12px 12px;padding:8px 12px;background:rgba(7,16,28,.96);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);flex-wrap:nowrap}
+  .search-input-wrap{flex:1 1 auto;min-width:0}
+  .search-wrap>button{flex:0 0 auto;padding:9px 12px;white-space:nowrap}
+  #usSymbol{width:100%}
+  /* 投資組合按鈕不再斷行 */
+  .portfolio-controls .ghost.sm{white-space:nowrap;padding:5px 8px}
+  .sm{min-height:36px}
+  /* 底部導覽列（拇指好按） */
+  #pgTW .nav-tabs{position:fixed;left:0;right:0;bottom:0;z-index:55;margin:0;background:rgba(7,16,28,.97);backdrop-filter:blur(12px);border-top:1px solid var(--line);border-bottom:0;padding:0 4px env(safe-area-inset-bottom);scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  #pgTW .nav-tabs::-webkit-scrollbar{display:none}
+  #pgTW .nav-tab{flex:1 0 auto;min-width:64px;padding:12px 10px;font-size:12px;border-bottom:0;border-top:2px solid transparent}
+  #pgTW .nav-tab.active{border-top-color:var(--cyan);background:rgba(0,212,255,.06)}
+  .toast{left:12px;right:12px;bottom:calc(68px + env(safe-area-inset-bottom))}
+  .to-top{bottom:calc(70px + env(safe-area-inset-bottom))}
+  [id^="anchor"],#aiScanTradeBox,#usAiScanBox,#dash,#usDash{scroll-margin-top:120px}
+  /* 窄螢幕的多欄格線改 2 欄 */
+  .w-grid{grid-template-columns:repeat(2,1fr)}
+  #p-learn [style*="repeat(4,1fr)"]{grid-template-columns:repeat(2,1fr)!important}
+  .health-grid{grid-template-columns:repeat(2,1fr)}
+  .bt-trades{display:block;overflow-x:auto;white-space:nowrap}
+  .footer{padding:16px 12px}
+}
+@media (min-width:769px){
+  [id^="anchor"],#aiScanTradeBox,#usAiScanBox,#dash,#usDash{scroll-margin-top:64px}
+}
 
 </style>
 </head>
@@ -2998,5 +3065,84 @@ document.addEventListener("click",function(e){
 document.addEventListener("DOMContentLoaded",initApp);
 </script>
 <div id="toast" class="toast"></div>
+<button class="to-top" id="btnToTop" aria-label="回到頂端" title="回到頂端">↑</button>
+<script>
+/* ── V12.9.3 UI/UX enhancements：只加互動，不改原本流程 ─────────── */
+(function(){
+  var MOBILE=function(){return window.innerWidth<=768;};
+  var TAB_KEY="aipicker_last_tab";
+  function $(id){return document.getElementById(id);}
+
+  // 1) 系統狀態預設收合，依結果上色；版本不一致時自動展開
+  function syncHealthState(){
+    var p=$("systemHealthPanel"),b=$("hBackend"),vw=$("versionWarn"),t=$("btnHealthToggle");if(!p||!b)return;
+    p.classList.remove("sh-ok","sh-warn","sh-bad");
+    if(!b.className)return;
+    var bad=/health-bad/.test(b.className);
+    var warn=/health-warn/.test(b.className)||(vw&&vw.style.display==="block")||["hYahoo","hTwse","hUsCtx"].some(function(id){var e=$(id);return e&&/health-(bad|warn)/.test(e.className);});
+    p.classList.add(bad?"sh-bad":warn?"sh-warn":"sh-ok");
+    if(vw&&vw.style.display==="block"&&p.classList.contains("compact")){p.classList.remove("compact");if(t)t.textContent="收合";}
+  }
+  function initHealth(){
+    var p=$("systemHealthPanel"),t=$("btnHealthToggle");if(!p)return;
+    p.classList.add("compact");if(t)t.textContent="展開";
+    var mo=new MutationObserver(syncHealthState);
+    ["hBackend","hYahoo","hTwse","hUsCtx","versionWarn"].forEach(function(id){var e=$(id);if(e)mo.observe(e,{attributes:true,childList:true,characterData:true,subtree:true});});
+    syncHealthState();
+  }
+
+  // 2) 記住上次的分頁；手機底部導覽自動捲到目前分頁
+  function revealActiveTab(){
+    var a=document.querySelector("#pgTW .nav-tab.active");
+    if(a&&MOBILE()&&a.scrollIntoView)a.scrollIntoView({block:"nearest",inline:"center"});
+  }
+  function initTabs(){
+    document.querySelectorAll("#pgTW .nav-tab").forEach(function(btn){
+      btn.addEventListener("click",function(){
+        try{localStorage.setItem(TAB_KEY,btn.dataset.page);}catch(e){}
+        setTimeout(revealActiveTab,0);
+        if(MOBILE())window.scrollTo({top:0});
+      });
+    });
+    if(typeof window.hideLoginOverlay==="function"){
+      var orig=window.hideLoginOverlay;
+      window.hideLoginOverlay=function(){
+        orig.apply(this,arguments);
+        var last=null;try{last=localStorage.getItem(TAB_KEY);}catch(e){}
+        if(last&&last!=="p-trade"&&$(last)&&typeof window.showPage==="function"){
+          setTimeout(function(){window.showPage(last);revealActiveTab();},0);
+        }
+      };
+    }
+  }
+
+  // 3) 鍵盤：按「/」聚焦搜尋，Esc 關閉建議清單
+  function initKeys(){
+    document.addEventListener("keydown",function(e){
+      var tag=(e.target&&e.target.tagName)||"";
+      if(e.key==="/"&&!/INPUT|TEXTAREA|SELECT/.test(tag)&&!e.ctrlKey&&!e.metaKey){
+        var us=$("pgUS"),inp=(us&&us.style.display!=="none")?$("usSymbol"):$("sid");
+        if(inp){e.preventDefault();inp.focus();inp.select();}
+      }
+      if(e.key==="Escape"){["suggestBox","usSuggestBox"].forEach(function(id){var b=$(id);if(b)b.style.display="none";});}
+    });
+  }
+
+  // 手機版縮短搜尋提示，避免被截斷
+  function initPlaceholder(){var sid=$("sid");if(sid&&MOBILE())sid.setAttribute("placeholder","代號或名稱");}
+
+  // 4) 回到頂端
+  function initToTop(){
+    var b=$("btnToTop");if(!b)return;
+    var tick=false;
+    window.addEventListener("scroll",function(){if(tick)return;tick=true;requestAnimationFrame(function(){b.classList.toggle("show",window.scrollY>700);tick=false;});},{passive:true});
+    b.addEventListener("click",function(){window.scrollTo({top:0,behavior:"smooth"});});
+  }
+
+  document.addEventListener("DOMContentLoaded",function(){
+    try{initHealth();initTabs();initKeys();initPlaceholder();initToTop();}catch(e){console.warn("ui enhancements",e);}
+  });
+})();
+</script>
 </body>
 </html>
