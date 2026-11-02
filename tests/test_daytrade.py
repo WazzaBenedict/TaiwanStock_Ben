@@ -161,6 +161,9 @@ def test_plan_levels_states():
     assert lv["status"] == "in_trade" and lv["entry_is_estimate"] is False
     up3 = up2 + [[101.0, 110.0, 101.0, 109.0, 1.0]]
     assert screener.plan_levels(up3, tm.Rule(), c)["status"] == "closed_target"
+    # a finished (past) session never reports "in_trade"
+    assert screener.plan_levels(up2, tm.Rule(), c, is_today=False)["status"] == "closed_close"
+    assert screener._roc_date("1151030") == "2026-10-30"
 
 
 if __name__ == "__main__":

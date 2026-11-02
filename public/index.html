@@ -978,7 +978,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none}
       try{
         var r=await apiFetch(API+"/api/daytrade/screen"+(refresh?"?refresh=true":""),{},180000); var d=await r.json();
         if(!r.ok){msg.textContent="⚠ "+(d.detail||r.status);return;}
-        rows=d.candidates||[]; msg.textContent=d.as_of+"：成交值前 "+d.universe+" 名中，"+rows.length+" 檔波動夠大，"+d.passed+" 檔扣成本後通過。"+(d.notes||[]).join(" ");
+        rows=d.candidates||[]; msg.textContent="分 K 資料到 "+(d.last_session||d.as_of)+"：成交值前 "+d.universe+" 名中，"+rows.length+" 檔波動夠大，"+d.passed+" 檔扣成本後通過。"+(d.notes||[]).join(" ");
         document.getElementById("dtRule").textContent=d.how_to_trade;
         document.getElementById("dtFoot").textContent="* 預估進場價（突破後下一根開盤才確定）。"+d.disclaimer+" 略過 "+(d.skipped||[]).length+" 檔。";
         document.getElementById("dtTable").style.display=rows.length?"table":"none"; draw();

@@ -42,7 +42,7 @@ UA = {"User-Agent": "Mozilla/5.0 (taiwanstock-daytrade/1.0)"}
 URL_DAY_ALL = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
 URL_TWTB4U = "https://www.twse.com.tw/exchangeReport/TWTB4U?response=json&date=%s"
 URL_PUNISH = "https://www.twse.com.tw/rwd/zh/announcement/punish?response=json"
-URL_NOTICE = "https://www.twse.com.tw/rwd/zh/announcement/notice?response=json"
+URL_NOTICE = "https://www.twse.com.tw/rwd/zh/announcement/notice?response=json&startDate=%s&endDate=%s"
 MIN_TRADES = 15
 RANDOM_DRAWS = 20
 
@@ -60,6 +60,14 @@ def _num(x) -> float:
         return 0.0
 
 
+def _roc_date(s: str) -> str:
+    """'1151030' (ROC year 115) -> '2026-10-30'."""
+    s = s.strip()
+    if re.fullmatch(r"\d{7}", s):
+        return "%04d-%s-%s" % (int(s[:3]) + 1911, s[3:5], s[5:7])
+    return s
+
+
 def universe(top: int = 40, min_price: float = 20.0) -> list[dict]:
     rows = _get_json(URL_DAY_ALL)
     out = []
@@ -72,6 +80,7 @@ def universe(top: int = 40, min_price: float = 20.0) -> list[dict]:
         if close < min_price or value <= 0:
             continue
         out.append({"stock_id": code, "name": str(r.get("Name", "")).strip(), "close": close,
+                    "date": _roc_date(str(r.get("Date", ""))),
                     "trade_value": value, "high": _num(r.get("HighestPrice")), "low": _num(r.get("LowestPrice"))})
     out.sort(key=lambda x: -x["trade_value"])
     return out[:top]
@@ -108,8 +117,15 @@ def daytrade_list(date: str) -> set[str]:
 
 
 def flagged_lists() -> tuple[set[str], set[str]]:
+    # the undated notice list is today's, published after the close: ask for the last
+    # few weekdays instead so attention stocks are flagged overnight and intraday
+    end = dt.date.today()
+    start, k = end, 0
+    while k < 3:
+        start -= dt.timedelta(days=1)
+        k += start.weekday() < 5
     out = []
-    for url in (URL_PUNISH, URL_NOTICE):
+    for url in (URL_PUNISH, URL_NOTICE % (start.strftime("%Y%m%d"), end.strftime("%Y%m%d"))):
         try:
             out.append(_codes_in(_get_json(url)))
         except Exception:
@@ -206,7 +222,8 @@ def _all_orb_trades(sessions, rule, costs):
 
 # ── today's prices: entry, stop-loss, take-profit ─────────────────────────────
 
-def plan_levels(bars: list[list[float]], rule: tm.Rule, costs: DayTradeCosts, shares: int = 1000) -> dict:
+def plan_levels(bars: list[list[float]], rule: tm.Rule, costs: DayTradeCosts, shares: int = 1000,
+                is_today: bool = True) -> dict:
     """Entry / stop / target for today from the bars traded so far (5-minute, from 09:00).
 
     Before the opening range is complete only the rule is known. After it, the trigger
@@ -234,7 +251,7 @@ def plan_levels(bars: list[list[float]], rule: tm.Rule, costs: DayTradeCosts, sh
             sig = i
             break
     if sig is None:
-        if len(bars) > tm.LAST_ENTRY_BAR:
+        if len(bars) > tm.LAST_ENTRY_BAR or not is_today:
             out.update(status="no_signal", message="13:00 前沒有收盤突破開盤區間高點，今天不進場。")
         else:
             out.update(status="waiting_breakout",
@@ -250,7 +267,13 @@ def plan_levels(bars: list[list[float]], rule: tm.Rule, costs: DayTradeCosts, sh
             out.update(status="skip", message="進場價已低於停損，不進場。")
             return out
         res, px, sell_net, _ = tm.walk(entry, stop, target, (b[:4] for b in bars[sig + 1:]), costs)
-        if res == "neither":
+        finished = len(bars) >= SESSION_BARS or not is_today
+        if res == "neither" and finished:
+            px = bars[-1][3]
+            pnl = costs.net_pnl(entry, costs.slip(px, "sell"), shares)
+            out.update(status="closed_close", exit=round(px, 2), net_pnl=round(pnl),
+                       message="沒碰到停損停利，收盤出場（%.2f），扣成本後 %+d 元。" % (px, pnl))
+        elif res == "neither":
             out.update(status="in_trade", last=round(bars[-1][3], 2),
                        message="已在 %s 進場，持有中；碰 %.2f 停損、%.2f 停利，否則 13:25 前出場。"
                        % (bar_time(sig + 1), stop, target))
@@ -275,9 +298,10 @@ def live_levels(stock_ids: list[str], rule: tm.Rule | None = None, costs: DayTra
             out[sid] = {"status": "no_data", "message": "取不到今天的 5 分 K（盤前、休市或資料源延遲）。"}
             continue
         ds, bars = got
-        lv = plan_levels(bars, rule, costs, shares)
+        is_today = ds == dt.date.today().isoformat()
+        lv = plan_levels(bars, rule, costs, shares, is_today)
         lv["date"] = ds
-        if ds != dt.date.today().isoformat():
+        if not is_today:
             lv["note"] = "這是 %s 的資料，今天還沒開盤或尚無資料。" % ds
         out[sid] = lv
     return {"rule": {"orb_minutes": rule.orb_minutes, "target_r": rule.target_r}, "levels": out,
@@ -308,41 +332,45 @@ def screen(top: int = 40, rule: tm.Rule | None = None, costs: DayTradeCosts | No
         d -= dt.timedelta(days=1)
     punish, notice = flagged_lists()
     notes = []
+    if uni[0].get("date"):
+        notes.append("成交值排名用 %s 的資料。" % uni[0]["date"])
     if not dtl:
         notes.append("無法取得證交所現股當沖名單，未以此過濾，請自行確認可當沖。")
     rows, skipped = [], []
     for u in uni:
         sid = u["stock_id"]
         if dtl and sid not in dtl:
-            skipped.append({"stock_id": sid, "name": u["name"], "reason": "不在現股當沖名單"})
+            skipped.append({"stock_id": sid, "name": u["name"], "reason": "不在現股當沖名單", "kind": "不可當沖"})
             continue
         if sid in punish:
-            skipped.append({"stock_id": sid, "name": u["name"], "reason": "處置股"})
+            skipped.append({"stock_id": sid, "name": u["name"], "reason": "處置股", "kind": "處置股"})
             continue
         try:
             sessions = load_sessions(sid, today)
         except DataError as e:
-            skipped.append({"stock_id": sid, "name": u["name"], "reason": "分 K 取得失敗：%s" % str(e)[:80]})
+            skipped.append({"stock_id": sid, "name": u["name"], "reason": "分 K 取得失敗：%s" % str(e)[:80], "kind": "資料失敗"})
             continue
         finally:
             time.sleep(pause)
         sessions = {k: v for k, v in sessions.items() if k < today}  # completed sessions only
         if len(sessions) < tm.MIN_POOL:
-            skipped.append({"stock_id": sid, "name": u["name"], "reason": "分 K 只有 %d 天" % len(sessions)})
+            skipped.append({"stock_id": sid, "name": u["name"], "reason": "分 K 只有 %d 天" % len(sessions), "kind": "資料不足"})
             continue
         ev = evaluate(sid, sessions, rule, costs)
         if ev["avg_range_pct"] < min_range_pct:
             skipped.append({"stock_id": sid, "name": u["name"],
-                            "reason": "平均日內振幅 %.1f%% 太小" % ev["avg_range_pct"]})
+                            "reason": "平均日內振幅 %.1f%% 太小" % ev["avg_range_pct"], "kind": "振幅太小"})
             continue
-        ev.update({"name": u["name"], "close": u["close"], "trade_value_e8": round(u["trade_value"] / 1e8, 1),
+        ev.update({"name": u["name"], "close": round(sessions[ev["to"]][-1][3], 2),
+                   "trade_value_e8": round(u["trade_value"] / 1e8, 1),
                    "attention": sid in notice})
         rows.append(ev)
         log("%s %s range %.1f%% orb %s rnd %s" % (sid, u["name"], ev["avg_range_pct"],
                                                    ev["orb"]["avg_net_r"], ev["random"]["avg_net_r"]))
     rows.sort(key=lambda r: (r["orb"]["avg_net_r"] is None, -(r["orb"]["avg_net_r"] or -9)))
     res = {
-        "as_of": today, "rule": {"orb_minutes": rule.orb_minutes, "target_r": rule.target_r,
+        "as_of": today, "universe_date": uni[0].get("date", ""),
+        "last_session": max((r["to"] for r in rows), default=""), "rule": {"orb_minutes": rule.orb_minutes, "target_r": rule.target_r,
                                  "stop_rule": rule.stop_rule},
         "costs": {"fee_discount": costs.fee_discount, "tax_rate": costs.tax_rate, "slip_ticks": costs.slip_ticks},
         "universe": len(uni), "daytrade_list_size": len(dtl), "candidates": rows, "skipped": skipped,
@@ -373,8 +401,11 @@ def format_text(res: dict) -> str:
             r["stock_id"], r["name"][:8], r["close"], r["avg_range_pct"], r["round_trip_cost_pct"], o["n"],
             o["avg_net_r"], rd["avg_net_r"], r["edge_vs_random_r"],
             "通過（僅供模擬觀察）" if r["passed"] else "不建議", "，注意股" if r.get("attention") else ""))
-    out.append("通過 %d 檔。略過 %d 檔（%s）" % (res["passed"], len(res["skipped"]),
-                                          "、".join(sorted({s["reason"][:8] for s in res["skipped"]}))))
+    kinds: dict[str, list[str]] = {}
+    for sk in res["skipped"]:
+        kinds.setdefault(sk.get("kind", "其他"), []).append(sk["stock_id"])
+    out.append("通過 %d 檔。略過 %d 檔：%s" % (res["passed"], len(res["skipped"]),
+               "；".join("%s %s" % (k, ",".join(v[:6]) + ("…" if len(v) > 6 else "")) for k, v in kinds.items()) or "無"))
     out += [res["how_to_trade"], res["disclaimer"]]
     return "\n".join(out)
 
