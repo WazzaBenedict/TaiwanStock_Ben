@@ -23,6 +23,15 @@ SESSION_BARS = 54  # 09:00 .. 13:25 bar starts
 CACHE_DIR = Path(os.getenv("DAYTRADE_CACHE_DIR", Path(__file__).resolve().parent / "cache"))
 
 
+TAIPEI = dt.timezone(dt.timedelta(hours=8))  # Taiwan has no DST
+
+
+def taipei_today() -> dt.date:
+    """Today's date in Taiwan. Servers (Render) run on UTC, which is a day behind
+    between 00:00 and 08:00 Taiwan time."""
+    return dt.datetime.now(TAIPEI).date()
+
+
 class DataError(Exception):
     pass
 
@@ -145,7 +154,7 @@ def load_sessions_finmind(stock_id: str, end_date: str, days: int = 60, token: s
     re-fetched; today's date is never cached because the session may be incomplete.
     """
     end = dt.date.fromisoformat(end_date)
-    today = dt.date.today()
+    today = taipei_today()
     sessions: dict[str, list[list[float]]] = {}
     tried, d = 0, end
     errors = []
