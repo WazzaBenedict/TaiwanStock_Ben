@@ -11,6 +11,7 @@ import datetime as dt
 import json
 import os
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -24,6 +25,13 @@ CACHE_DIR = Path(os.getenv("DAYTRADE_CACHE_DIR", Path(__file__).resolve().parent
 
 class DataError(Exception):
     pass
+
+
+class TierError(DataError):
+    """FinMind refused the request because of the account level or quota."""
+    def __init__(self, msg, code=None):
+        super().__init__(msg)
+        self.code = code
 
 
 def bar_index(t: dt.time) -> int:
@@ -113,15 +121,23 @@ def fetch_finmind_day(stock_id: str, date: str, token: str | None = None, timeou
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             payload = json.loads(r.read().decode("utf-8"))
-    except Exception as e:  # network, HTTP 402/403 (tier), 429 (quota)
+    except urllib.error.HTTPError as e:  # 400/402/403 = account level, 429 = quota
+        msg = ""
+        try:
+            msg = json.loads(e.read().decode("utf-8")).get("msg", "")
+        except Exception:
+            pass
+        raise TierError("FinMind %s %s: HTTP %s %s" % (stock_id, date, e.code, msg or e.reason),
+                        e.code) from e
+    except Exception as e:  # network
         raise DataError("FinMind %s %s: %s" % (stock_id, date, e)) from e
     if payload.get("status") not in (200, None):
         raise DataError("FinMind %s %s: %s" % (stock_id, date, payload.get("msg")))
     return [r for r in payload.get("data", []) if str(r.get("date", ""))[:10] == date]
 
 
-def load_sessions(stock_id: str, end_date: str, days: int = 60, token: str | None = None,
-                  use_cache: bool = True, pause: float = 0.3) -> dict[str, list[list[float]]]:
+def load_sessions_finmind(stock_id: str, end_date: str, days: int = 60, token: str | None = None,
+                          use_cache: bool = True, pause: float = 0.3) -> dict[str, list[list[float]]]:
     """Up to `days` trading sessions ending on `end_date` (inclusive), as 5-minute bars.
 
     Walks back over calendar days (weekends skipped) until enough non-empty sessions
@@ -144,6 +160,8 @@ def load_sessions(stock_id: str, end_date: str, days: int = 60, token: str | Non
             else:
                 try:
                     rows = fetch_finmind_day(stock_id, ds, token)
+                except TierError:
+                    raise  # every other day will fail the same way
                 except DataError as e:
                     errors.append(str(e))
                     if len(errors) >= 5 and not sessions:
@@ -159,6 +177,85 @@ def load_sessions(stock_id: str, end_date: str, days: int = 60, token: str | Non
                     sessions[ds] = bars
         d -= dt.timedelta(days=1)
     return dict(sorted(sessions.items()))
+
+
+LAST_SOURCE = {"name": ""}  # which feed the last load_sessions call used
+YAHOO_URL = "https://query2.finance.yahoo.com/v8/finance/chart/%s?range=60d&interval=5m"
+
+
+def parse_yahoo_chart(payload: dict, end_date: str | None = None) -> dict[str, list[list[float]]]:
+    """Yahoo v8 chart JSON (5-minute) -> {date: 54 bars}. Timestamps are bar starts in
+    UTC; the exchange offset comes from meta.gmtoffset (Taipei = +8h). A bar stamped
+    13:25 or later (the closing auction) is merged into the last bar."""
+    res = (payload.get("chart") or {}).get("result") or []
+    if not res:
+        err = (payload.get("chart") or {}).get("error") or {}
+        raise DataError("Yahoo: %s" % (err.get("description") or "no data"))
+    r0 = res[0]
+    off = int((r0.get("meta") or {}).get("gmtoffset") or 28800)
+    ts = r0.get("timestamp") or []
+    q = ((r0.get("indicators") or {}).get("quote") or [{}])[0]
+    by_day: dict[str, list] = {}
+    for i, t in enumerate(ts):
+        o, h, l, c = (q.get(k, [None] * len(ts))[i] for k in ("open", "high", "low", "close"))
+        v = (q.get("volume") or [0] * len(ts))[i] or 0
+        if None in (o, h, l, c) or min(o, h, l, c) <= 0:
+            continue
+        local = dt.datetime.fromtimestamp(t + off, dt.timezone.utc).replace(tzinfo=None)
+        ds = local.date().isoformat()
+        if end_date and ds > end_date:
+            continue
+        idx = min(bar_index(local.time()), SESSION_BARS - 1)
+        if idx < 0:
+            continue
+        bars = by_day.setdefault(ds, [None] * SESSION_BARS)
+        b = bars[idx]
+        if b is None:
+            bars[idx] = [float(o), float(h), float(l), float(c), float(v)]
+        else:
+            b[1], b[2], b[3], b[4] = max(b[1], h), min(b[2], l), float(c), b[4] + v
+    out = {}
+    for ds, bars in sorted(by_day.items()):
+        full = fill_quiet_bars(bars)
+        if full is not None:
+            out[ds] = full
+    return out
+
+
+def load_sessions_yahoo(stock_id: str, end_date: str, timeout: int = 20) -> dict[str, list[list[float]]]:
+    """Free fallback: Yahoo keeps about 60 days of 5-minute bars. Tries the TWSE suffix
+    (.TW) and then TPEx (.TWO). Unofficial and can lag or have gaps."""
+    last = None
+    for suffix in (".TW", ".TWO"):
+        url = YAHOO_URL % urllib.parse.quote(stock_id + suffix)
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (taiwanstock-daytrade/1.0)"})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                out = parse_yahoo_chart(json.loads(r.read().decode("utf-8")), end_date)
+            if out:
+                return out
+        except Exception as e:
+            last = e
+    raise DataError("Yahoo %s: %s" % (stock_id, last or "no 5-minute data"))
+
+
+def load_sessions(stock_id: str, end_date: str, days: int = 60, token: str | None = None,
+                  source: str = "auto") -> dict[str, list[list[float]]]:
+    """source: "finmind", "yahoo", or "auto" = FinMind when a token is set, falling back
+    to Yahoo when FinMind refuses the account level (minute bars are a sponsor-tier
+    dataset) or when no token is set."""
+    token = token or os.getenv("FINMIND_TOKEN", "")
+    LAST_SOURCE["name"] = "yahoo"
+    if source == "yahoo" or (source == "auto" and not token):
+        return load_sessions_yahoo(stock_id, end_date)
+    try:
+        out = load_sessions_finmind(stock_id, end_date, days, token)
+        LAST_SOURCE["name"] = "finmind"
+        return out
+    except TierError:
+        if source == "finmind":
+            raise
+        return load_sessions_yahoo(stock_id, end_date)
 
 
 def load_offline(path: str) -> dict[str, list[list[float]]]:

@@ -54,6 +54,21 @@ def test_minute_aggregation_end_labels_and_auction():
     assert bar_time(parse_hhmm("10:15")) == "10:15"
 
 
+def test_parse_yahoo_chart():
+    from daytrade.data import parse_yahoo_chart
+    base = int(dt.datetime(2026, 10, 30, 1, 0, tzinfo=dt.timezone.utc).timestamp())  # 09:00 Taipei
+    ts = [base + 300 * i for i in range(SESSION_BARS)] + [base + 300 * SESSION_BARS]  # + 13:30 auction stamp
+    n = len(ts)
+    q = {"open": [100.0] * n, "high": [101.0] * n, "low": [99.0] * n, "close": [100.0] * (n - 1) + [102.0], "volume": [1] * n}
+    q["close"][5] = None  # one missing bar gets filled
+    payload = {"chart": {"result": [{"meta": {"gmtoffset": 28800}, "timestamp": ts, "indicators": {"quote": [q]}}]}}
+    out = parse_yahoo_chart(payload)
+    assert list(out) == ["2026-10-30"]
+    bars = out["2026-10-30"]
+    assert len(bars) == SESSION_BARS and bars[-1][3] == 102.0 and bars[5][4] == 0.0
+    assert parse_yahoo_chart(payload, end_date="2026-10-29") == {}
+
+
 def test_fill_quiet_bars():
     b = [[1, 1, 1, 1, 1]] + [None] * 2 + [[2, 2, 2, 2, 1]] * (SESSION_BARS - 3)
     assert fill_quiet_bars(b)[1] == [1, 1, 1, 1, 0.0]

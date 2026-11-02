@@ -29,6 +29,7 @@ def timemachine(
     replays: int = Query(10000, ge=100, le=20000),
     seed: int = tm.DEFAULT_SEED,
     days: int = Query(60, ge=20, le=120),
+    source: str = Query("auto", pattern="^(auto|finmind|yahoo)$"),
 ):
     """Sync def: FastAPI runs it in a worker thread, so the FinMind calls don't block the loop."""
     if not re.fullmatch(r"\d{4,6}[A-Z]?", stock_id) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
@@ -38,9 +39,9 @@ def timemachine(
             stock_id, date, entry=entry, stop=stop, target=target, entry_time=entry_time,
             rule=tm.Rule(orb_minutes, target_r, stop_rule),
             costs=DayTradeCosts(fee_discount=fee_discount, slip_ticks=slip_ticks),
-            shares=shares, replays=replays, seed=seed, days=days,
+            shares=shares, replays=replays, seed=seed, days=days, source=source,
         )
     except tm.TMError as e:
         raise HTTPException(422, str(e))
     except DataError as e:
-        raise HTTPException(502, "分 K 資料取得失敗（FinMind 可能需要付費等級的 token，或配額用完）：%s" % e)
+        raise HTTPException(502, "分 K 資料取得失敗（FinMind 分 K 需要贊助會員，免費改用 Yahoo 只有近 60 天）：%s" % e)

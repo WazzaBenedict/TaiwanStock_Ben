@@ -13,8 +13,10 @@ The method is adapted from `trader-timemachine` in
 FinMind minute data, and costs included.
 
 ```bash
-# needs FINMIND_TOKEN in the environment; TaiwanStockKBar may need a paid tier
+# FinMind minute bars (TaiwanStockKBar) need a sponsor-level FINMIND_TOKEN;
+# without one it falls back to Yahoo 5-minute bars (free, about the last 60 days only)
 python -m daytrade.timemachine 2330 2026-10-30                    # opening-range breakout plan, auto
+python -m daytrade.timemachine 2330 2026-10-30 --source yahoo
 python -m daytrade.timemachine 2330 2026-10-30 --entry 1050 --stop 1040 --target 1070 --entry-time 10:15
 python -m daytrade.timemachine 2330 2026-10-30 --offline bars.json --json
 python -m daytrade.test_daytrade                                   # tests, synthetic data, no network

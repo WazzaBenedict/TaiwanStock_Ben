@@ -32,10 +32,10 @@ from dataclasses import asdict, dataclass, field
 
 try:  # package import (app) or script run
     from .costs import DayTradeCosts, round_to_tick, tick_size
-    from .data import SESSION_BARS, bar_time, parse_hhmm, load_sessions, load_offline, DataError
+    from .data import SESSION_BARS, LAST_SOURCE, bar_time, parse_hhmm, load_sessions, load_offline, DataError
 except ImportError:  # pragma: no cover
     from costs import DayTradeCosts, round_to_tick, tick_size  # type: ignore
-    from data import SESSION_BARS, bar_time, parse_hhmm, load_sessions, load_offline, DataError  # type: ignore
+    from data import SESSION_BARS, LAST_SOURCE, bar_time, parse_hhmm, load_sessions, load_offline, DataError  # type: ignore
 
 DEFAULT_SEED = 19
 MIN_POOL = 20
@@ -265,13 +265,18 @@ def run(stock_id: str, date: str, *, entry: float | None = None, stop: float | N
         target: float | None = None, entry_time: str | None = None, rule: Rule | None = None,
         costs: DayTradeCosts | None = None, shares: int = 1000, replays: int = 10000,
         seed: int = DEFAULT_SEED, window: int = 2, days: int = 60, sessions: dict | None = None,
-        token: str | None = None) -> dict:
+        token: str | None = None, source: str = "auto") -> dict:
     rule = rule or Rule()
     costs = costs or DayTradeCosts()
     if replays < 100 or replays > 50000:
         raise TMError("replays must be between 100 and 50,000")
+    data_source = "offline"
     if sessions is None:
-        sessions = load_sessions(stock_id, date, days=days + 1, token=token)
+        sessions = load_sessions(stock_id, date, days=days + 1, token=token, source=source)
+        if days < len(sessions) - 1:  # keep the newest `days` sessions before `date`, plus `date`
+            keep = sorted(sessions)[-(days + 1):]
+            sessions = {k: sessions[k] for k in keep}
+        data_source = LAST_SOURCE["name"]
     if date not in sessions:
         raise TMError("%s %s: no complete 5-minute session for that date (holiday, not yet closed, or data gap)"
                       % (stock_id, date))
@@ -310,6 +315,7 @@ def run(stock_id: str, date: str, *, entry: float | None = None, stop: float | N
             "rule": asdict(plan.rule),
         },
         "costs": asdict(costs),
+        "data_source": data_source,
         "pool": {"sessions": full, "from": min(d for d in sessions if d < date), "to": max(d for d in sessions if d < date)},
         "mc": mc,
         "history": hist,
@@ -326,8 +332,9 @@ def format_text(res: dict) -> str:
         "%s %s  進場 %.2f @%s  停損 %.2f  停利 %.2f (%.2fR)  %d 股  來回成本約 %.2f%%"
         % (p["stock_id"], p["date"], p["entry"], p["entry_time"], p["stop"], p["target"],
            p["target_r"], p["shares"], p["round_trip_cost_pct"]),
-        "%d 次重播（seed %d），樣本 %d 個交易日 %s ~ %s"
-        % (mc["replays"], mc["seed"], res["pool"]["sessions"], res["pool"]["from"], res["pool"]["to"]),
+        "%d 次重播（seed %d），樣本 %d 個交易日 %s ~ %s，資料來源 %s"
+        % (mc["replays"], mc["seed"], res["pool"]["sessions"], res["pool"]["from"], res["pool"]["to"],
+           res.get("data_source", "")),
         "  先碰停利 %5.1f%%" % mc["target_first"],
         "  先碰停損 %5.1f%%" % mc["stop_first"],
         "  都沒碰到 %5.1f%%（13:30 收盤出場）" % mc["neither"],
@@ -364,13 +371,19 @@ def main(argv=None):
     ap.add_argument("--days", type=int, default=60)
     ap.add_argument("--offline", help="JSON file of sessions or FinMind KBar rows")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--source", default="auto", choices=["auto", "finmind", "yahoo"])
     a = ap.parse_args(argv)
+    try:  # Windows consoles default to a legacy code page
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
     try:
         res = run(a.stock_id, a.date, entry=a.entry, stop=a.stop, target=a.target, entry_time=a.entry_time,
                   rule=Rule(a.orb_minutes, a.target_r, a.stop_rule),
                   costs=DayTradeCosts(fee_discount=a.fee_discount, slip_ticks=a.slip_ticks),
                   shares=a.shares, replays=a.replays, seed=a.seed, days=a.days,
-                  sessions=load_offline(a.offline) if a.offline else None)
+                  sessions=load_offline(a.offline) if a.offline else None, source=a.source)
     except (TMError, DataError) as e:
         print("錯誤：%s" % e, file=sys.stderr)
         return 2
