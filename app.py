@@ -28,6 +28,8 @@ LINE_TO_ID               = os.getenv("LINE_TO_ID", "")
 ENABLE_LINE_ALERTS       = os.getenv("ENABLE_LINE_ALERTS", "false").lower() == "true"
 LAST_ALERTS: dict[str, datetime] = {}
 ALERT_COOLDOWN_MINUTES   = 30
+# 自選股掃描不再推播 LINE「買點」：技術面評分在全市場回測沒有預測力（reports/backtest_report.md）
+BUY_PUSH_ENABLED         = False
 
 # Optional API keys for richer US data
 FINNHUB_API_KEY      = os.getenv("FINNHUB_API_KEY", "")
@@ -2675,7 +2677,8 @@ async def check_alerts(body:WatchlistBody):
             cat=ai.get("scan_category","AVOID")
             lok=(cat=="ENTERABLE" and conf>=70 and rr2>=1.5 and tv
                  and ts2>=70 and final2>=75 and not ovh and not fb2)
-            if lo and lok:
+            # LINE「買點」推播已停用：全市場回測顯示技術面評分沒有預測力（見 reports/backtest_report.md）
+            if BUY_PUSH_ENABLED and lo and lok:
                 ls=LAST_ALERTS.get(sid)
                 if ls is None or (now-ls).total_seconds()>=ALERT_COOLDOWN_MINUTES*60:
                     res=await send_line_message(_blm(sid,sn,ai,cp2))
@@ -2684,7 +2687,7 @@ async def check_alerts(body:WatchlistBody):
     rank={"BUY":3,"WATCH":2,"AVOID":1}
     results.sort(key=lambda x:(rank.get(x.get("signal",""),0),x.get("confidence",0)),reverse=True)
     return{"checked":len(stock_ids),"alerts":[r for r in results if r.get("signal")=="BUY"],
-           "all_results":results,"sent_line":sent,"line_enabled":lo,
+           "all_results":results,"sent_line":sent,"line_enabled":lo,"buy_push_enabled":BUY_PUSH_ENABLED,
            "errors":errors,"error_count":len(errors),"duration_seconds":round(time.time()-t0,1)}
 
 # ══════════════════════════════════════════════════════════════════════════════

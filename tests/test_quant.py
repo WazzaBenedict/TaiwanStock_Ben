@@ -307,3 +307,9 @@ def test_deflated_sharpe_penalises_many_trials():
     one = deflated_sharpe(r, 1, 0.0)["dsr"]
     many = deflated_sharpe(r, 100, 0.03 ** 2)["dsr"]
     assert 0 <= many < one <= 1
+
+
+def test_line_buy_push_disabled():
+    """LINE「買點」推播停用：技術面評分在全市場回測沒有預測力。"""
+    import app
+    assert app.BUY_PUSH_ENABLED is False

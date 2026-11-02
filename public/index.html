@@ -1214,7 +1214,7 @@ async function onUserLogin(user) {
   renderWL(); refreshWL(); startWLTimer();
   checkLineStatus(); loadWeights();
   autoOn = localStorage.getItem("tw_auto_"+user.uid)==="1";
-  updateAutoUI(); if(autoOn) startAutoTimer();
+  autoOn=false; updateAutoUI(); setTxt("autoCountdown","已停用");
   setSyncBadge("ok");
   refreshAuthHealthStatus();
   // US WL if on US page
@@ -1701,7 +1701,7 @@ async function scanAlerts(silent) {
     var alerts=d.alerts||[],sentLine=d.sent_line||[],checked=d.checked||ids.length,lineOk=d.line_enabled,dur=d.duration_seconds||0;
     var txt;
     if(!alerts.length)txt="✅ 掃描完成 "+checked+" 檔（"+dur+"s）\n目前自選股沒有技術面條件符合的股票。";
-    else{var lines=alerts.map(function(a){return"📈 "+dsn(a.stock_id,a.stock_name)+"  技術面評分："+a.confidence+"/100\n   "+(a.summary||"");});txt="📊 掃描 "+checked+" 檔（"+dur+"s），"+alerts.length+" 檔技術面條件符合（僅供研究，非買進建議）\n\n"+lines.join("\n\n");if(sentLine.length)txt+="\n\n✅ LINE 已推播："+sentLine.join("、");else if(!lineOk)txt+="\n（LINE 未設定）";}
+    else{var lines=alerts.map(function(a){return"📈 "+dsn(a.stock_id,a.stock_name)+"  技術面評分："+a.confidence+"/100\n   "+(a.summary||"");});txt="📊 掃描 "+checked+" 檔（"+dur+"s），"+alerts.length+" 檔技術面條件符合（僅供研究，非買進建議）\n\n"+lines.join("\n\n");txt+="\n\n（LINE 買點推播已停用）";}
     if(!silent&&el){el.className="scan-result ok";el.textContent=txt;el.style.display="block";}
     return{txt:txt,alerts:alerts,sentLine:sentLine,checked:checked};
   } catch(e) {if(wakeT)clearTimeout(wakeT);if(!silent&&el){el.className="scan-result fail";el.textContent="❌ "+(e.message||"掃描失敗");el.style.display="block";}return null;}
@@ -1808,8 +1808,10 @@ function twScanCard(r) {
 
 // ── Auto LINE ──────────────────────────────────────────────────────
 function updateAutoUI(){var btn=$I("btnAuto");if(!btn)return;if(autoOn){btn.textContent="已開啟";btn.className="green-btn sm";}else{btn.textContent="已關閉";btn.className="ghost sm";}}
-function toggleAuto(){autoOn=!autoOn;if(currentUser)localStorage.setItem("tw_auto_"+currentUser.uid,autoOn?"1":"0");updateAutoUI();if(autoOn)startAutoTimer();else{clearInterval(autoTimer);autoTimer=null;setTxt("autoCountdown","—");}}
-function startAutoTimer(){clearInterval(autoTimer);autoLeft=300;autoTimer=setInterval(async function(){autoLeft--;var m=Math.floor(autoLeft/60),s=autoLeft%60;setTxt("autoCountdown",m+":"+(s<10?"0":"")+s);if(autoLeft<=0){autoLeft=300;setTxt("autoLastT",new Date().toLocaleTimeString("zh-TW"));var r=await scanAlerts(true);if(r){setTxt("autoScanned",r.checked+"檔");setTxt("autoPushed",r.sentLine.length+"檔");}}},1000);}
+function toggleAuto(){if(AUTO_SCAN_DISABLED){autoOn=false;updateAutoUI();setTxt("autoCountdown","已停用");alert("自動掃描與 LINE 買點推播已停用：回測顯示技術面評分沒有預測力。仍可手動掃描自選股。");return;}autoOn=!autoOn;if(currentUser)localStorage.setItem("tw_auto_"+currentUser.uid,autoOn?"1":"0");updateAutoUI();if(autoOn)startAutoTimer();else{clearInterval(autoTimer);autoTimer=null;setTxt("autoCountdown","—");}}
+// 每 5 分鐘自動掃描已停用：技術面評分在全市場回測沒有預測力（reports/backtest_report.md）
+var AUTO_SCAN_DISABLED=true;
+function startAutoTimer(){clearInterval(autoTimer);autoTimer=null;autoOn=false;setTxt("autoCountdown","已停用");}
 
 // ── Mobile Fast Data V12.9.2 ──────────────────────────────────────
 function isMobileFastMode(){
