@@ -1,4 +1,4 @@
-"""Run: python -m pytest daytrade -q   (or python -m daytrade.test_daytrade)"""
+"""Run: python -m pytest -q tests/test_daytrade.py"""
 import datetime as dt
 import random
 
@@ -132,6 +132,35 @@ def test_refuses_short_pool():
         assert False
     except tm.TMError as e:
         assert "need at least" in str(e)
+
+
+def test_screener_evaluate_and_codes():
+    from daytrade import screener
+    s = synth_sessions(45, seed=11)
+    ev = screener.evaluate("TEST", s, tm.Rule(), DayTradeCosts())
+    assert ev["sessions"] == 45 and ev["random"]["n"] == 45 * screener.RANDOM_DRAWS
+    assert ev["orb"]["n"] >= 1 and ev["round_trip_cost_pct"] > 0.3
+    # a driftless random walk should not pass after costs
+    assert ev["passed"] is False
+    payload = {"tables": [{"data": [["2330", "台積電", "Y"], ["0050", "ETF", ""], ["abc"]]}], "data": [["x", "2317"]]}
+    assert screener._codes_in(payload) == {"2330", "2317"}
+
+
+def test_plan_levels_states():
+    from daytrade import screener
+    c = DayTradeCosts()
+    flat = [[100.0, 100.5, 99.5, 100.0, 1.0]] * 3
+    lv = screener.plan_levels(flat[:2], tm.Rule(), c)
+    assert lv["status"] == "waiting_range"
+    lv = screener.plan_levels(flat, tm.Rule(), c)
+    assert lv["status"] == "waiting_breakout" and lv["stop"] < lv["entry"] < lv["target"]
+    up = flat + [[100.4, 101.0, 100.3, 100.9, 1.0]]
+    assert screener.plan_levels(up, tm.Rule(), c)["status"] == "breakout_now"
+    up2 = up + [[101.0, 101.2, 100.8, 101.0, 1.0]]
+    lv = screener.plan_levels(up2, tm.Rule(), c)
+    assert lv["status"] == "in_trade" and lv["entry_is_estimate"] is False
+    up3 = up2 + [[101.0, 110.0, 101.0, 109.0, 1.0]]
+    assert screener.plan_levels(up3, tm.Rule(), c)["status"] == "closed_target"
 
 
 if __name__ == "__main__":

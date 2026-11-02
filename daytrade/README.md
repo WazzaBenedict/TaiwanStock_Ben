@@ -19,7 +19,7 @@ python -m daytrade.timemachine 2330 2026-10-30                    # opening-rang
 python -m daytrade.timemachine 2330 2026-10-30 --source yahoo
 python -m daytrade.timemachine 2330 2026-10-30 --entry 1050 --stop 1040 --target 1070 --entry-time 10:15
 python -m daytrade.timemachine 2330 2026-10-30 --offline bars.json --json
-python -m daytrade.test_daytrade                                   # tests, synthetic data, no network
+python -m pytest -q tests/test_daytrade.py                         # tests, synthetic data, no network
 ```
 
 API: `GET /api/daytrade/timemachine?stock_id=2330&date=2026-10-30` (see `api.py` for options).

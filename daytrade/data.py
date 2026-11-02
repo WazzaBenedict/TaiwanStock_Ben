@@ -183,7 +183,8 @@ LAST_SOURCE = {"name": ""}  # which feed the last load_sessions call used
 YAHOO_URL = "https://query2.finance.yahoo.com/v8/finance/chart/%s?range=60d&interval=5m"
 
 
-def parse_yahoo_chart(payload: dict, end_date: str | None = None) -> dict[str, list[list[float]]]:
+def parse_yahoo_chart(payload: dict, end_date: str | None = None,
+                      partial: bool = False) -> dict[str, list[list[float]]]:
     """Yahoo v8 chart JSON (5-minute) -> {date: 54 bars}. Timestamps are bar starts in
     UTC; the exchange offset comes from meta.gmtoffset (Taipei = +8h). A bar stamped
     13:25 or later (the closing auction) is merged into the last bar."""
@@ -216,10 +217,31 @@ def parse_yahoo_chart(payload: dict, end_date: str | None = None) -> dict[str, l
             b[1], b[2], b[3], b[4] = max(b[1], h), min(b[2], l), float(c), b[4] + v
     out = {}
     for ds, bars in sorted(by_day.items()):
+        if partial:  # an unfinished session: keep the bars traded so far
+            while bars and bars[-1] is None:
+                bars = bars[:-1]
         full = fill_quiet_bars(bars)
         if full is not None:
             out[ds] = full
     return out
+
+
+def fetch_today_yahoo(stock_id: str, timeout: int = 15) -> tuple[str, list[list[float]]] | None:
+    """The latest session's 5-minute bars so far (possibly unfinished). Yahoo's
+    Taiwan intraday data can be delayed by several minutes or more."""
+    for suffix in (".TW", ".TWO"):
+        url = "https://query2.finance.yahoo.com/v8/finance/chart/%s?range=1d&interval=5m" % \
+            urllib.parse.quote(stock_id + suffix)
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (taiwanstock-daytrade/1.0)"})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                out = parse_yahoo_chart(json.loads(r.read().decode("utf-8")), partial=True)
+            if out:
+                ds = max(out)
+                return ds, out[ds]
+        except Exception:
+            continue
+    return None
 
 
 YAHOO_DAILY_URL = "https://query2.finance.yahoo.com/v8/finance/chart/%s?range=6mo&interval=1d"
