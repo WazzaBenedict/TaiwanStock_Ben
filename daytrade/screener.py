@@ -315,7 +315,8 @@ def screen(top: int = 40, rule: tm.Rule | None = None, costs: DayTradeCosts | No
     rule = rule or tm.Rule()
     costs = costs or DayTradeCosts()
     today = taipei_today().isoformat()
-    cpath = CACHE_DIR / ("screen-%s-%d-%d-%s.json" % (today, top, rule.orb_minutes, rule.target_r))
+    cpath = CACHE_DIR / ("screen-%s-%d-%d-%s-d%g-s%d.json" % (today, top, rule.orb_minutes, rule.target_r,
+                                                          costs.fee_discount, costs.slip_ticks))
     if use_cache and cpath.exists():
         return json.loads(cpath.read_text(encoding="utf-8"))
     log = log or (lambda *_: None)
@@ -372,7 +373,7 @@ def screen(top: int = 40, rule: tm.Rule | None = None, costs: DayTradeCosts | No
         "as_of": today, "universe_date": uni[0].get("date", ""),
         "last_session": max((r["to"] for r in rows), default=""), "rule": {"orb_minutes": rule.orb_minutes, "target_r": rule.target_r,
                                  "stop_rule": rule.stop_rule},
-        "costs": {"fee_discount": costs.fee_discount, "tax_rate": costs.tax_rate, "slip_ticks": costs.slip_ticks},
+        "costs": {"broker": costs.broker, "fee_discount": costs.fee_discount, "min_fee": costs.min_fee, "tax_rate": costs.tax_rate, "slip_ticks": costs.slip_ticks},
         "universe": len(uni), "daytrade_list_size": len(dtl), "candidates": rows, "skipped": skipped,
         "passed": sum(r["passed"] for r in rows), "notes": notes,
         "how_to_trade": ("規則：9:%02d 前不進場；之後某根 5 分 K 收盤突破開盤 %d 分鐘高點，下一根開盤買進；"
@@ -415,7 +416,7 @@ def main(argv=None):
     ap.add_argument("--top", type=int, default=40)
     ap.add_argument("--orb-minutes", type=int, default=15)
     ap.add_argument("--target-r", type=float, default=1.0)
-    ap.add_argument("--fee-discount", type=float, default=0.6)
+    ap.add_argument("--fee-discount", type=float, default=DayTradeCosts().fee_discount)
     ap.add_argument("--slip-ticks", type=int, default=1)
     ap.add_argument("--min-range", type=float, default=2.0)
     ap.add_argument("--no-cache", action="store_true")

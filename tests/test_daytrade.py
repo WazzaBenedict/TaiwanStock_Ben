@@ -34,8 +34,8 @@ def test_tick_table():
 
 def test_costs_round_trip():
     c = DayTradeCosts(fee_discount=0.6, slip_ticks=1)
-    # 1 lot at 100 flat: two fees of max(20, 100000*0.001425*0.6=85.5) + tax 150
-    assert abs(c.net_pnl(100, 100, 1000) - (-(85.5 * 2 + 150))) < 1e-6
+    # 1 lot at 100 flat: two fees of floor(max(20, 100000*0.001425*0.6=85.5)) + tax 150
+    assert abs(c.net_pnl(100, 100, 1000) - (-(85 * 2 + 150))) < 1e-6  # fees floored to NT$
     # min fee applies to small orders
     assert abs(c.fee(1000) - 20) < 1e-9
     assert c.slip(100, "buy") == 100.5 and c.slip(100, "sell") == 99.9
