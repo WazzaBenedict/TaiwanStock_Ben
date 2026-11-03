@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>HERO HQ 台股 AI 英雄指揮中心 V13.2.0</title>
+<title>HERO HQ 台股 AI 英雄指揮中心 V13.3.0</title>
 <meta name="theme-color" content="#0a0e1f"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -632,7 +632,7 @@ button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
       使用 Google 帳號登入
     </button>
     <div id="loginError"></div>
-    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:12px">版本 <b class="app-ver">V13.2.0</b></div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:12px">版本 <b class="app-ver">V13.3.0</b></div>
   </div>
 </div>
 
@@ -642,7 +642,7 @@ button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
     <span class="live-dot"></span>
     <span class="hq-brand">HERO<span>HQ</span></span>
     <span class="hq-brand-sub">台股 AI 英雄指揮中心</span>
-    <span class="ver app-ver" title="目前版本">V13.2.0</span>
+    <span class="ver app-ver" title="目前版本">V13.3.0</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="mkt-switcher us-only">
@@ -662,7 +662,7 @@ button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
     </div>
     <div class="version-warn" id="versionWarn"></div>
     <div class="health-grid" id="healthGrid">
-      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V13.2.0</b></div>
+      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V13.3.0</b></div>
       <div class="health-chip"><span>Backend</span><b id="hBackend">—</b></div>
       <div class="health-chip"><span>Firestore</span><b id="hFirestore">待登入</b></div>
       <div class="health-chip"><span>Yahoo</span><b id="hYahoo">—</b></div>
@@ -709,7 +709,7 @@ button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
   <div class="hq-floor-title"><span>快速出動</span></div>
   <div class="hq-quick" id="hqQuick"></div>
   <details class="hq-notes" id="hqNotes">
-    <summary>📰 <b class="app-ver">V13.2.0</b> 更新內容</summary>
+    <summary>📰 <b class="app-ver">V13.3.0</b> 更新內容</summary>
     <ul id="hqNotesList"></ul>
   </details>
   <div class="fee-set" id="feeSet">
@@ -1156,6 +1156,81 @@ button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
 <!-- ═══ TW Account Page ═══ -->
 <!-- ══ 台股時光機 (day-trade replay, daytrade/timemachine.py) ══ -->
 <div class="page" id="p-timemachine">
+  <!-- V13.3 小資當沖風控（整張）：下單前檢查 + 今日/累計停損記帳。只在瀏覽器計算，不下單。 -->
+  <div class="section" id="dtRiskSection">
+    <div class="section-title"><div class="section-title-left">🛡️ 小資當沖風控（整張） <span class="d-badge">下單前先過這關，不會幫你下單</span></div></div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:8px">
+      規則：每筆 ≤ 每筆上限、股價 20～50 元、只做先買後賣、13:00 後不進場、13:20 前全部平倉；今天虧到每日停損就收工，累計虧到總停損就停手回到模擬。
+      當天沒賣掉（跌停鎖死、斷線、忘記平倉）T+2 要付整筆買進金額，請確定 2 天內拿得出來。回測：常見當沖規則扣成本後平均每筆虧 0.6%～1.2%。
+    </div>
+    <div class="row" style="gap:8px;flex-wrap:wrap;font-size:12px;margin-bottom:8px">
+      <label>股價 <input id="rkPx" type="number" step="0.05" min="0" style="width:80px" placeholder="35"></label>
+      <label>張數 <input id="rkLots" type="number" step="1" min="1" value="1" style="width:56px"></label>
+      <label>停損 % <input id="rkStop" type="number" step="0.1" min="0.1" value="1.5" style="width:64px"></label>
+      <button class="ghost sm" id="rkCheck">檢查</button>
+    </div>
+    <details style="font-size:12px;margin-bottom:8px"><summary>我的上限設定</summary>
+      <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:6px">
+        <label>交割金 <input id="rkCash" type="number" step="100" style="width:80px"></label>
+        <label>當沖額度 <input id="rkCredit" type="number" step="1000" style="width:96px"></label>
+        <label>每筆上限 <input id="rkMaxN" type="number" step="1000" style="width:88px"></label>
+        <label>每日停損 <input id="rkDay" type="number" step="100" style="width:72px"></label>
+        <label>總停損 <input id="rkTotal" type="number" step="100" style="width:72px"></label>
+        <button class="ghost sm" id="rkSave">儲存</button>
+      </div></details>
+    <div id="rkOut" style="font-size:12px;line-height:1.8"></div>
+    <div class="row" style="gap:8px;flex-wrap:wrap;font-size:12px;margin-top:10px">
+      <label>記一筆已平倉損益（扣完成本，虧損填負數）<input id="rkPnl" type="number" step="1" style="width:90px" placeholder="-850"></label>
+      <button class="ghost sm" id="rkAdd">記錄</button><button class="ghost sm" id="rkReset">清除全部紀錄</button>
+    </div>
+    <div id="rkLog" style="font-family:var(--mono);font-size:12px;margin-top:6px"></div>
+  </div>
+  <script>
+  (function(){
+    var DEF={cash:5000,credit:200000,maxN:50000,day:1000,total:2500};
+    function ld(k,d){try{var v=JSON.parse(localStorage.getItem(k));return v==null?d:v;}catch(e){return d;}}
+    function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+    function cfg(){var c=ld("tw_dt_risk_cfg",{});var o={};for(var k in DEF)o[k]=Number(c[k])>0?Number(c[k]):DEF[k];return o;}
+    function log(){var l=ld("tw_dt_risk_log",[]);return Array.isArray(l)?l:[];}
+    function twNow(){var d=new Date(Date.now()+8*3600e3);return {date:d.toISOString().slice(0,10),min:d.getUTCHours()*60+d.getUTCMinutes()};}
+    function disc(){return window.feeDisc?feeDisc():0.6;}
+    function fee(n){return Math.max(20,Math.floor(n*0.001425*disc()));}
+    function nt(x){x=Math.round(x);return (x<0?"-":"")+"NT$"+Math.abs(x).toLocaleString();}
+    function tick(p){return p<10?0.01:p<50?0.05:p<100?0.1:p<500?0.5:p<1000?1:5;}
+    function totals(){var t=twNow().date,day=0,all=0;log().forEach(function(e){all+=e.p;if(e.d===t)day+=e.p;});return {day:day,all:all};}
+    function fill(){var c=cfg();["cash","credit","maxN","day","total"].forEach(function(k){var i=$I("rk"+k.charAt(0).toUpperCase()+k.slice(1));if(i)i.value=c[k];});}
+    function drawLog(){var c=cfg(),T=totals(),el=$I("rkLog");if(!el)return;
+      var cls=function(x){return x<0?"dt-neg":"dt-pos";};
+      el.innerHTML='今日損益 <b class="'+cls(T.day)+'">'+nt(T.day)+'</b>（每日停損 '+nt(-c.day)+'）　累計 <b class="'+cls(T.all)+'">'+nt(T.all)+'</b>（總停損 '+nt(-c.total)+'）'+
+        (T.all<=-c.total?'<br><b class="dt-neg">⛔ 已到總停損：停止真錢當沖，回到模擬交易。</b>':T.day<=-c.day?'<br><b class="dt-neg">⛔ 今天已到每日停損：收工，明天再說。</b>':'');}
+    function check(){
+      var c=cfg(),px=Number($I("rkPx").value),lots=Math.floor(Number($I("rkLots").value)||0),sp=Number($I("rkStop").value)||0,out=$I("rkOut");
+      if(!(px>0)||lots<1){out.innerHTML='<span class="dt-neg">請輸入股價和張數</span>';return;}
+      var n=px*1000*lots,cost=fee(n)*2+Math.floor(n*0.0015),be=cost/n*100,loss=n*sp/100+cost,T=totals(),now=twNow(),bad=[],warn=[];
+      if(n>c.maxN)bad.push("金額 "+nt(n)+" 超過每筆上限 "+nt(c.maxN));
+      if(n>c.credit)bad.push("超過當沖額度 "+nt(c.credit));
+      if(px<20||px>50)bad.push("股價不在 20～50 元（太低跳動比例大、太高 1 張就太重）");
+      if(T.all<=-c.total)bad.push("已到總停損，停止真錢當沖");
+      else if(T.day<=-c.day)bad.push("今天已到每日停損");
+      else if(T.day-loss< -c.day)bad.push("這筆若停損，今天會虧到 "+nt(T.day-loss)+"，超過每日停損");
+      if(now.min>=13*60&&now.min<13*60+30)bad.push("13:00 後不再進場");
+      if(n>c.cash)warn.push("賣不掉時 T+2 要付 "+nt(n)+"，你的交割金只有 "+nt(c.cash)+"，請確定 2 天內拿得出差額 "+nt(n-c.cash));
+      if(sp>2)warn.push("停損 "+sp+"% 偏寬");
+      out.innerHTML=(bad.length?'<b class="dt-neg">⛔ 不要下單</b>：'+bad.map(esc).join("；"):'<b class="dt-pass">✅ 在上限內</b>（仍然只是風控，不代表會賺）')+
+        '<br>買進金額 '+nt(n)+'　來回成本 '+nt(cost)+'（要漲 '+be.toFixed(2)+'% ＋ 滑價才打平；1 跳 = '+(tick(px)/px*100).toFixed(2)+'%）'+
+        '<br>停損 '+sp+'% 的虧損約 '+nt(loss)+'　停損價 ≈ '+(px*(1-sp/100)).toFixed(2)+
+        (warn.length?'<br><span class="dt-neg">⚠️ '+warn.map(esc).join("<br>⚠️ ")+'</span>':'');
+    }
+    function init(){
+      if(!$I("rkCheck")||$I("rkCheck").dataset.on)return; $I("rkCheck").dataset.on="1"; fill(); drawLog();
+      $I("rkCheck").onclick=check;
+      $I("rkSave").onclick=function(){var o={};["cash","credit","maxN","day","total"].forEach(function(k){o[k]=Number($I("rk"+k.charAt(0).toUpperCase()+k.slice(1)).value);});sv("tw_dt_risk_cfg",o);fill();drawLog();};
+      $I("rkAdd").onclick=function(){var p=Number($I("rkPnl").value);if(!isFinite(p)||$I("rkPnl").value==="")return;var l=log();l.push({d:twNow().date,p:Math.round(p)});sv("tw_dt_risk_log",l.slice(-500));$I("rkPnl").value="";drawLog();};
+      $I("rkReset").onclick=function(){if(confirm("清除所有損益紀錄？"))sv("tw_dt_risk_log",[]);drawLog();};
+    }
+    if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
+  })();
+  </script>
   <div class="section" id="dtScanSection">
     <div class="section-title"><div class="section-title-left">🎯 當沖候選（先買後賣） <span class="d-badge">扣成本後的歷史成績，非投資建議</span></div>
       <div class="row" style="gap:6px"><button class="ghost sm" id="btnDtScan">掃描</button><button class="ghost sm" id="btnDtLevels">更新今日價位</button></div></div>
@@ -1514,7 +1589,7 @@ button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
 <div class="footer">
   ⚠️ 本工具僅供技術分析學習參考，不構成任何投資建議。台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
   資料來源：TWSE MIS · Yahoo Finance · TWSE Official · FinMind · Google News RSS（均為免費公開）<br>
-  HERO HQ 台股 AI 英雄指揮中心 <span class="app-ver">V13.2.0</span>
+  HERO HQ 台股 AI 英雄指揮中心 <span class="app-ver">V13.3.0</span>
 </div>
 
 <script>
@@ -1527,7 +1602,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="13.2.0";
+var FRONTEND_VERSION="13.3.0";
 // 美股功能先收起來（程式碼保留）。要恢復請改成 true。
 var ENABLE_US=false;
 
@@ -1547,6 +1622,7 @@ function initFeeSetting(){
     if(typeof CURRENT_ID!=="undefined"&&CURRENT_ID&&typeof loadTradePlanV2==="function")loadTradePlanV2(CURRENT_ID);};}
 }
 var RELEASE_NOTES=[
+  "V13.3：⚡ 當沖 分頁新增「小資當沖風控（整張）」：下單前檢查每筆上限、股價 20～50、每日／總停損、13:00 後不進場，並提醒賣不掉時 T+2 要付的全額",
   "V13.2：交易成本改用元大證券電子下單：手續費 0.1425% × 6 折、整股每筆最低 20 元、零股最低 1 元、無條件捨去；證交稅 0.3%、當沖 0.15%、ETF 0.1%",
   "交易計畫卡、⚡ 當沖、台股時光機、個股回測、勝率統計全部改用同一套成本；首頁可改成你自己的手續費折扣",
   "個股回測與勝率之前沒扣成本，現在扣完手續費與證交稅後才算賺錢（數字會比以前保守）",

@@ -1,7 +1,7 @@
 """
 V12.9.2 Multi-Portfolio Watchlist Manager
 架構：TW Engine / US Engine / Shared Engine（三層分離）
-版本：13.2.0
+版本：13.3.0
 """
 import os, re, asyncio, json, time, hashlib
 from datetime import datetime, timedelta
@@ -13,7 +13,7 @@ from authz import require_writer
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="V12.9.2 Multi-Portfolio Watchlist Manager", version="13.2.0")
+app = FastAPI(title="V12.9.2 Multi-Portfolio Watchlist Manager", version="13.3.0")
 _raw = os.getenv("ALLOWED_ORIGINS",
     "http://localhost:5500,http://127.0.0.1:5500,"
     "https://taiwanstock-ben.web.app,https://taiwanstock-ben.firebaseapp.com")
@@ -662,7 +662,7 @@ def get_stock_name(sid: str, api_name: str | None=None) -> str:
 # TW LEARNING / WEIGHTS
 # ══════════════════════════════════════════════════════════════════════════════
 TW_DEFAULT_WEIGHTS={"technical":0.35,"fundamental":0.25,"chip":0.25,"news":0.15,
-    "risk":0.10,"macro":0.05,"updated_at":"","version":"13.2.0","last_reason":"預設權重"}
+    "risk":0.10,"macro":0.05,"updated_at":"","version":"13.3.0","last_reason":"預設權重"}
 TW_WEIGHT_LIMITS={"technical":(0.20,0.45),"fundamental":(0.10,0.35),"chip":(0.10,0.40),"news":(0.05,0.25)}
 
 def _rjf(path,default):
@@ -2803,15 +2803,15 @@ def _suggest_learning_weights(payload: dict) -> dict:
 
 @app.post("/api/learning/summary", dependencies=[Depends(require_writer)])
 def api_learning_summary_v128(payload: dict = Body(default={})):
-    return {"version": "13.2.0", "summary": _learning_summary(payload), "time": datetime.now().isoformat()}
+    return {"version": "13.3.0", "summary": _learning_summary(payload), "time": datetime.now().isoformat()}
 
 @app.post("/api/learning/calibrate", dependencies=[Depends(require_writer)])
 def api_learning_calibrate_v128(payload: dict = Body(default={})):
-    return {"version": "13.2.0", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
+    return {"version": "13.3.0", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
 
 @app.post("/api/learning/suggest-weights", dependencies=[Depends(require_writer)])
 def api_learning_suggest_weights_v128(payload: dict = Body(default={})):
-    return {"version": "13.2.0", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
+    return {"version": "13.3.0", "calibration": _suggest_learning_weights(payload), "time": datetime.now().isoformat()}
 
 @app.post("/api/learning/apply-weights", dependencies=[Depends(require_writer)])
 def api_learning_apply_weights_v128(payload: dict = Body(default={})):
@@ -2820,20 +2820,20 @@ def api_learning_apply_weights_v128(payload: dict = Body(default={})):
     # Only TW backend has server-side scoring weights in this single-file app.
     if market == "tw":
         saved = save_ai_weights(weights)
-        return {"version": "13.2.0", "applied": True, "market": market, "weights": saved, "time": datetime.now().isoformat()}
-    return {"version": "13.2.0", "applied": False, "market": market, "weights": weights,
+        return {"version": "13.3.0", "applied": True, "market": market, "weights": saved, "time": datetime.now().isoformat()}
+    return {"version": "13.3.0", "applied": False, "market": market, "weights": weights,
             "message": "US personal weights are stored per user in Firestore by the frontend.", "time": datetime.now().isoformat()}
 
 @app.get("/api/learning/status")
 def api_learning_status_v128():
     h = load_signal_history()
-    return {"version": "13.2.0", "server_tw_signal_history": _lst(h),
+    return {"version": "13.3.0", "server_tw_signal_history": _lst(h),
             "note": "V12.8 personal learning events are stored in each user's Firestore and sent to /api/learning/summary or /api/learning/calibrate for calculation.",
             "time": datetime.now().isoformat()}
 
 @app.get("/api/debug/learning")
 def api_debug_learning_v128():
-    return {"version": "13.2.0", "engine": "Real AI Learning Engine",
+    return {"version": "13.3.0", "engine": "Real AI Learning Engine",
             "frontend_firestore_paths": ["users/{uid}/ai_learning_events/tw", "users/{uid}/ai_learning_events/us", "users/{uid}/ai_weight_versions/tw", "users/{uid}/ai_weight_versions/us", "users/{uid}/ai_learning_summary/tw", "users/{uid}/ai_learning_summary/us"],
             "apis": ["POST /api/learning/summary", "POST /api/learning/calibrate", "POST /api/learning/suggest-weights", "POST /api/learning/apply-weights", "GET /api/learning/status"],
             "time": datetime.now().isoformat()}
@@ -2984,7 +2984,7 @@ async def us_scan_diversified(pool:str="diversified",symbols:str="",min_score:in
 
 @app.get("/api/debug/recommendation-history")
 def api_debug_recommendation_history():
-    return {"version":"13.2.0","note":"Per-user recommendation history is stored client-side/localStorage or Firestore by the frontend. Backend diversified scan accepts history_symbols to apply novelty/repeat penalties.","fields":["symbol/stock_id","market","scan_category","shown_at","diversity_group","diversified_score"]}
+    return {"version":"13.3.0","note":"Per-user recommendation history is stored client-side/localStorage or Firestore by the frontend. Backend diversified scan accepts history_symbols to apply novelty/repeat penalties.","fields":["symbol/stock_id","market","scan_category","shown_at","diversity_group","diversified_score"]}
 
 @app.get("/api/debug/scan-status")
 def api_scan_status():
@@ -2994,7 +2994,7 @@ def api_scan_status():
         for k,(payload,ts) in list(cache.items())[-12:]:
             out.append({"key":k,"age_seconds":round(now-ts,1),"market":payload.get("market"),"mode":payload.get("scan_mode"),"pool":payload.get("pool"),"classified":payload.get("classified"),"failed":payload.get("failed")})
         return out
-    return {"version":"13.2.0","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
+    return {"version":"13.3.0","scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # API — DATA HEALTH / DIAGNOSTICS
@@ -3105,12 +3105,12 @@ async def api_health_full():
 
     payload = {
         "status": "ok" if not errors else "partial",
-        "version": "13.2.0",
-        "frontend_expected": "13.2.0",
+        "version": "13.3.0",
+        "frontend_expected": "13.3.0",
         "time": datetime.now().isoformat(),
         "backend": {
             "title": "V12.9.2 Multi-Portfolio Watchlist Manager",
-            "version": "13.2.0"
+            "version": "13.3.0"
         },
         "line": {
             "configured": bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
@@ -3220,7 +3220,7 @@ async def api_trade_plan_check(
 @app.get("/api/debug/trade-plans")
 def api_debug_trade_plans():
     return {
-        "version": "13.2.0",
+        "version": "13.3.0",
         "storage": "Firestore frontend: users/{uid}/trade_plans/tw and users/{uid}/trade_plans/us",
         "checker": "/api/trade-plan/check",
         "statuses": ["WAITING_ENTRY","ENTERABLE_NOW","ABOVE_ENTRY_ZONE","NEAR_TARGET","NEAR_STOP","STOP_BROKEN","TARGET_REACHED","INVALIDATED","NO_PRICE"],
@@ -3324,7 +3324,7 @@ async def api_position_check(
 @app.get("/api/debug/positions")
 def api_debug_positions():
     return {
-        "version": "13.2.0",
+        "version": "13.3.0",
         "storage": "Firestore frontend: users/{uid}/positions/tw and users/{uid}/positions/us",
         "checker": "/api/position/check",
         "statuses": ["HOLDING_NORMAL","NEAR_TARGET","TARGET_REACHED","NEAR_STOP","STOP_BROKEN","RISK_UP","REVIEW_REQUIRED","NO_PRICE"],
@@ -3448,13 +3448,13 @@ def _build_review_text(total, wins, pnl, avg_r, strategy_stats):
 @app.post("/api/performance/summary")
 def api_performance_summary(payload: dict = Body(default={})):  # frontend sends Firestore journal rows
     trades = payload.get("trades") or payload.get("journal") or []
-    return {"version": "13.2.0", "market": payload.get("market", "all"), "summary": _summarize_trades(trades), "time": datetime.now().isoformat()}
+    return {"version": "13.3.0", "market": payload.get("market", "all"), "summary": _summarize_trades(trades), "time": datetime.now().isoformat()}
 
 @app.post("/api/trade-journal/review")
 def api_trade_journal_review(payload: dict = Body(default={})):
     trades = payload.get("trades") or []
     summary = _summarize_trades(trades)
-    return {"version": "13.2.0", "review": summary.get("review"), "summary": summary, "time": datetime.now().isoformat()}
+    return {"version": "13.3.0", "review": summary.get("review"), "summary": summary, "time": datetime.now().isoformat()}
 
 @app.post("/api/report/summary")
 def api_report_summary(payload: dict = Body(default={})):
@@ -3471,12 +3471,12 @@ def api_report_summary(payload: dict = Body(default={})):
         "",
         summary.get("review") or "",
     ]
-    return {"version": "13.2.0", "report_text": "\n".join(lines), "summary": summary, "time": datetime.now().isoformat()}
+    return {"version": "13.3.0", "report_text": "\n".join(lines), "summary": summary, "time": datetime.now().isoformat()}
 
 @app.get("/api/debug/portfolios")
 def api_debug_portfolios():
     return {
-        "version": "13.2.0",
+        "version": "13.3.0",
         "storage": "Firestore frontend: users/{uid}/portfolios/{portfolio_id}",
         "legacy_watchlists": "users/{uid}/watchlists/tw and users/{uid}/watchlists/us are kept for fallback",
         "features": ["multiple portfolios", "default portfolio migration", "portfolio-specific watchlist", "portfolio scan"],
@@ -3486,7 +3486,7 @@ def api_debug_portfolios():
 @app.get("/api/debug/trade-journal")
 def api_debug_trade_journal():
     return {
-        "version": "13.2.0",
+        "version": "13.3.0",
         "storage": "Firestore frontend: users/{uid}/trade_journal/tw and users/{uid}/trade_journal/us",
         "endpoints": ["/api/performance/summary", "/api/trade-journal/review", "/api/report/summary"],
         "features": ["close position to journal", "R multiple", "strategy performance", "CSV export", "text report"],
@@ -3499,7 +3499,7 @@ def api_debug_trade_journal():
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/health")
 def health():
-    return{"status":"ok","version":"13.2.0","frontend_expected":"13.2.0","time":datetime.now().isoformat(),
+    return{"status":"ok","version":"13.3.0","frontend_expected":"13.3.0","time":datetime.now().isoformat(),
            "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
            "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
            "price_sources":"Yahoo Finance → TWSE Official → FinMind",
