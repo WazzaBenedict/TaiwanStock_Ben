@@ -7,7 +7,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="14.0.0";
+var FRONTEND_VERSION="14.0.1";
 // 美股功能先收起來（程式碼保留）。要恢復請改成 true。
 var ENABLE_US=false;
 
@@ -27,6 +27,7 @@ function initFeeSetting(){
     if(typeof CURRENT_ID!=="undefined"&&CURRENT_ID&&typeof loadTradePlanV2==="function")loadTradePlanV2(CURRENT_ID);};}
 }
 var RELEASE_NOTES=[
+  "V14.0.1：後端移除美股程式（少了約 830 行），系統檢查更快；觀察名單、權重、訊號歷史可備份到雲端，主機休眠後不再消失（需在 Render 設定金鑰後生效）。",
   "V14.0：地基整理。畫面與功能不變；網頁拆成獨立的樣式與腳本檔，移除舊版資料夾，之後合併到主線就會自動發布網頁，不必再開家用電腦。",
   "V13.3：⚡ 當沖 分頁新增「小資當沖風控（整張）」：下單前檢查每筆上限、股價 20～50、每日／總停損、13:00 後不進場，並提醒賣不掉時 T+2 要付的全額",
   "V13.2：交易成本改用元大證券電子下單：手續費 0.1425% × 6 折、整股每筆最低 20 元、零股最低 1 元、無條件捨去；證交稅 0.3%、當沖 0.15%、ETF 0.1%",
@@ -2112,17 +2113,16 @@ async function loadSystemHealth(){
     if(!r.ok)throw new Error(d.detail||"health failed");
     var bv=d.version||((d.backend||{}).version)||"—";
     setHealth("hBackend","V"+bv,bv===FRONTEND_VERSION?"health-ok":"health-warn");
-    var us=((d.data_health||{}).us||{}).checks||{};
     var tw=((d.data_health||{}).tw||{}).checks||{};
-    setHealth("hYahoo",((us.yahoo_quote||{}).status||"—"),statusCls((us.yahoo_quote||{}).status));
+    setHealth("hYahoo",((tw.macro||{}).status||"—"),statusCls((tw.macro||{}).status));
     setHealth("hTwse",((tw.twse_mis||{}).status||"—"),statusCls((tw.twse_mis||{}).status));
-    setHealth("hUsCtx",((us.market_context||{}).status||"—"),statusCls((us.market_context||{}).status));
+    var st=d.storage||{};setHealth("hBackup",st.enabled?(st.last_error?"錯誤":"已啟用"):"未設定",st.enabled&&!st.last_error?"health-ok":"health-warn");
     var vw=$I("versionWarn");
     if(vw){
       if(bv!==FRONTEND_VERSION){vw.style.display="block";vw.textContent="前後端版本不一致：Frontend V"+FRONTEND_VERSION+"，Backend V"+bv+"。請確認 Render 是否已部署最新版本，或按 Ctrl+F5。";}
       else{vw.style.display="none";vw.textContent="";}
     }
-    setTxt("sysHealthShort","Backend V"+bv+" · US "+(((d.data_health||{}).us||{}).overall||"—")+" · TW "+(((d.data_health||{}).tw||{}).overall||"—"));
+    setTxt("sysHealthShort","Backend V"+bv+" · TW "+(((d.data_health||{}).tw||{}).overall||"—"));
   }catch(e){
     console.warn("system health failed",e);
     setTxt("sysHealthShort","檢查失敗："+(e.message||e));

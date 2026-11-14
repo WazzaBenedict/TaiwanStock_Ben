@@ -39,3 +39,9 @@ node_modules/
 
 # Day-trade minute-bar cache
 daytrade/cache/
+
+# 伺服器執行時產生的狀態檔
+watchlist.json
+stock_master.json
+tw_weights.json
+tw_signal_history.json

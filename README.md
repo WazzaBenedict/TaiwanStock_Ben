@@ -13,6 +13,7 @@ TaiwanStock_Ben/
 ├── app.py                 # FastAPI 後端（版本號：APP_VERSION）
 ├── twcosts.py             # 元大證券電子下單成本模型（全 App 共用）
 ├── authz.py               # 寫入 API 的登入驗證
+├── cloudstore.py          # 伺服器狀態檔備份到 Firestore（Render 設 FIREBASE_SERVICE_ACCOUNT 後啟用）
 ├── tradeplan/             # 交易計畫卡
 ├── daytrade/              # 當沖篩選、時光機
 ├── tests/                 # pytest
