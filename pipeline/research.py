@@ -196,11 +196,146 @@ def label(is_: dict, oos: dict) -> tuple[str, str]:
     return "研究中", "樣本外贏 0050，但差距還不夠穩定或樣本內不一致"
 
 
-def evaluate(rule: dict, bars, bench: list[dict], today: str, fees=None) -> dict:
+# ── 股票池規則：用投信買賣超、月營收，在固定的 150 檔股票池裡選股 ──
+SEED = Path(__file__).resolve().parent / "seed"
+DATA_FILE = Path(__file__).resolve().parent / "research_data.json"   # 每天新增的資料，存在雲端
+
+
+def _read(path: Path, default):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return default
+
+
+def load_pool() -> dict:
+    """種子資料（隨程式碼發布）加上雲端累積的每日新增。"""
+    uni = _read(SEED / "universe.json", {"stocks": []})
+    t86 = _read(SEED / "t86.json", {})
+    rev = _read(SEED / "revenue.json", {})
+    cloudstore.pull(DATA_FILE)
+    add = _read(DATA_FILE, {})
+    t86.update(add.get("t86", {}))
+    for c, m in add.get("rev", {}).items():
+        rev.setdefault(c, {}).update(m)
+    return {"codes": [x["code"] for x in uni["stocks"]], "as_of": uni.get("as_of"), "t86": t86, "rev": rev, "add": add}
+
+
+def _num(v) -> float:
+    try:
+        return float(str(v).replace(",", ""))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def update_pool(cl: httpx.Client, pool: dict, last_day: str) -> list[str]:
+    """補上最新一天的投信買賣超與最新一個月的營收；失敗就略過，下次排程再補。"""
+    notes, add, cs = [], pool["add"], set(pool["codes"])
+    add.setdefault("t86", {})
+    add.setdefault("rev", {})
+    if last_day and last_day not in pool["t86"]:
+        try:
+            r = cl.get("https://www.twse.com.tw/rwd/zh/fund/T86", params={"date": last_day.replace("-", ""), "selectType": "ALL", "response": "json"})
+            j = r.json() if r.status_code == 200 else {}
+            if j.get("stat") == "OK":
+                f = j["fields"]
+                ic, it = f.index("證券代號"), f.index("投信買賣超股數")
+                day = {row[ic].strip(): int(_num(row[it])) for row in j["data"] if row[ic].strip() in cs and _num(row[it]) != 0}
+                add["t86"][last_day] = pool["t86"][last_day] = day
+                notes.append(f"t86 {last_day} +{len(day)}")
+            else:
+                notes.append(f"t86 {last_day} 未取得（{r.status_code}）")
+        except Exception as e:
+            notes.append(f"t86 {last_day} 失敗 {type(e).__name__}")
+    try:
+        rows = cl.get("https://openapi.twse.com.tw/v1/opendata/t187ap05_L").json()
+        n = 0
+        for x in rows:
+            c, ym = str(x.get("公司代號", "")).strip(), str(x.get("資料年月", "")).strip()
+            v = _num(x.get("營業收入-當月營收"))
+            if c in cs and len(ym) >= 4 and v > 0:
+                key = f"{int(ym[:-2]) + 1911}{ym[-2:]}"
+                if pool["rev"].setdefault(c, {}).get(key) is None:
+                    pool["rev"][c][key] = add["rev"].setdefault(c, {})[key] = round(v)
+                    n += 1
+        if n:
+            notes.append(f"營收 +{n}")
+    except Exception as e:
+        notes.append(f"營收失敗 {type(e).__name__}")
+    if notes:
+        DATA_FILE.write_text(json.dumps(add, ensure_ascii=False), encoding="utf-8")
+        cloudstore.push(DATA_FILE)
+    return notes
+
+
+def pool_trust(pool: dict, bars: dict, top=5, hold=11) -> list[tuple]:
+    """前一天投信買超金額最大的 5 檔，隔天開盤買，第 11 個交易日收盤賣。"""
+    idx = {c: {b["d"]: i for i, b in enumerate(bs)} for c, bs in bars.items()}
+    out = []
+    for d in sorted(pool["t86"]):
+        rank = []
+        for c, sh in pool["t86"][d].items():
+            i = idx.get(c, {}).get(d)
+            if sh > 0 and i is not None:
+                rank.append((sh * bars[c][i]["c"], c, i))
+        for _, c, i in sorted(rank, reverse=True)[:top]:
+            bs = bars[c]
+            if i + hold < len(bs) and bs[i + 1]["o"]:
+                out.append((c, {"d_in": bs[i + 1]["d"], "d_out": bs[i + hold]["d"], "buy": bs[i + 1]["o"], "sell": bs[i + hold]["c"], "daytrade": False, "at_open": True}))
+    return out
+
+
+def _ym(y: int, m: int, k: int) -> str:
+    t = y * 12 + (m - 1) + k
+    return f"{t // 12}{t % 12 + 1:02d}"
+
+
+def rev_yoy3(rev: dict, y: int, m: int) -> float | None:
+    """近三個月營收合計的年增率。缺任何一個月就不算。"""
+    cur = [rev.get(_ym(y, m, -k)) for k in range(3)]
+    old = [rev.get(_ym(y, m, -k - 12)) for k in range(3)]
+    if None in cur or None in old or sum(old) <= 0:
+        return None
+    return sum(cur) / sum(old) - 1
+
+
+def pool_revenue(pool: dict, bars: dict, bench: list[dict], top=10) -> list[tuple]:
+    """每月 11 日後的第一個交易日（營收都已公布）：買近三月營收年增率最高、且年增率還在加速的 10 檔，抱到下個月同一時間。"""
+    days = [b["d"] for b in bench]
+    decide = []                                   # (決策日, 可用的營收年, 月)
+    for i, d in enumerate(days):
+        if int(d[8:]) >= 11 and (i == 0 or days[i - 1][:7] != d[:7] or int(days[i - 1][8:]) < 11):
+            y, m = int(d[:4]), int(d[5:7])
+            decide.append((d, *((y, m - 1) if m > 1 else (y - 1, 12))))
+    idx = {c: {b["d"]: i for i, b in enumerate(bs)} for c, bs in bars.items()}
+    out = []
+    for (d, y, m), nxt in zip(decide, decide[1:]):
+        rank = []
+        for c in pool["codes"]:
+            r = pool["rev"].get(c) or {}
+            a = rev_yoy3(r, y, m)
+            b = rev_yoy3(r, *((y, m - 1) if m > 1 else (y - 1, 12)))
+            if a is not None and b is not None and a > b and d in idx.get(c, {}) and nxt[0] in idx[c]:
+                rank.append((a, c))
+        for _, c in sorted(rank, reverse=True)[:top]:
+            bs, i, j = bars[c], idx[c][d], idx[c][nxt[0]]
+            out.append((c, {"d_in": d, "d_out": nxt[0], "buy": bs[i]["c"], "sell": bs[j]["c"], "daytrade": False}))
+    return out
+
+
+POOL_RULES = [
+    {"id": "trust_top5", "name": "跟投信買超前 5 名", "desc": "股票池裡前一天投信買超金額最大的 5 檔，隔天開盤買，抱 11 個交易日", "code": "pool", "kind": "選股", "fn": pool_trust,
+     "caution": "股票池是 2026 年 11 月成交值前 150 名，等於事後挑了現在的熱門股，歷史數字偏樂觀；請以「上線後」那一段為準"},
+    {"id": "rev_top10", "name": "月營收加速前 10 名", "desc": "每月營收公布後，買近三月營收年增率最高且仍在加速的 10 檔，抱一個月", "code": "pool", "kind": "選股", "fn": pool_revenue,
+     "caution": "股票池是 2026 年 11 月成交值前 150 名，等於事後挑了現在的熱門股，歷史數字偏樂觀；請以「上線後」那一段為準"},
+]
+
+
+def evaluate(rule: dict, bars, bench: list[dict], today: str, fees=None, trades=None) -> dict:
     """bars 可以是單一標的的日線，或 [(代號, 日線), ...]（一條規則套用多檔）。"""
     fees = fees or broker()
     series = bars if bars and isinstance(bars[0], tuple) else [(rule["code"], bars)]
-    bars = series[0][1]
+    bars = series[0][1] if series[0][1] else bench
     bmap = {b["d"]: b for b in bench}
     oos_start = (date.fromisoformat(today) - timedelta(days=OOS_DAYS)).isoformat()
     seg = {"is": [], "oos": [], "live": []}
@@ -210,7 +345,8 @@ def evaluate(rule: dict, bars, bench: list[dict], today: str, fees=None) -> dict
         w = [bench[i + h]["c"] / bench[i]["c"] - 1 for i in range(len(bench) - h)]
         uncond = sum(w) / len(w) if w else 0.0
     extra = {"ref": bench} if rule.get("ref0050") else {}
-    trades = [(code, t) for code, bs in series for t in rule["fn"](bs, **rule.get("args", {}), **extra)]
+    if trades is None:
+        trades = [(code, t) for code, bs in series for t in rule["fn"](bs, **rule.get("args", {}), **extra)]
     trades.sort(key=lambda x: x[1]["d_in"])
     for code, t in trades:
         bi, bo = bmap.get(t["d_in"]), bmap.get(t["d_out"])
@@ -223,7 +359,7 @@ def evaluate(rule: dict, bars, bench: list[dict], today: str, fees=None) -> dict
                 net -= ROUND_TRIP_ETF / 2
             row = {"net": net, "bench": b_out / b_in - 1}
         else:
-            base = bi["o"] if t["daytrade"] else bi["c"]
+            base = bi["o"] if t["daytrade"] or t.get("at_open") else bi["c"]
             if not base:
                 continue
             row = {"net": trade_net(t["buy"], t["sell"], code, t["daytrade"], fees), "bench": uncond if uncond is not None else bo["c"] / base - 1}
@@ -289,7 +425,7 @@ def track_changes(cards: list[dict], today: str) -> list[dict]:
 def build() -> dict:
     today = datetime.now(timezone(timedelta(hours=8))).date().isoformat()
     fees = broker()
-    errors, cards, cache = {}, [], {}
+    errors, cards, cache, pool_notes = {}, [], {}, []
     with httpx.Client(timeout=30, headers=UA, follow_redirects=True) as cl:
         bench = yahoo(cl, "0050")
         cache["0050"] = bench
@@ -305,8 +441,26 @@ def build() -> dict:
                 cards.append(evaluate(r, got if r.get("codes") else got[0][1], bench, today, fees))
             except Exception as e:
                 errors[r["id"]] = f"{type(e).__name__}: {str(e)[:100]}"
+        try:                                   # 股票池規則：要抓 150 檔日線，失敗不影響上面的規則
+            pool = load_pool()
+            if pool["codes"] and bench:
+                pool_notes = update_pool(cl, pool, bench[-1]["d"])
+                pbars = {}
+                for c in pool["codes"]:
+                    bs = yahoo(cl, c, "5y")
+                    if bs:
+                        pbars[c] = bs
+                if len(pbars) < len(pool["codes"]) * 0.8:
+                    raise RuntimeError(f"股票池日線只抓到 {len(pbars)} 檔")
+                for r in POOL_RULES:
+                    tr = r["fn"](pool, pbars) if r["fn"] is pool_trust else r["fn"](pool, pbars, bench)
+                    card = evaluate(r, [], bench, today, fees, trades=tr)
+                    card["first_day"] = min((t["d_in"] for _, t in tr), default=None)
+                    cards.append(card)
+        except Exception as e:
+            errors["pool"] = f"{type(e).__name__}: {str(e)[:100]}"
     out = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "today": today, "live_start": LIVE_START,
-           "oos_days": OOS_DAYS, "min_n": MIN_N, "trade_size": TRADE_SIZE, "fee_discount": fees.fee_discount, "cards": cards, "errors": errors, "evidence": EVIDENCE, "rule_watch": RULE_WATCH, "evidence_date": "2026-11-14",
+           "oos_days": OOS_DAYS, "min_n": MIN_N, "trade_size": TRADE_SIZE, "fee_discount": fees.fee_discount, "cards": cards, "errors": errors, "pool_notes": pool_notes, "evidence": EVIDENCE, "rule_watch": RULE_WATCH, "evidence_date": "2026-11-14",
            "counts": {k: sum(1 for c in cards if c["label"] == k) for k in ("可用", "研究中", "未通過")}}
     try:
         log = track_changes(cards, today)
@@ -322,7 +476,7 @@ def build() -> dict:
 def main(argv: list[str]) -> int:
     path = Path(argv[1]) if len(argv) > 1 else Path(__file__).resolve().parent.parent / "public" / "data" / "research.json"
     out = build()
-    if len(out["cards"]) < len(RULES) // 2:
+    if len(out["cards"]) < len(RULES) // 2:   # 股票池規則失敗時仍照常發布其他規則
         print("research incomplete, not writing:", json.dumps(out["errors"], ensure_ascii=False))
         return 1
     path.parent.mkdir(parents=True, exist_ok=True)
