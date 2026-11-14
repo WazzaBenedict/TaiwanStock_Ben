@@ -51,3 +51,27 @@ def test_label_thresholds_and_change_log(tmp_path, monkeypatch):
     R.track_changes([{"id": "a", "name": "A", "label": "研究中"}], "2026-11-16")
     log = R.track_changes([{"id": "a", "name": "A", "label": "未通過"}], "2026-11-17")
     assert log["runs"] == 2 and log["changes"] == [{"date": "2026-11-17", "id": "a", "name": "A", "from": "研究中", "to": "未通過"}]
+
+
+def test_rev_yoy3_and_revenue_rule_picks_accelerating_growth():
+    assert R._ym(2026, 1, -1) == "202512" and R._ym(2026, 3, -14) == "202501"
+    rev = {R._ym(2024, 1, k): 100 for k in range(24)}
+    assert R.rev_yoy3(rev, 2025, 12) == 0 and R.rev_yoy3({}, 2025, 12) is None
+    grow = dict(rev)
+    grow.update({"202510": 150, "202511": 200, "202512": 300})        # 年增率逐月加速
+    bench = bars(120, lambda i: (100.0, 100.0), start=date(2025, 12, 1))
+    pb = {"1111": bars(120, lambda i: (50.0, 50.0 + i * 0.1), start=date(2025, 12, 1)), "2222": bars(120, lambda i: (50.0, 50.0), start=date(2025, 12, 1))}
+    tr = R.pool_revenue({"codes": ["1111", "2222"], "rev": {"1111": grow, "2222": rev}}, pb, bench)
+    assert tr and all(c == "1111" for c, _ in tr)                      # 沒成長的 2222 不會入選
+    assert tr[0][1]["d_in"] == "2025-12-11" and tr[0][1]["d_out"] == "2026-01-11"   # 12/11 用到 11 月營收
+
+
+def test_trust_rule_buys_next_open_and_holds_11_days():
+    pb = {"1111": bars(40, lambda i: (10.0 + i, 10.5 + i)), "2222": bars(40, lambda i: (100.0, 100.0))}
+    d0 = pb["1111"][5]["d"]
+    tr = R.pool_trust({"t86": {d0: {"1111": 5000, "2222": -9000}}}, pb, top=5, hold=11)
+    assert len(tr) == 1 and tr[0][0] == "1111"                         # 賣超的不買
+    t = tr[0][1]
+    assert t["d_in"] == pb["1111"][6]["d"] and t["buy"] == 16.0 and t["d_out"] == pb["1111"][16]["d"] and t["sell"] == 26.5
+    card = R.evaluate(R.POOL_RULES[0], [], pb["2222"], pb["2222"][-1]["d"], trades=tr)
+    assert card["oos"]["n"] == 1 and card["label"] == "研究中"

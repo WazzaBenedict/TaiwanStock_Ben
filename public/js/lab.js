@@ -4,9 +4,9 @@ var LAB=(function(){
   function $(id){return document.getElementById(id);}
   function e(s){return String(s==null?"":s).replace(/[&<>'"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c];});}
   function pc(v){if(v==null||isNaN(v))return '<span class="lb-na">—</span>';return '<span class="'+(v>0?"up":v<0?"down":"")+'">'+(v>0?"+":"")+Number(v).toFixed(2)+'%</span>';}
-  function seg(title,s,hint){
+  function seg(title,s,hint,vs){vs=vs||"0050";
     if(!s||!s.n)return '<div class="lb-seg"><div class="lb-seg-t">'+title+'</div><div class="lb-na">還沒有資料</div><div class="lb-hint">'+hint+'</div></div>';
-    return '<div class="lb-seg"><div class="lb-seg-t">'+title+'（'+s.n+' 筆）</div><div>每筆平均 '+pc(s.avg_net_pct)+'</div><div>比 0050 '+pc(s.avg_excess_pct)+'</div><div class="lb-hint">勝率 '+s.win_rate_pct+'%　'+hint+'</div></div>';
+    return '<div class="lb-seg"><div class="lb-seg-t">'+title+'（'+s.n+(vs==="0050"?' 筆':' 期')+'）</div><div>'+(vs==="0050"?'每筆':'每期')+'平均 '+pc(s.avg_net_pct)+'</div><div>比 '+e(vs)+' '+pc(s.avg_excess_pct)+'</div><div class="lb-hint">勝率 '+s.win_rate_pct+'%　'+hint+'</div></div>';
   }
   function render(){
     var box=$("labBody");if(!box)return;
@@ -19,7 +19,7 @@ var LAB=(function(){
       h+='<div class="lb-card"><div class="lb-head"><span class="lb-tag '+cls[k.label]+'">'+e(k.label)+'</span><span class="lb-name">'+e(k.name)+'</span><span class="lb-kind">'+e(k.kind)+'</span></div>'
         +'<div class="lb-desc">'+e(k.desc)+'。'+e(k.why)+'。</div>'
         +(k.caution?'<div class="lb-caution">注意：'+e(k.caution)+'。</div>':'')
-        +'<div class="lb-segs">'+seg("上線後",k.live,"規則定稿後才發生，最可信")+seg("樣本外",k.oos,"最近兩年")+seg("樣本內",k.is,"較早歷史，僅供參考")+'</div></div>';
+        +'<div class="lb-segs">'+seg("上線後",k.live,"規則定稿後才發生，最可信",k.vs)+seg("樣本外",k.oos,"最近兩年",k.vs)+seg("樣本內",k.is,"較早歷史，僅供參考",k.vs)+'</div></div>';
     });
     var ch=data.changes||[];
     h+='<div class="lb-sub-t">標籤變動紀錄</div>'+(ch.length?'<ul class="lb-list">'+ch.slice().reverse().map(function(x){return '<li>'+e(x.date)+'　'+e(x.name)+'：'+e(x.from)+' 變成 '+e(x.to)+'</li>';}).join("")+'</ul>':'<div class="lb-na">還沒有變動。規則被升級或淘汰時會記在這裡。</div>');

@@ -7,7 +7,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="14.3.1";
+var FRONTEND_VERSION="14.3.2";
 // 美股功能先收起來（程式碼保留）。要恢復請改成 true。
 var ENABLE_US=false;
 
@@ -27,6 +27,7 @@ function initFeeSetting(){
     if(typeof CURRENT_ID!=="undefined"&&CURRENT_ID&&typeof loadTradePlanV2==="function")loadTradePlanV2(CURRENT_ID);};}
 }
 var RELEASE_NOTES=[
+  "V14.3.2：研究室新增兩條選股規則，每天自動補資料並重新檢驗：「月營收加速前 10 名」與「跟投信買超前 5 名」。股票池是成交值前 150 檔，因為是事後挑的熱門股，這兩條改成要贏過「股票池平均」才算數，而且同一天進場的合併成一期計算。",
   "V14.3.1：研究室新增三條有文獻依據的規則（長期持有正2、正2 搭配 200 日線、高股息 ETF 除息前行情），並加上「外部研究怎麼說」十則證據摘要與「規則變動與複查日期」。持有類規則改用還原股利的價格比較。",
   "V14.3：「AI學習」改成「研究室」。每個交易日自動重算 8 條規則的評分表（當沖、隔夜、大跌後接、200 日線），全部扣元大成本並和 0050 比較，分成樣本內、樣本外、上線後三段；標籤（可用／研究中／未通過）由程式依固定門檻判定，變動會留下紀錄。",
   "V14.2.2：帳本匯入支援元大 App「資產總覽」的明細格式：只有股票名稱也能查到代號，並從「應收付」反推每筆實際手續費與交易稅；沒有成交時間的當沖不再被誤判成先賣後買。",

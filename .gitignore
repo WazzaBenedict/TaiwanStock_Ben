@@ -50,3 +50,4 @@ public/data/today.json
 FIREBASE_SERVICE_ACCOUNT
 public/data/research.json
 pipeline/research_log.json
+pipeline/research_data.json
