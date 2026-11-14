@@ -7,7 +7,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="14.2.0";
+var FRONTEND_VERSION="14.2.1";
 // 美股功能先收起來（程式碼保留）。要恢復請改成 true。
 var ENABLE_US=false;
 
@@ -27,6 +27,7 @@ function initFeeSetting(){
     if(typeof CURRENT_ID!=="undefined"&&CURRENT_ID&&typeof loadTradePlanV2==="function")loadTradePlanV2(CURRENT_ID);};}
 }
 var RELEASE_NOTES=[
+  "V14.2.1：帳本匯入支援元大 App「資產總覽」的明細格式：只有股票名稱也能查到代號，並從「應收付」反推每筆實際手續費與交易稅；沒有成交時間的當沖不再被誤判成先賣後買。",
   "V14.2：新增「帳本」頁（取代原本的日誌分頁）。記錄真實成交後，自動扣元大手續費與交易稅算出淨損益，並和同一筆錢同期放在 0050 比較；附紀律檢查（每筆上限、每日與累計停損、13:00 後不進場、不先賣後買）和每週當沖獲利轉 0050 的結算。可手動輸入，也可匯入對帳單 CSV 或直接貼上表格。",
   "V14.1：總部最上方新增「今日」卡：每個交易日 06:50、13:45、19:00 自動更新，顯示今日結論、0050 開盤預估、大盤風險燈、隔夜行情、觀察名單、新聞，並累計開盤預估命中率。不必等後端喚醒；英雄的對話框會講當天的真實數字。",
   "V14.0.1：後端移除美股程式（少了約 830 行），系統檢查更快；觀察名單、權重、訊號歷史可備份到雲端，主機休眠後不再消失（需在 Render 設定金鑰後生效）。",

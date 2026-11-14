@@ -14,7 +14,7 @@ import cloudstore
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-APP_VERSION = "14.2.0"  # 每次發版只改這一行；前端在 public/js/app.js 的 FRONTEND_VERSION
+APP_VERSION = "14.2.1"  # 每次發版只改這一行；前端在 public/js/app.js 的 FRONTEND_VERSION
 
 app = FastAPI(title="HERO HQ 台股 API", version=APP_VERSION)
 _raw = os.getenv("ALLOWED_ORIGINS",
@@ -31,7 +31,12 @@ from daytrade.api import router as daytrade_router
 from ledger.api import make_router as _ledger_router
 from twcosts import net_return as _tw_net_return, broker as _tw_broker, is_etf as _tw_is_etf
 app.include_router(daytrade_router)
-app.include_router(_ledger_router(lambda code, days: fetch_tw_history(code, days)))
+def _name_to_code(name: str) -> str | None:
+    """對帳單只有股票名稱時，用股票清單查代號（名稱要完全相同）。"""
+    if not STOCK_MASTER: _lfm()
+    hits = [sid for sid, info in STOCK_MASTER.items() if info.get("name") == name]
+    return hits[0] if len(hits) == 1 else None
+app.include_router(_ledger_router(lambda code, days: fetch_tw_history(code, days), _name_to_code))
 
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
 LINE_TO_ID               = os.getenv("LINE_TO_ID", "")

@@ -79,3 +79,32 @@ def test_import_no_header_and_implied_discount():
 def test_import_endpoint():
     r = client().post("/api/ledger/import", json={"text": CSV}).json()
     assert len(r["fills"]) == 3 and r["columns"]["price"] == "成交價"
+
+
+YUANTA_APP = """交易日期,證券名稱,交易類別,價格,股數,應收付,已實現損益
+2026/11/02,友達,現沖買進,30,1000,"-30,025",--
+2026/11/02,友達,現沖買進,29.95,1000,"-29,975",--
+2026/11/02,友達,現沖買進,29.9,1000,"-29,925",--
+2026/11/02,友達,現沖賣出,30.65,3000,"91,735","1,810"
+2026/11/03,友達,現沖賣出,29.2,6000,"174,789","-4,764"
+2026/11/03,友達,現沖買進,29.9,6000,"-179,553",--
+2026/11/03,不存在公司,現沖買進,10,1000,"-10,020",--
+"""
+
+
+def test_yuanta_app_format_name_lookup_net_amount_and_untimed_daytrades():
+    import ledger
+    r = importer.parse(YUANTA_APP, name_to_code=lambda n: {"友達": "2409"}.get(n))
+    f = r["fills"]
+    assert len(f) == 6 and all(x["code"] == "2409" for x in f)
+    assert (f[0]["fee"], f[0]["tax"]) == (25, 0) and (f[3]["fee"], f[3]["tax"]) == (78, 137)
+    assert (f[4]["fee"], f[4]["tax"]) == (149, 262) and f[5]["fee"] == 153
+    assert r["skipped"][0]["reason"] == "找不到股票代號"
+    assert r["implied_fee_discount"] is None or r["implied_fee_discount"]["discount"] == 0.6
+    out = ledger.compute(f, {})
+    by_day = {}
+    for t in out["trades"]:
+        by_day[t["close_date"]] = by_day.get(t["close_date"], 0) + t["net"]
+    assert round(by_day["2026-11-02"]) == 1810 and round(by_day["2026-11-03"]) == -4764   # 與元大 App 的已實現損益一致
+    assert not [v for v in out["violations"] if v["rule"] == "short_first"]           # 沒有時間時不誤判先賣後買
+    assert all(t["daytrade"] for t in out["trades"])
