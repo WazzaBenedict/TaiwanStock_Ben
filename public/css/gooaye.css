@@ -1,0 +1,19 @@
+/* 股癌紀律提醒（v14.2.1） */
+.gy{display:none;background:var(--panel);border:2px solid var(--line);border-radius:14px;box-shadow:4px 4px 0 var(--ink,#000);padding:12px 14px;margin-bottom:16px}
+.gy-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}
+.gy-kicker{font-weight:900;font-size:16px;border-left:5px solid #80ed99;padding-left:8px}
+.gy-src{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.gy-today{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.gy-why{font-size:12px;color:var(--yellow);font-weight:700;margin-bottom:4px}
+.gy-title{font-weight:900;font-size:14px;line-height:1.6}
+.gy-text{font-size:13px;line-height:1.7;color:var(--text)}
+.gy-test{font-size:12px;line-height:1.7;color:var(--muted);margin-top:4px;border-left:3px solid var(--line);padding-left:8px}
+.gy-tag{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;margin-right:6px;border:1px solid var(--line);white-space:nowrap}
+.gy-ok{color:#22c55e;border-color:#22c55e}
+.gy-fail{color:#ef4444;border-color:#ef4444}
+.gy-note{color:var(--muted)}
+.gy details{margin-top:8px}
+.gy summary{cursor:pointer;min-height:40px;display:flex;align-items:center;font-weight:700;font-size:13px}
+.gy-list{list-style:none;padding:0;margin:0}
+.gy-item{padding:10px 0;border-top:1px solid var(--line)}
+.gy-foot{font-size:11px;line-height:1.6;color:var(--muted);margin-top:6px}
