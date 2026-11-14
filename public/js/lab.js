@@ -18,6 +18,7 @@ var LAB=(function(){
     data.cards.slice().sort(function(a,b){return order[a.label]-order[b.label];}).forEach(function(k){
       h+='<div class="lb-card"><div class="lb-head"><span class="lb-tag '+cls[k.label]+'">'+e(k.label)+'</span><span class="lb-name">'+e(k.name)+'</span><span class="lb-kind">'+e(k.kind)+'</span></div>'
         +'<div class="lb-desc">'+e(k.desc)+'。'+e(k.why)+'。</div>'
+        +(k.caution?'<div class="lb-caution">注意：'+e(k.caution)+'。</div>':'')
         +'<div class="lb-segs">'+seg("上線後",k.live,"規則定稿後才發生，最可信")+seg("樣本外",k.oos,"最近兩年")+seg("樣本內",k.is,"較早歷史，僅供參考")+'</div></div>';
     });
     var ch=data.changes||[];

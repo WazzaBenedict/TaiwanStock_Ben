@@ -25,6 +25,7 @@ from twcosts import broker, is_etf  # noqa: E402
 LIVE_START = "2026-11-16"     # 規則定稿後的第一個交易日
 OOS_DAYS = 730
 MIN_N = 30
+ROUND_TRIP_ETF = 0.00271       # ETF 一買一賣的成本（手續費 6 折兩次加交易稅 0.1%）
 TRADE_SIZE = 50000          # 每筆約 5 萬元，和帳本的每筆上限一致
 LOG_FILE = Path(__file__).resolve().parent / "research_log.json"
 UA = {"User-Agent": "Mozilla/5.0"}
@@ -81,6 +82,41 @@ def rule_ma200(bars, **_):
     return out
 
 
+def rule_hold_blocks(bars, block=10, **_):
+    """長期持有：切成每 10 個交易日一段來和 0050 比，不換手所以不計買賣成本；用還原股利的價格。"""
+    out = []
+    for i in range(0, len(bars) - block, block):
+        a, b = bars[i], bars[i + block]
+        out.append({"d_in": a["d"], "d_out": b["d"], "buy": a.get("a") or a["c"], "sell": b.get("a") or b["c"], "daytrade": False, "free": True})
+    return out
+
+
+def rule_trend_blocks(bars, block=10, ref=None, **_):
+    """每 10 個交易日檢查一次：0050 收盤在 200 日線之上才持有，否則空手。進出各算一次成本。"""
+    ref = ref or bars
+    closes = {b["d"]: i for i, b in enumerate(ref)}
+    out, held = [], False
+    for i in range(0, len(bars) - block, block):
+        a, b = bars[i], bars[i + block]
+        j = closes.get(a["d"])
+        if j is None or j < 199:
+            continue
+        on = ref[j]["c"] > sum(x["c"] for x in ref[j - 199:j + 1]) / 200
+        out.append({"d_in": a["d"], "d_out": b["d"], "buy": a.get("a") or a["c"], "sell": b.get("a") or b["c"], "daytrade": False,
+                    "free": True, "flat": not on, "switch": on != held})
+        held = on
+    return out
+
+
+def rule_pre_exdiv(bars, before=10, **_):
+    """除息日前 10 個交易日收盤買，除息前一天收盤賣。"""
+    out = []
+    for i, b in enumerate(bars):
+        if b.get("div") and i - before >= 0:
+            out.append({"d_in": bars[i - before]["d"], "d_out": bars[i - 1]["d"], "buy": bars[i - before]["c"], "sell": bars[i - 1]["c"], "daytrade": False})
+    return out
+
+
 RULES = [
     {"id": "dt_2409", "name": "友達每天當沖做多", "desc": "開盤買、收盤賣，每天做", "code": "2409", "fn": rule_daytrade_long, "kind": "當沖"},
     {"id": "dt_3481", "name": "群創每天當沖做多", "desc": "開盤買、收盤賣，每天做", "code": "3481", "fn": rule_daytrade_long, "kind": "當沖"},
@@ -89,6 +125,12 @@ RULES = [
     {"id": "on_0050", "name": "0050 買收盤賣開盤", "desc": "每天收盤買、隔天開盤賣", "code": "0050", "fn": rule_overnight, "kind": "隔夜"},
     {"id": "dip_2409", "name": "友達大跌 3% 後接", "desc": "單日跌 3% 以上，收盤買，抱 5 個交易日", "code": "2409", "fn": rule_dip_buy, "args": {"drop": 3.0}, "kind": "波段"},
     {"id": "dip_0050", "name": "0050 大跌 2% 後接", "desc": "單日跌 2% 以上，收盤買，抱 5 個交易日", "code": "0050", "fn": rule_dip_buy, "args": {"drop": 2.0}, "kind": "波段", "bench": "uncond"},
+    {"id": "hold_00631L", "name": "長期持有 00631L（正2）", "desc": "買進後不動，每 10 個交易日和 0050 比一次", "code": "00631L", "fn": rule_hold_blocks, "kind": "持有",
+     "caution": "報酬較高是用更大的波動換來的：2014 到 2026 年最大跌幅約 55%（0050 約 34%），花了近兩年才回到原點"},
+    {"id": "trend_00631L", "name": "00631L 搭配 200 日線", "desc": "0050 在 200 日線之上才持有正2，跌破就空手，每 10 個交易日檢查", "code": "00631L", "fn": rule_trend_blocks, "kind": "擇時", "ref0050": True,
+     "caution": "目的是避開大跌，不是多賺；多頭年會少賺"},
+    {"id": "exdiv_hd", "name": "高股息 ETF 除息前行情", "desc": "0056、00878、00919 除息前 10 個交易日買、除息前一天賣", "code": "0056", "codes": ["0056", "00878", "00919"], "fn": rule_pre_exdiv, "kind": "事件",
+     "caution": "研究顯示除息前有買盤推升，但 2025 年 7 月收益平準金新制後效果可能變弱"},
     {"id": "ma200_0050", "name": "0050 站上 200 日線才持有", "desc": "跌破 200 日線就出場，站回再買", "code": "0050", "fn": rule_ma200, "kind": "擇時", "timing": True},
 ]
 
@@ -120,8 +162,11 @@ def label(is_: dict, oos: dict) -> tuple[str, str]:
     return "研究中", "樣本外贏 0050，但差距還不夠穩定或樣本內不一致"
 
 
-def evaluate(rule: dict, bars: list[dict], bench: list[dict], today: str, fees=None) -> dict:
+def evaluate(rule: dict, bars, bench: list[dict], today: str, fees=None) -> dict:
+    """bars 可以是單一標的的日線，或 [(代號, 日線), ...]（一條規則套用多檔）。"""
     fees = fees or broker()
+    series = bars if bars and isinstance(bars[0], tuple) else [(rule["code"], bars)]
+    bars = series[0][1]
     bmap = {b["d"]: b for b in bench}
     oos_start = (date.fromisoformat(today) - timedelta(days=OOS_DAYS)).isoformat()
     seg = {"is": [], "oos": [], "live": []}
@@ -130,14 +175,24 @@ def evaluate(rule: dict, bars: list[dict], bench: list[dict], today: str, fees=N
         h = rule.get("args", {}).get("hold", 5)
         w = [bench[i + h]["c"] / bench[i]["c"] - 1 for i in range(len(bench) - h)]
         uncond = sum(w) / len(w) if w else 0.0
-    for t in rule["fn"](bars, **rule.get("args", {})):
+    extra = {"ref": bench} if rule.get("ref0050") else {}
+    trades = [(code, t) for code, bs in series for t in rule["fn"](bs, **rule.get("args", {}), **extra)]
+    trades.sort(key=lambda x: x[1]["d_in"])
+    for code, t in trades:
         bi, bo = bmap.get(t["d_in"]), bmap.get(t["d_out"])
         if not bi or not bo or not t["buy"] or not t["sell"]:
             continue
-        base = bi["o"] if t["daytrade"] else bi["c"]
-        if not base:
-            continue
-        row = {"net": trade_net(t["buy"], t["sell"], rule["code"], t["daytrade"], fees), "bench": uncond if uncond is not None else bo["c"] / base - 1}
+        if t.get("free"):                               # 持有類：用還原價，0050 也用還原價
+            b_in, b_out = bi.get("a") or bi["c"], bo.get("a") or bo["c"]
+            net = 0.0 if t.get("flat") else t["sell"] / t["buy"] - 1
+            if t.get("switch"):
+                net -= ROUND_TRIP_ETF / 2
+            row = {"net": net, "bench": b_out / b_in - 1}
+        else:
+            base = bi["o"] if t["daytrade"] else bi["c"]
+            if not base:
+                continue
+            row = {"net": trade_net(t["buy"], t["sell"], code, t["daytrade"], fees), "bench": uncond if uncond is not None else bo["c"] / base - 1}
         key = "live" if t["d_in"] >= LIVE_START else "oos" if t["d_in"] >= oos_start else "is"
         seg[key].append(row)
     s = {k: _stats(v) for k, v in seg.items()}
@@ -147,17 +202,32 @@ def evaluate(rule: dict, bars: list[dict], bench: list[dict], today: str, fees=N
         a = _stats(allr)
         why = f"交易次數少（全部 {a.get('n', 0)} 筆），不能用筆數下結論；全期間合計比同期抱 0050 {'多' if a.get('sum_excess_pct', 0) > 0 else '少'} {abs(a.get('sum_excess_pct', 0))}%"
     return {"id": rule["id"], "name": rule["name"], "desc": rule["desc"], "code": rule["code"], "kind": rule["kind"],
-            "label": lab, "why": why, "is": s["is"], "oos": s["oos"], "live": s["live"],
+            "label": lab, "why": why, "caution": rule.get("caution"), "is": s["is"], "oos": s["oos"], "live": s["live"],
             "first_day": bars[0]["d"] if bars else None}
 
 
 def yahoo(cl: httpx.Client, code: str, rng: str = "10y") -> list[dict]:
-    from pipeline.snapshot import yahoo_daily
+    """日線，附還原收盤價 a 與除息日標記 div。"""
     for suf in (".TW", ".TWO"):
         try:
-            rows = yahoo_daily(cl, code + suf, rng)
+            r = cl.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{code}{suf}", params={"range": rng, "interval": "1d", "events": "div"})
+            r.raise_for_status()
+            res = r.json()["chart"]["result"][0]
+            q = res["indicators"]["quote"][0]
+            adj = (res["indicators"].get("adjclose") or [{}])[0].get("adjclose") or []
+            off = res["meta"].get("gmtoffset", 0)
+            day = lambda ts: datetime.fromtimestamp(ts + off, timezone.utc).strftime("%Y-%m-%d")
+            divs = {day(v["date"]) for v in (res.get("events", {}).get("dividends") or {}).values()}
+            rows = []
+            for k, ts in enumerate(res.get("timestamp") or []):
+                c = q["close"][k]
+                if not c or c <= 0:
+                    continue
+                d = day(ts)
+                rows.append({"d": d, "o": q["open"][k], "h": q["high"][k], "l": q["low"][k], "c": c,
+                             "a": adj[k] if k < len(adj) and adj[k] else c, "div": d in divs})
             if len(rows) > 250:
-                return [r for r in rows if r["c"] and r["c"] > 0]
+                return rows
         except Exception:
             continue
     return []
@@ -191,12 +261,14 @@ def build() -> dict:
         cache["0050"] = bench
         for r in RULES:
             try:
-                if r["code"] not in cache:
-                    cache[r["code"]] = yahoo(cl, r["code"])
-                bars = cache[r["code"]]
-                if not bars or not bench:
+                codes = r.get("codes") or [r["code"]]
+                for c in codes:
+                    if c not in cache:
+                        cache[c] = yahoo(cl, c)
+                got = [(c, cache[c]) for c in codes if cache[c]]
+                if not got or not bench:
                     raise RuntimeError("抓不到日線")
-                cards.append(evaluate(r, bars, bench, today, fees))
+                cards.append(evaluate(r, got if r.get("codes") else got[0][1], bench, today, fees))
             except Exception as e:
                 errors[r["id"]] = f"{type(e).__name__}: {str(e)[:100]}"
     out = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "today": today, "live_start": LIVE_START,

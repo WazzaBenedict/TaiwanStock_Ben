@@ -21,3 +21,4 @@
 .lb-note{font-size:12px;color:var(--muted);line-height:1.7;margin-top:12px}
 .lb-old summary{cursor:pointer;font-size:13px;color:var(--muted);min-height:36px;display:flex;align-items:center}
 @media(max-width:620px){.lb-segs{grid-template-columns:1fr}}
+.lb-caution{font-size:12px;line-height:1.6;color:var(--yellow);margin-bottom:8px}
