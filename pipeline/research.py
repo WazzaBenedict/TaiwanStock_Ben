@@ -323,15 +323,43 @@ def pool_revenue(pool: dict, bars: dict, bench: list[dict], top=10) -> list[tupl
     return out
 
 
+def pool_average(trades: list[tuple], bars: dict, fees) -> dict:
+    """同一段期間把股票池每一檔都買一次的平均淨報酬，當作股票池規則的比較基準。
+    股票池是事後挑的熱門股，本身就會贏 0050；規則要贏過這個平均才算有選股能力。"""
+    idx = {c: {b["d"]: i for i, b in enumerate(bs)} for c, bs in bars.items()}
+    out = {}
+    for key in {(t["d_in"], t["d_out"], bool(t.get("at_open"))) for _, t in trades}:
+        d_in, d_out, at_open = key
+        rs = []
+        for c, bs in bars.items():
+            i, j = idx[c].get(d_in), idx[c].get(d_out)
+            if i is None or j is None:
+                continue
+            buy = bs[i]["o"] if at_open else bs[i]["c"]
+            if buy and bs[j]["c"]:
+                rs.append(trade_net(buy, bs[j]["c"], c, False, fees))
+        if rs:
+            out[key] = sum(rs) / len(rs)
+    return out
+
+
+def cluster(rows: list[dict]) -> list[dict]:
+    """同一天進場的交易彼此高度相關，合併成一筆（取平均）再做統計，避免把筆數灌水。"""
+    g: dict[str, list] = {}
+    for r in rows:
+        g.setdefault(r["d"], []).append(r)
+    return [{"net": sum(x["net"] for x in v) / len(v), "bench": sum(x["bench"] for x in v) / len(v)} for _, v in sorted(g.items())]
+
+
 POOL_RULES = [
     {"id": "trust_top5", "name": "跟投信買超前 5 名", "desc": "股票池裡前一天投信買超金額最大的 5 檔，隔天開盤買，抱 11 個交易日", "code": "pool", "kind": "選股", "fn": pool_trust,
-     "caution": "股票池是 2026 年 11 月成交值前 150 名，等於事後挑了現在的熱門股，歷史數字偏樂觀；請以「上線後」那一段為準"},
+     "caution": "股票池是 2026 年 11 月成交值前 150 名，等於事後挑了現在的熱門股，所以這條規則比的是「股票池平均」而不是 0050；同一天進場的算一期"},
     {"id": "rev_top10", "name": "月營收加速前 10 名", "desc": "每月營收公布後，買近三月營收年增率最高且仍在加速的 10 檔，抱一個月", "code": "pool", "kind": "選股", "fn": pool_revenue,
-     "caution": "股票池是 2026 年 11 月成交值前 150 名，等於事後挑了現在的熱門股，歷史數字偏樂觀；請以「上線後」那一段為準"},
+     "caution": "股票池是 2026 年 11 月成交值前 150 名，等於事後挑了現在的熱門股，所以這條規則比的是「股票池平均」而不是 0050；同一個月進場的算一期"},
 ]
 
 
-def evaluate(rule: dict, bars, bench: list[dict], today: str, fees=None, trades=None) -> dict:
+def evaluate(rule: dict, bars, bench: list[dict], today: str, fees=None, trades=None, pool_bench=None) -> dict:
     """bars 可以是單一標的的日線，或 [(代號, 日線), ...]（一條規則套用多檔）。"""
     fees = fees or broker()
     series = bars if bars and isinstance(bars[0], tuple) else [(rule["code"], bars)]
@@ -363,10 +391,21 @@ def evaluate(rule: dict, bars, bench: list[dict], today: str, fees=None, trades=
             if not base:
                 continue
             row = {"net": trade_net(t["buy"], t["sell"], code, t["daytrade"], fees), "bench": uncond if uncond is not None else bo["c"] / base - 1}
+            if pool_bench is not None:
+                pb = pool_bench.get((t["d_in"], t["d_out"], bool(t.get("at_open"))))
+                if pb is None:
+                    continue
+                row = {"net": row["net"], "bench": pb, "d": t["d_in"]}
         key = "live" if t["d_in"] >= LIVE_START else "oos" if t["d_in"] >= oos_start else "is"
         seg[key].append(row)
+    if pool_bench is not None:
+        seg = {k: cluster(v) for k, v in seg.items()}
     s = {k: _stats(v) for k, v in seg.items()}
     lab, why = label(s["is"], s["oos"])
+    if pool_bench is not None:
+        why = why.replace("0050", "股票池平均").replace("筆", "期")
+        if lab == "可用" and s["live"].get("n", 0) < MIN_N:      # 股票池是事後挑的，歷史再好也要等上線後的結果
+            lab, why = "研究中", f"歷史上贏過股票池平均，但股票池是事後挑的，要等上線後累積滿 {MIN_N} 期才能升級"
     if rule.get("timing") and s["oos"]["n"] < MIN_N:      # 擇時規則交易次數天生很少，用整段結果說明
         allr = seg["is"] + seg["oos"] + seg["live"]
         a = _stats(allr)
@@ -454,7 +493,8 @@ def build() -> dict:
                     raise RuntimeError(f"股票池日線只抓到 {len(pbars)} 檔")
                 for r in POOL_RULES:
                     tr = r["fn"](pool, pbars) if r["fn"] is pool_trust else r["fn"](pool, pbars, bench)
-                    card = evaluate(r, [], bench, today, fees, trades=tr)
+                    card = evaluate(r, [], bench, today, fees, trades=tr, pool_bench=pool_average(tr, pbars, fees))
+                    card["vs"] = "股票池平均"
                     card["first_day"] = min((t["d_in"] for _, t in tr), default=None)
                     cards.append(card)
         except Exception as e:
