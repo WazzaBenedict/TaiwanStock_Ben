@@ -1,26 +1,47 @@
 name: Deploy frontend
-# 合併到 main 後自動把 public/ 發布到 Firebase Hosting。
-# 需要 repo secret FIREBASE_SERVICE_ACCOUNT（Firebase 服務帳戶金鑰 JSON）；沒設定時會跳過並提示。
+# 發布 public/ 到 Firebase Hosting，並在發布前產生「今日」快照 public/data/today.json。
+# 觸發：合併到 main、手動、以及交易日 06:50／13:45／19:00（台北時間）定時更新快照。
+# 需要 repo secret FIREBASE_SERVICE_ACCOUNT；選用 FINMIND_TOKEN（提高夜盤資料額度）。
+# 注意：GitHub 的定時工作可能延遲數分鐘；repo 60 天沒有任何活動時，定時工作會被自動停用。
 on:
   push:
     branches: [main]
-    paths: ["public/**", "firebase.json", ".firebaserc", ".github/workflows/deploy-hosting.yml"]
+    paths: ["public/**", "pipeline/**", "cloudstore.py", "firebase.json", ".firebaserc", ".github/workflows/deploy-hosting.yml"]
+  schedule:
+    - cron: "50 22 * * 0-4"   # 06:50 台北，週一至週五（盤前）
+    - cron: "45 5 * * 1-5"    # 13:45 台北（收盤）
+    - cron: "0 11 * * 1-5"    # 19:00 台北（收盤價定稿）
   workflow_dispatch:
 concurrency:
   group: deploy-hosting
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
       HAS_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
       - name: Version numbers agree
         run: python scripts/check_version.py
+      - name: Build today snapshot
+        id: snapshot
+        continue-on-error: true
+        run: |
+          pip install -q httpx==0.27.0 PyJWT==2.8.0 cryptography==42.0.8
+          python -m pipeline.snapshot public/data/today.json
+      - name: Keep the previous snapshot if today's failed
+        if: steps.snapshot.outcome != 'success'
+        run: |
+          echo "::warning::今日快照產生失敗，沿用線上舊檔。"
+          mkdir -p public/data
+          curl -fsS -m 30 https://taiwanstock-ben.web.app/data/today.json -o public/data/today.json || rm -f public/data/today.json
       - name: Skip notice
         if: env.HAS_KEY != 'true'
         run: echo "::warning::FIREBASE_SERVICE_ACCOUNT 尚未設定，略過發布。"

@@ -7,7 +7,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="14.0.1";
+var FRONTEND_VERSION="14.1.0";
 // 美股功能先收起來（程式碼保留）。要恢復請改成 true。
 var ENABLE_US=false;
 
@@ -27,6 +27,7 @@ function initFeeSetting(){
     if(typeof CURRENT_ID!=="undefined"&&CURRENT_ID&&typeof loadTradePlanV2==="function")loadTradePlanV2(CURRENT_ID);};}
 }
 var RELEASE_NOTES=[
+  "V14.1：總部最上方新增「今日」卡：每個交易日 06:50、13:45、19:00 自動更新，顯示今日結論、0050 開盤預估、大盤風險燈、隔夜行情、觀察名單、新聞，並累計開盤預估命中率。不必等後端喚醒；英雄的對話框會講當天的真實數字。",
   "V14.0.1：後端移除美股程式（少了約 830 行），系統檢查更快；觀察名單、權重、訊號歷史可備份到雲端，主機休眠後不再消失（需在 Render 設定金鑰後生效）。",
   "V14.0：地基整理。畫面與功能不變；網頁拆成獨立的樣式與腳本檔，移除舊版資料夾，之後合併到主線就會自動發布網頁，不必再開家用電腦。",
   "V13.3：⚡ 當沖 分頁新增「小資當沖風控（整張）」：下單前檢查每筆上限、股價 20～50、每日／總停損、13:00 後不進場，並提醒賣不掉時 T+2 要付的全額",
@@ -182,7 +183,7 @@ function officeBubble(){
   var ph=marketPhase(),cands=OFFICE.sprites.filter(function(s){return !s.walking;});
   if(!cands.length)return;
   var s=cands[Math.floor(Math.random()*cands.length)],b=s.el.querySelector(".of-bubble");if(!b)return;
-  var txt=s.atDesk?heroLine(s.h,ph):(s.visiting?("找"+s.visiting.name+"討論中…"):(s.spot==="咖啡機"?"先來杯咖啡☕":"休息一下，馬上回座"));
+  var real=(window.TODAY_HERO_LINES||{})[s.h.id];var txt=s.atDesk?((real&&Math.random()<.65)?real:heroLine(s.h,ph)):(s.visiting?("找"+s.visiting.name+"討論中…"):(s.spot==="咖啡機"?"先來杯咖啡☕":"休息一下，馬上回座"));
   b.textContent=txt;s.el.classList.add("talk");
   setTimeout(function(){s.el.classList.remove("talk");},3200);
 }
@@ -259,7 +260,7 @@ function renderHQ(){
   var ph=marketPhase();
   var pe=$I("hqPhase");if(pe){pe.textContent=ph.label;pe.className="hq-phase"+(ph.key==="live"||ph.key==="open-soon"?" live":"");}
   var ce=$I("hqClock");if(ce)ce.textContent="台北 "+ph.t.label;
-  var be=$I("hqBrief");if(be)be.textContent="指揮官簡報｜"+((PHASE_LINES[ph.key]||{}).brief||"");
+  var be=$I("hqBrief");if(be)be.textContent=(window.TODAY&&TODAY.conclusion)?("今日結論｜"+TODAY.conclusion):("指揮官簡報｜"+((PHASE_LINES[ph.key]||{}).brief||""));
   var la=$I("hqLeadAvatar");if(la&&!la.firstChild)la.innerHTML=heroBody(HEROES[4]);
   var ms=$I("hqMissions");
   if(ms){
