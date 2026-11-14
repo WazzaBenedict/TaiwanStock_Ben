@@ -403,7 +403,7 @@ def evaluate(rule: dict, bars, bench: list[dict], today: str, fees=None, trades=
     s = {k: _stats(v) for k, v in seg.items()}
     lab, why = label(s["is"], s["oos"])
     if pool_bench is not None:
-        why = why.replace("0050", "股票池平均").replace("筆", "期")
+        why = why.replace("同期放 0050", "股票池平均").replace("0050", "股票池平均").replace("筆", "期")
         if lab == "可用" and s["live"].get("n", 0) < MIN_N:      # 股票池是事後挑的，歷史再好也要等上線後的結果
             lab, why = "研究中", f"歷史上贏過股票池平均，但股票池是事後挑的，要等上線後累積滿 {MIN_N} 期才能升級"
     if rule.get("timing") and s["oos"]["n"] < MIN_N:      # 擇時規則交易次數天生很少，用整段結果說明
