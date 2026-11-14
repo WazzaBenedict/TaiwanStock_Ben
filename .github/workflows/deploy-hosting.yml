@@ -42,6 +42,16 @@ jobs:
           echo "::warning::今日快照產生失敗，沿用線上舊檔。"
           mkdir -p public/data
           curl -fsS -m 30 https://taiwanstock-ben.web.app/data/today.json -o public/data/today.json || rm -f public/data/today.json
+      - name: Build research scorecard
+        id: research
+        continue-on-error: true
+        run: python -m pipeline.research public/data/research.json
+      - name: Keep the previous scorecard if today's failed
+        if: steps.research.outcome != 'success'
+        run: |
+          echo "::warning::研究室評分表產生失敗，沿用線上舊檔。"
+          mkdir -p public/data
+          curl -fsS -m 30 https://taiwanstock-ben.web.app/data/research.json -o public/data/research.json || rm -f public/data/research.json
       - name: Skip notice
         if: env.HAS_KEY != 'true'
         run: echo "::warning::FIREBASE_SERVICE_ACCOUNT 尚未設定，略過發布。"

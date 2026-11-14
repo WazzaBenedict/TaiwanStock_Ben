@@ -48,3 +48,5 @@ tw_signal_history.json
 pipeline/today_log.json
 public/data/today.json
 FIREBASE_SERVICE_ACCOUNT
+public/data/research.json
+pipeline/research_log.json
