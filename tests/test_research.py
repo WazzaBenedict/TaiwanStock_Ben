@@ -63,7 +63,7 @@ def test_rev_yoy3_and_revenue_rule_picks_accelerating_growth():
     pb = {"1111": bars(120, lambda i: (50.0, 50.0 + i * 0.1), start=date(2025, 12, 1)), "2222": bars(120, lambda i: (50.0, 50.0), start=date(2025, 12, 1))}
     tr = R.pool_revenue({"codes": ["1111", "2222"], "rev": {"1111": grow, "2222": rev}}, pb, bench)
     assert tr and all(c == "1111" for c, _ in tr)                      # 沒成長的 2222 不會入選
-    assert tr[0][1]["d_in"] == "2026-01-11" and tr[0][1]["d_out"] == "2026-02-11"
+    assert tr[0][1]["d_in"] == "2025-12-11" and tr[0][1]["d_out"] == "2026-01-11"   # 12/11 用到 11 月營收
 
 
 def test_trust_rule_buys_next_open_and_holds_11_days():
