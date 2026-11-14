@@ -1,0 +1,35 @@
+/* 研究室（v14.3）：讀每日自動重算的評分表 data/research.json。標籤由程式依固定門檻判定。 */
+var LAB=(function(){
+  var data=null,loading=false;
+  function $(id){return document.getElementById(id);}
+  function e(s){return String(s==null?"":s).replace(/[&<>'"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c];});}
+  function pc(v){if(v==null||isNaN(v))return '<span class="lb-na">—</span>';return '<span class="'+(v>0?"up":v<0?"down":"")+'">'+(v>0?"+":"")+Number(v).toFixed(2)+'%</span>';}
+  function seg(title,s,hint){
+    if(!s||!s.n)return '<div class="lb-seg"><div class="lb-seg-t">'+title+'</div><div class="lb-na">還沒有資料</div><div class="lb-hint">'+hint+'</div></div>';
+    return '<div class="lb-seg"><div class="lb-seg-t">'+title+'（'+s.n+' 筆）</div><div>每筆平均 '+pc(s.avg_net_pct)+'</div><div>比 0050 '+pc(s.avg_excess_pct)+'</div><div class="lb-hint">勝率 '+s.win_rate_pct+'%　'+hint+'</div></div>';
+  }
+  function render(){
+    var box=$("labBody");if(!box)return;
+    if(!data){box.innerHTML='<div class="lb-na">評分表還沒產生，下一次排程（交易日 06:50、13:45、19:00）後會出現。</div>';return;}
+    var c=data.counts||{},cls={"可用":"ok","研究中":"mid","未通過":"bad"};
+    var h='<div class="lb-verdict">'+(c["可用"]?'目前有 '+c["可用"]+' 條規則通過檢驗。':'目前沒有任何一條規則通過檢驗。能做的最好選擇仍是持有 0050。')+'</div>';
+    h+='<div class="lb-counts"><span class="lb-tag ok">可用 '+(c["可用"]||0)+'</span><span class="lb-tag mid">研究中 '+(c["研究中"]||0)+'</span><span class="lb-tag bad">未通過 '+(c["未通過"]||0)+'</span><span class="lb-age">'+e(data.today)+' 更新，已自動重算 '+(data.runs||1)+' 次</span></div>';
+    var order={"可用":0,"研究中":1,"未通過":2};
+    data.cards.slice().sort(function(a,b){return order[a.label]-order[b.label];}).forEach(function(k){
+      h+='<div class="lb-card"><div class="lb-head"><span class="lb-tag '+cls[k.label]+'">'+e(k.label)+'</span><span class="lb-name">'+e(k.name)+'</span><span class="lb-kind">'+e(k.kind)+'</span></div>'
+        +'<div class="lb-desc">'+e(k.desc)+'。'+e(k.why)+'。</div>'
+        +'<div class="lb-segs">'+seg("上線後",k.live,"規則定稿後才發生，最可信")+seg("樣本外",k.oos,"最近兩年")+seg("樣本內",k.is,"較早歷史，僅供參考")+'</div></div>';
+    });
+    var ch=data.changes||[];
+    h+='<div class="lb-sub-t">標籤變動紀錄</div>'+(ch.length?'<ul class="lb-list">'+ch.slice().reverse().map(function(x){return '<li>'+e(x.date)+'　'+e(x.name)+'：'+e(x.from)+' 變成 '+e(x.to)+'</li>';}).join("")+'</ul>':'<div class="lb-na">還沒有變動。規則被升級或淘汰時會記在這裡。</div>');
+    h+='<div class="lb-note">怎麼判定：每筆約 '+(data.trade_size||50000).toLocaleString("en-US")+' 元，扣元大手續費（'+data.fee_discount+' 折）與交易稅，再和同一筆錢同期放 0050 比。樣本外至少 '+data.min_n+' 筆才下結論；扣成本後虧損或輸給 0050 就是「未通過」；樣本內、樣本外都贏 0050 且差距穩定才是「可用」。「上線後」從 '+e(data.live_start)+' 起每個交易日自動累積。價格未含股利。這是歷史統計，不是獲利保證。</div>';
+    box.innerHTML=h;
+  }
+  async function open(){
+    if(data||loading){render();return;}
+    loading=true;
+    try{var r=await fetch("data/research.json?t="+Math.floor(Date.now()/6e5));if(r.ok)data=await r.json();}catch(x){}
+    loading=false;render();
+  }
+  return {open:open,_data:function(){return data;}};
+})();

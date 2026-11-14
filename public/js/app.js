@@ -7,7 +7,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="14.2.2";
+var FRONTEND_VERSION="14.3.0";
 // 美股功能先收起來（程式碼保留）。要恢復請改成 true。
 var ENABLE_US=false;
 
@@ -27,6 +27,7 @@ function initFeeSetting(){
     if(typeof CURRENT_ID!=="undefined"&&CURRENT_ID&&typeof loadTradePlanV2==="function")loadTradePlanV2(CURRENT_ID);};}
 }
 var RELEASE_NOTES=[
+  "V14.3：「AI學習」改成「研究室」。每個交易日自動重算 8 條規則的評分表（當沖、隔夜、大跌後接、200 日線），全部扣元大成本並和 0050 比較，分成樣本內、樣本外、上線後三段；標籤（可用／研究中／未通過）由程式依固定門檻判定，變動會留下紀錄。",
   "V14.2.2：帳本匯入支援元大 App「資產總覽」的明細格式：只有股票名稱也能查到代號，並從「應收付」反推每筆實際手續費與交易稅；沒有成交時間的當沖不再被誤判成先賣後買。",
   "V14.2.1：總部新增「股癌紀律提醒」卡：把 Podcast 反覆出現的觀點整理成 10 條檢查清單，每天顯示一條；觀察名單有股票漲停、或大盤風險燈轉黃轉紅時，會自動換成對應的提醒。其中「漲停隔天開盤不要追」有回測支持，「抱緊創新高、連跌 5 天出場」回測未通過，所以只當提醒、不做成訊號。",
   "V14.2：新增「帳本」頁（取代原本的日誌分頁）。記錄真實成交後，自動扣元大手續費與交易稅算出淨損益，並和同一筆錢同期放在 0050 比較；附紀律檢查（每筆上限、每日與累計停損、13:00 後不進場、不先賣後買）和每週當沖獲利轉 0050 的結算。可手動輸入，也可匯入對帳單 CSV 或直接貼上表格。",
@@ -65,9 +66,9 @@ var HEROES=[
   {id:"vanguard",page:"p-market",room:"情報室",roomEn:"WAR ROOM",cell:[0,2],name:"夜鶯",code:"NIGHTINGALE",icon:"🌐",type:"spy",
    color:"#ff8c42",suit:"#16161d",skin:"#f2c29b",hair:"#b5452b",
    role:"王牌特務｜大盤環境、市場情緒與 AI 選股掃描"},
-  {id:"nexus",page:"p-learn",room:"AI 研究所",roomEn:"AI CORE",cell:[1,2],name:"智核",code:"NEXUS",icon:"🧠",type:"synth",
+  {id:"nexus",page:"p-learn",room:"研究室",roomEn:"AI CORE",cell:[1,2],name:"智核",code:"NEXUS",icon:"🧠",type:"synth",
    color:"#80ed99",suit:"#2a3f5f",skin:"#9fb3c8",cape:"#3d5a80",
-   role:"合成人｜AI 學習：評估信號、調整權重"},
+   role:"合成人｜研究室：每天自動檢驗策略，更新評分"},
   {id:"archive",page:"p-ledger",room:"帳本室",roomEn:"ARCHIVE",cell:[2,2],name:"巨力博士",code:"TITAN",icon:"📘",type:"titan",
    color:"#f4a261",suit:"#4a6fa5",skin:"#8fa37a",hair:"#2b2b2b",
    role:"巨力博士｜帳本：真實成交、對照 0050、紀律檢查"}
@@ -747,6 +748,7 @@ function showPage(pageId) {
   if(pageId==="p-market"&&currentUser){loadMacro();loadSentiment();}
   if(pageId==="p-account") renderAccountUI(currentUser);
   if(pageId==="p-ledger"&&window.LEDGER) LEDGER.open();
+  if(pageId==="p-learn"&&window.LAB) LAB.open();
   try{renderHeroStrip(pageId); if(pageId==="p-hq") renderHQ();}catch(e){console.warn("hero ui",e);}
   if(pageId==="p-plans") { loadTradePlans().then(function(){renderTradePlans(); refreshTradePlans(false);}); }
 }
