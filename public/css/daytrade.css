@@ -1,0 +1,5 @@
+    .dt-table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12px;white-space:nowrap}
+    .dt-table th,.dt-table td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:right}
+    .dt-table th{color:var(--muted);font-weight:600}.dt-table td:first-child,.dt-table th:first-child{text-align:left}
+    .dt-pos{color:#3ddc97}.dt-neg{color:#ff6b6b}.dt-pass{color:#3ddc97;font-weight:700}.dt-fail{color:var(--muted)}
+    .dt-st{font-size:11px;color:var(--muted);text-align:left!important;white-space:normal;min-width:180px}

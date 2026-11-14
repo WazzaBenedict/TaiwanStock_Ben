@@ -9,18 +9,26 @@
 ## 📁 專案結構
 
 ```
-tw-stock-monitor/
-├── app.py                 # FastAPI 後端
-├── requirements.txt       # Python 套件清單
-├── firebase.json          # Firebase Hosting 設定
-├── .firebaserc            # Firebase 專案 ID
-├── .gitignore
-├── README.md
-└── public/                # 前端靜態檔案（部署到 Firebase Hosting）
-    ├── index.html         # 主頁面
-    ├── config.js          # API URL 設定（唯一需要改的地方）
-    └── 404.html           # 404 頁面
+TaiwanStock_Ben/
+├── app.py                 # FastAPI 後端（版本號：APP_VERSION）
+├── twcosts.py             # 元大證券電子下單成本模型（全 App 共用）
+├── authz.py               # 寫入 API 的登入驗證
+├── tradeplan/             # 交易計畫卡
+├── daytrade/              # 當沖篩選、時光機
+├── tests/                 # pytest
+├── scripts/check_version.py   # 前後端版本號一致性檢查
+├── .github/workflows/     # ci.yml（測試）、deploy-hosting.yml（自動發布網頁）
+├── firebase.json / .firebaserc
+└── public/                # 前端（Firebase Hosting）
+    ├── index.html         # 版面
+    ├── css/               # 樣式
+    ├── js/                # 腳本（版本號：js/app.js 的 FRONTEND_VERSION）
+    └── config.js          # API 網址與 Firebase 設定
 ```
+
+發版時三個地方要同一個版本號：`app.py` 的 `APP_VERSION`、`public/js/app.js` 的 `FRONTEND_VERSION`、`public/index.html` 裡的 `?v=` 與顯示字樣。`python scripts/check_version.py` 會檢查。
+
+合併到 `main` 後，後端由 Render 自動部署；前端由 `deploy-hosting.yml` 自動發布（需在 GitHub repo 設定 secret `FIREBASE_SERVICE_ACCOUNT`）。
 
 ---
 
