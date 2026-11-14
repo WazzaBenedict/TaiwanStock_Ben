@@ -60,7 +60,8 @@ def normalize(fills: list[dict]) -> tuple[list[dict], list[dict]]:
                    "code": code, "side": side, "price": price, "shares": int(shares),
                    "fee": _num(f.get("fee")), "tax": _num(f.get("tax")),
                    "plan_price": _num(f.get("plan_price")), "note": str(f.get("note") or "")[:200]})
-    ok.sort(key=lambda r: (r["date"], r["time"] or "99:99", r["seq"]))
+    # 沒有時間的紀錄（例如券商 App 的明細）無法判斷同一天的先後，一律先買後賣，才不會把當沖誤判成先賣後買。
+    ok.sort(key=lambda r: (r["date"], r["time"] or "99:99", 0 if r["time"] or r["side"] == "buy" else 1, r["seq"]))
     return ok, bad
 
 
@@ -188,7 +189,7 @@ def compute(fills: list[dict], bars0050: dict | None = None, last_prices: dict |
                                      "fills_with_actual_costs": used_actual_costs, "fills": len(rows)},
             "notes": ["損益已扣手續費與交易稅；成交紀錄有實際費用時用實際值，否則用元大電子下單費率估算。",
                       "影子 0050：當沖比當天 0050 開盤到收盤；隔日以上比進場日收盤到出場日收盤；未扣 0050 買賣成本。",
-                      "先進先出配對；同一天買進並賣出視為當沖（交易稅 0.15%）。"]}
+                      "先進先出配對；同一天買進並賣出視為當沖（交易稅 0.15%）。成交紀錄沒有時間時，同一天視為先買後賣，無法檢查先賣後買與 13:00 後進場。"]}
 
 
 def _agg(ts: list[dict]) -> dict:

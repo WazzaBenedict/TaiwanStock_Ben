@@ -7,7 +7,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="14.2.1";
+var FRONTEND_VERSION="14.2.2";
 // 美股功能先收起來（程式碼保留）。要恢復請改成 true。
 var ENABLE_US=false;
 
@@ -27,6 +27,7 @@ function initFeeSetting(){
     if(typeof CURRENT_ID!=="undefined"&&CURRENT_ID&&typeof loadTradePlanV2==="function")loadTradePlanV2(CURRENT_ID);};}
 }
 var RELEASE_NOTES=[
+  "V14.2.2：帳本匯入支援元大 App「資產總覽」的明細格式：只有股票名稱也能查到代號，並從「應收付」反推每筆實際手續費與交易稅；沒有成交時間的當沖不再被誤判成先賣後買。",
   "V14.2.1：總部新增「股癌紀律提醒」卡：把 Podcast 反覆出現的觀點整理成 10 條檢查清單，每天顯示一條；觀察名單有股票漲停、或大盤風險燈轉黃轉紅時，會自動換成對應的提醒。其中「漲停隔天開盤不要追」有回測支持，「抱緊創新高、連跌 5 天出場」回測未通過，所以只當提醒、不做成訊號。",
   "V14.2：新增「帳本」頁（取代原本的日誌分頁）。記錄真實成交後，自動扣元大手續費與交易稅算出淨損益，並和同一筆錢同期放在 0050 比較；附紀律檢查（每筆上限、每日與累計停損、13:00 後不進場、不先賣後買）和每週當沖獲利轉 0050 的結算。可手動輸入，也可匯入對帳單 CSV 或直接貼上表格。",
   "V14.1：總部最上方新增「今日」卡：每個交易日 06:50、13:45、19:00 自動更新，顯示今日結論、0050 開盤預估、大盤風險燈、隔夜行情、觀察名單、新聞，並累計開盤預估命中率。不必等後端喚醒；英雄的對話框會講當天的真實數字。",

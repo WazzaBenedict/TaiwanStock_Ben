@@ -13,7 +13,7 @@ MAX_OPEN_CODES = 20
 BARS_TTL = 1800
 
 
-def make_router(fetch_history) -> APIRouter:
+def make_router(fetch_history, name_to_code=None) -> APIRouter:
     """fetch_history(code, lookback_days) -> (DataFrame[日期, 開盤價, 收盤價...], source)"""
     router = APIRouter(prefix="/api/ledger", tags=["ledger"])
     cache: dict[str, tuple[dict, float]] = {}
@@ -80,6 +80,6 @@ def make_router(fetch_history) -> APIRouter:
         text = payload.get("text") or ""
         if not isinstance(text, str) or len(text) > 2_000_000:
             raise HTTPException(400, detail="內容格式錯誤或檔案超過 2MB")
-        return importer.parse(text, payload.get("default_date"))
+        return importer.parse(text, payload.get("default_date"), name_to_code)
 
     return router

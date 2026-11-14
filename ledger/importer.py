@@ -22,6 +22,7 @@ COLS = {
     "lots": ["成交張數", "張數"],
     "fee": ["手續費"],
     "tax": ["交易稅", "證交稅"],
+    "amount": ["應收付金額", "應收付", "收付金額", "淨收付"],
 }
 CODE_RE = re.compile(r"(?<![0-9A-Za-z])(\d{4,6}[A-Za-z]?)(?![0-9A-Za-z])")
 
@@ -95,7 +96,23 @@ def _header(rows) -> tuple[int, dict] | None:
     return None
 
 
-def parse(text: str, default_date: str | None = None) -> dict:
+def split_costs(side: str, price: float, shares: int, amount: float, daytrade_tax: bool, etf=False) -> tuple[float, float] | None:
+    """從「應收付」反推手續費與交易稅。買進：付出金額減成交金額就是手續費。
+    賣出：差額是手續費加交易稅，交易稅照稅率算（無條件捨去），剩下的是手續費。對不上就回傳 None。"""
+    notional = price * shares
+    diff = abs(amount) - notional if side == "buy" else notional - abs(amount)
+    if diff < 0 or diff > notional * 0.006:
+        return None
+    if side == "buy":
+        return float(round(diff)), 0.0
+    rate = 0.0 if etf == "bond" else 0.001 if etf else (0.0015 if daytrade_tax else 0.003)
+    tax = float(int(notional * rate + 1e-6))
+    if diff < tax:
+        return None
+    return float(round(diff - tax)), tax
+
+
+def parse(text: str, default_date: str | None = None, name_to_code=None) -> dict:
     rows = _rows(text or "")
     found = _header(rows)
     if not found:
@@ -117,22 +134,31 @@ def parse(text: str, default_date: str | None = None) -> dict:
         if shares is None and "lots" in m and _num(cell(r, "lots")) is not None:
             shares = _num(cell(r, "lots")) * 1000
         cm = CODE_RE.search(cell(r, "code")) or CODE_RE.search(cell(r, "name"))
+        code = cm.group(1).upper() if cm else None
+        if not code and name_to_code and cell(r, "name"):
+            code = name_to_code(cell(r, "name").replace(" ", ""))
         if not d and not side and price is None:
             continue                                   # 小計、頁尾之類的列
-        why = ("日期看不懂" if not d else "買賣別看不懂" if not side else "沒有股票代號" if not cm
+        why = ("日期看不懂" if not d else "買賣別看不懂" if not side else "找不到股票代號" if not code
                else "成交價看不懂" if not price or price <= 0 else "股數看不懂" if not shares or shares <= 0 else None)
         if why:
             skipped.append({"line": n, "reason": why, "raw": " | ".join(r)[:200]})
             continue
         tm = re.search(r"(\d{1,2}):(\d{2})", cell(r, "time") or cell(r, "date"))
         t = f"{int(tm.group(1)):02d}:{tm.group(2)}" if tm else ""
-        code = cm.group(1).upper()
         key = f"{d}|{t}|{code}|{side}|{price:g}|{int(shares)}"
         seen[key] = seen.get(key, 0) + 1                # 同一天同價同量的重複成交要保留
         fid = "imp_" + hashlib.sha1(f"{key}|{seen[key]}".encode()).hexdigest()[:12]
         raw_side = cell(r, "side")
+        fee, tax = _num(cell(r, "fee")), _num(cell(r, "tax"))
+        amount = _num(cell(r, "amount"))
+        if fee is None and amount:
+            from twcosts import is_etf
+            sc = split_costs(side, price, int(shares), amount, "沖" in raw_side, is_etf(code))
+            if sc:
+                fee, tax = sc
         fills.append({"id": fid, "date": d, "time": t, "code": code, "side": side, "price": price, "shares": int(shares),
-                      "fee": _num(cell(r, "fee")), "tax": _num(cell(r, "tax")),
+                      "fee": fee, "tax": tax,
                       "note": raw_side if ("融" in raw_side or "券" in raw_side) else "", "source": "import"})
     return {"fills": fills, "skipped": skipped, "columns": {k: rows[hi][j] for k, j in m.items()},
             "implied_fee_discount": implied_discount(fills), "error": None}
