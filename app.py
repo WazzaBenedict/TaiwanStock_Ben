@@ -10,10 +10,11 @@ import xml.etree.ElementTree as ET
 import httpx, numpy as np, pandas as pd
 from fastapi import FastAPI, HTTPException, Query, Body, Depends
 from authz import require_writer
+import cloudstore
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-APP_VERSION = "14.0.0"  # 每次發版只改這一行；前端在 public/js/app.js 的 FRONTEND_VERSION
+APP_VERSION = "14.0.1"  # 每次發版只改這一行；前端在 public/js/app.js 的 FRONTEND_VERSION
 
 app = FastAPI(title="HERO HQ 台股 API", version=APP_VERSION)
 _raw = os.getenv("ALLOWED_ORIGINS",
@@ -36,19 +37,11 @@ ENABLE_LINE_ALERTS       = os.getenv("ENABLE_LINE_ALERTS", "false").lower() == "
 LAST_ALERTS: dict[str, datetime] = {}
 ALERT_COOLDOWN_MINUTES   = 30
 
-# Optional API keys for richer US data
-FINNHUB_API_KEY      = os.getenv("FINNHUB_API_KEY", "")
-FMP_API_KEY          = os.getenv("FMP_API_KEY", "")
-TWELVE_DATA_API_KEY  = os.getenv("TWELVE_DATA_API_KEY", "")
-
 BASE_DIR           = Path(__file__).parent
 WATCHLIST_FILE     = BASE_DIR / "watchlist.json"
 STOCK_MASTER_FILE  = BASE_DIR / "stock_master.json"
 TW_WEIGHTS_FILE    = BASE_DIR / "tw_weights.json"
-US_WEIGHTS_FILE    = BASE_DIR / "us_weights.json"
 TW_HISTORY_FILE    = BASE_DIR / "tw_signal_history.json"
-US_HISTORY_FILE    = BASE_DIR / "us_signal_history.json"
-US_MASTER_FILE     = BASE_DIR / "us_stock_master.json"
 
 FINMIND_BASE  = "https://api.finmindtrade.com/api/v4/data"
 FINMIND_TOKEN = os.getenv("FINMIND_TOKEN", "")
@@ -674,7 +667,9 @@ def _rjf(path,default):
     return default
 
 def _wjf(path,data):
-    try: path.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding="utf-8")
+    try:
+        path.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding="utf-8")
+        cloudstore.push_async(path)
     except: pass
 
 def _nw(w,defaults,limits):
@@ -850,7 +845,9 @@ def _rwl()->list[dict]:
     return []
 
 def _wwl(items:list[dict]):
-    try: WATCHLIST_FILE.write_text(json.dumps({"watchlist":items},ensure_ascii=False,indent=2),encoding="utf-8")
+    try:
+        WATCHLIST_FILE.write_text(json.dumps({"watchlist":items},ensure_ascii=False,indent=2),encoding="utf-8")
+        cloudstore.push_async(WATCHLIST_FILE)
     except: pass
 
 class WatchlistUpdateBody(BaseModel): watchlist: list
@@ -1339,600 +1336,9 @@ async def _analyze_stock_core(stock_id:str) -> dict:
     except Exception as e:
         return{"stock_id":stock_id,"stock_name":sname,"error":str(e),"chart_data":[],"indicators":{},"score":{"score":0,"technical_score":0,"reasons":[str(e)]},"ai_signal":_empty_ai("WATCH",str(e))}
 
-# ══════════════════════════════════════════════════════════════════════════════
-# US ENGINE — 美股資料
-# ══════════════════════════════════════════════════════════════════════════════
-
-# ── US Symbol Master ────────────────────────────────────────────────────────
-US_BUILTIN: dict[str,dict] = {
-    "AAPL":{"name":"Apple Inc.","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "MSFT":{"name":"Microsoft Corp.","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "NVDA":{"name":"NVIDIA Corp.","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "AMZN":{"name":"Amazon.com Inc.","exchange":"NASDAQ","type":"Stock","sector":"Consumer Cyclical"},
-    "GOOGL":{"name":"Alphabet Inc. (A)","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "GOOG":{"name":"Alphabet Inc. (C)","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "META":{"name":"Meta Platforms","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "TSLA":{"name":"Tesla Inc.","exchange":"NASDAQ","type":"Stock","sector":"Consumer Cyclical"},
-    "AVGO":{"name":"Broadcom Inc.","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "ORCL":{"name":"Oracle Corp.","exchange":"NYSE","type":"Stock","sector":"Technology"},
-    "AMD":{"name":"Advanced Micro Devices","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "INTC":{"name":"Intel Corp.","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "QCOM":{"name":"Qualcomm Inc.","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "MU":{"name":"Micron Technology","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "AMAT":{"name":"Applied Materials","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "LRCX":{"name":"Lam Research","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "KLAC":{"name":"KLA Corp.","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "MRVL":{"name":"Marvell Technology","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "SMCI":{"name":"Super Micro Computer","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "ARM":{"name":"Arm Holdings","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "ASTS":{"name":"AST SpaceMobile","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "RKLB":{"name":"Rocket Lab USA","exchange":"NASDAQ","type":"Stock","sector":"Industrials"},
-    "IONQ":{"name":"IonQ Inc.","exchange":"NYSE","type":"Stock","sector":"Technology"},
-    "SOUN":{"name":"SoundHound AI","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "PLTR":{"name":"Palantir Technologies","exchange":"NYSE","type":"Stock","sector":"Technology"},
-    "AI":{"name":"C3.ai Inc.","exchange":"NYSE","type":"Stock","sector":"Technology"},
-    "RGTI":{"name":"Rigetti Computing","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "QUBT":{"name":"Quantum Computing","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "BBAI":{"name":"BigBear.ai Holdings","exchange":"NYSE","type":"Stock","sector":"Technology"},
-    "COIN":{"name":"Coinbase Global","exchange":"NASDAQ","type":"Stock","sector":"Financial Services"},
-    "MSTR":{"name":"MicroStrategy Inc.","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "HOOD":{"name":"Robinhood Markets","exchange":"NASDAQ","type":"Stock","sector":"Financial Services"},
-    "SOFI":{"name":"SoFi Technologies","exchange":"NASDAQ","type":"Stock","sector":"Financial Services"},
-    "AFRM":{"name":"Affirm Holdings","exchange":"NASDAQ","type":"Stock","sector":"Financial Services"},
-    "PYPL":{"name":"PayPal Holdings","exchange":"NASDAQ","type":"Stock","sector":"Financial Services"},
-    "SQ":{"name":"Block Inc.","exchange":"NYSE","type":"Stock","sector":"Financial Services"},
-    "V":{"name":"Visa Inc.","exchange":"NYSE","type":"Stock","sector":"Financial Services"},
-    "MA":{"name":"Mastercard Inc.","exchange":"NYSE","type":"Stock","sector":"Financial Services"},
-    "RIVN":{"name":"Rivian Automotive","exchange":"NASDAQ","type":"Stock","sector":"Consumer Cyclical"},
-    "LCID":{"name":"Lucid Group","exchange":"NASDAQ","type":"Stock","sector":"Consumer Cyclical"},
-    "NIO":{"name":"NIO Inc. (ADR)","exchange":"NYSE","type":"Stock","sector":"Consumer Cyclical"},
-    "CRM":{"name":"Salesforce Inc.","exchange":"NYSE","type":"Stock","sector":"Technology"},
-    "ADBE":{"name":"Adobe Inc.","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "NFLX":{"name":"Netflix Inc.","exchange":"NASDAQ","type":"Stock","sector":"Communication Services"},
-    "SNOW":{"name":"Snowflake Inc.","exchange":"NYSE","type":"Stock","sector":"Technology"},
-    "DDOG":{"name":"Datadog Inc.","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "ZS":{"name":"Zscaler Inc.","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "CRWD":{"name":"CrowdStrike Holdings","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "PANW":{"name":"Palo Alto Networks","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "NET":{"name":"Cloudflare Inc.","exchange":"NYSE","type":"Stock","sector":"Technology"},
-    "MDB":{"name":"MongoDB Inc.","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "PATH":{"name":"UiPath Inc.","exchange":"NYSE","type":"Stock","sector":"Technology"},
-    "UPST":{"name":"Upstart Holdings","exchange":"NASDAQ","type":"Stock","sector":"Financial Services"},
-    "MRNA":{"name":"Moderna Inc.","exchange":"NASDAQ","type":"Stock","sector":"Healthcare"},
-    "BNTX":{"name":"BioNTech SE (ADR)","exchange":"NASDAQ","type":"Stock","sector":"Healthcare"},
-    "ENPH":{"name":"Enphase Energy","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "FSLR":{"name":"First Solar Inc.","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "PLUG":{"name":"Plug Power Inc.","exchange":"NASDAQ","type":"Stock","sector":"Industrials"},
-    "IBM":{"name":"IBM Corp.","exchange":"NYSE","type":"Stock","sector":"Technology"},
-    "CSCO":{"name":"Cisco Systems","exchange":"NASDAQ","type":"Stock","sector":"Technology"},
-    "DELL":{"name":"Dell Technologies","exchange":"NYSE","type":"Stock","sector":"Technology"},
-    "JPM":{"name":"JPMorgan Chase","exchange":"NYSE","type":"Stock","sector":"Financial Services"},
-    "GS":{"name":"Goldman Sachs","exchange":"NYSE","type":"Stock","sector":"Financial Services"},
-    "MS":{"name":"Morgan Stanley","exchange":"NYSE","type":"Stock","sector":"Financial Services"},
-    "BAC":{"name":"Bank of America","exchange":"NYSE","type":"Stock","sector":"Financial Services"},
-    "WFC":{"name":"Wells Fargo","exchange":"NYSE","type":"Stock","sector":"Financial Services"},
-    "WMT":{"name":"Walmart Inc.","exchange":"NYSE","type":"Stock","sector":"Consumer Defensive"},
-    "COST":{"name":"Costco Wholesale","exchange":"NASDAQ","type":"Stock","sector":"Consumer Defensive"},
-    "HD":{"name":"Home Depot","exchange":"NYSE","type":"Stock","sector":"Consumer Cyclical"},
-    "MCD":{"name":"McDonald's Corp.","exchange":"NYSE","type":"Stock","sector":"Consumer Cyclical"},
-    "SBUX":{"name":"Starbucks Corp.","exchange":"NASDAQ","type":"Stock","sector":"Consumer Cyclical"},
-    "DIS":{"name":"Walt Disney Co.","exchange":"NYSE","type":"Stock","sector":"Communication Services"},
-    "SPY":{"name":"SPDR S&P 500 ETF","exchange":"NYSEARCA","type":"ETF","sector":"Broad Market"},
-    "QQQ":{"name":"Invesco Nasdaq 100 ETF","exchange":"NASDAQ","type":"ETF","sector":"Technology"},
-    "IWM":{"name":"iShares Russell 2000 ETF","exchange":"NYSEARCA","type":"ETF","sector":"Small Cap"},
-    "SOXX":{"name":"iShares Semiconductor ETF","exchange":"NASDAQ","type":"ETF","sector":"Technology"},
-    "SMH":{"name":"VanEck Semiconductor ETF","exchange":"NASDAQ","type":"ETF","sector":"Technology"},
-    "ARKK":{"name":"ARK Innovation ETF","exchange":"NYSEARCA","type":"ETF","sector":"Innovation"},
-    "TQQQ":{"name":"ProShares UltraPro QQQ (3x)","exchange":"NASDAQ","type":"ETF","sector":"Leveraged"},
-    "SQQQ":{"name":"ProShares UltraPro Short QQQ","exchange":"NASDAQ","type":"ETF","sector":"Inverse"},
-    "SOXL":{"name":"Direxion Daily SOX Bull 3X","exchange":"NYSEARCA","type":"ETF","sector":"Leveraged"},
-    "SOXS":{"name":"Direxion Daily SOX Bear 3X","exchange":"NYSEARCA","type":"ETF","sector":"Inverse"},
-    "GLD":{"name":"SPDR Gold ETF","exchange":"NYSEARCA","type":"ETF","sector":"Commodities"},
-    "SLV":{"name":"iShares Silver ETF","exchange":"NYSEARCA","type":"ETF","sector":"Commodities"},
-    "TLT":{"name":"iShares 20Y Treasury ETF","exchange":"NASDAQ","type":"ETF","sector":"Fixed Income"},
-    "XLK":{"name":"Tech Sector ETF (SPDR)","exchange":"NYSEARCA","type":"ETF","sector":"Technology"},
-}
-
-_us_master: dict[str,dict] = {}
-_us_master_ts: float = 0.0
-_us_master_loading: bool = False
-
-def _load_us_master() -> dict:
-    global _us_master, _us_master_ts
-    master = dict(US_BUILTIN)
-    try:
-        if US_MASTER_FILE.exists():
-            d=json.loads(US_MASTER_FILE.read_text(encoding="utf-8"))
-            for sym,info in (d.get("symbols") or {}).items():
-                if sym and isinstance(info,dict): master[sym.upper()]=info
-    except: pass
-    _us_master=master; _us_master_ts=time.time()
-    return master
-
-def get_us_master() -> dict:
-    if not _us_master: _load_us_master()
-    return _us_master
-
-def search_us_master(q: str, limit=10) -> list[dict]:
-    q=q.strip().upper(); master=get_us_master()
-    results=[]; seen=set()
-    if q in master:
-        info=master[q]; results.append({"symbol":q,"name":info.get("name",""),"exchange":info.get("exchange",""),"type":info.get("type","Stock"),"sector":info.get("sector","")}); seen.add(q)
-    for sym,info in master.items():
-        if sym not in seen and sym.startswith(q):
-            results.append({"symbol":sym,"name":info.get("name",""),"exchange":info.get("exchange",""),"type":info.get("type","Stock"),"sector":info.get("sector","")}); seen.add(sym)
-            if len(results)>=limit: break
-    if len(results)<limit:
-        q_lo=q.lower()
-        for sym,info in master.items():
-            if sym not in seen and q_lo in info.get("name","").lower():
-                results.append({"symbol":sym,"name":info.get("name",""),"exchange":info.get("exchange",""),"type":info.get("type","Stock"),"sector":info.get("sector","")}); seen.add(sym)
-                if len(results)>=limit: break
-    return results[:limit]
-
-async def _bg_update_us_master():
-    global _us_master_loading
-    if _us_master_loading: return
-    _us_master_loading=True
-    master=dict(US_BUILTIN)
-    try:
-        async with httpx.AsyncClient(timeout=20,follow_redirects=True) as cl:
-            for exchange in ("nasdaq","nyse","amex"):
-                try:
-                    r=await cl.get(f"https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=5000&exchange={exchange}",headers={"User-Agent":"Mozilla/5.0"})
-                    if r.status_code==200:
-                        rows=r.json().get("data",{}).get("table",{}).get("rows",[])
-                        for row in rows:
-                            sym=str(row.get("symbol","")).strip().upper()
-                            if sym and re.match(r'^[A-Z]{1,6}$',sym):
-                                master[sym]={"name":row.get("name",""),"exchange":exchange.upper(),"type":"Stock","sector":row.get("sector","")}
-                except: pass
-    except: pass
-    finally: _us_master_loading=False
-    try:
-        US_MASTER_FILE.write_text(json.dumps({"updated_at":datetime.now().isoformat(),"count":len(master),"symbols":master},ensure_ascii=False),encoding="utf-8")
-    except: pass
-    _us_master.update(master)
-
-# ── US Quotes & History ─────────────────────────────────────────────────────
-_us_quote_cache: dict[str,tuple[dict,float]] = {}
-_us_full_cache:  dict[str,tuple[dict,float]] = {}
-US_LITE_TTL = 30; US_FULL_TTL = 600
-
-async def fetch_us_quote(symbol: str, client: httpx.AsyncClient) -> dict | None:
-    """Yahoo Finance real-time quote."""
-    try:
-        url=f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=1d"
-        r=await client.get(url,headers={"User-Agent":"Mozilla/5.0"},timeout=10,follow_redirects=True)
-        if r.status_code!=200: return None
-        res=r.json().get("chart",{}).get("result")
-        if not res: return None
-        res=res[0]; meta=res.get("meta",{})
-        price=meta.get("regularMarketPrice") or meta.get("previousClose")
-        if not price: return None
-        prev=meta.get("previousClose") or meta.get("chartPreviousClose") or price
-        chg=round(float(price)-float(prev),4); chgp=round(chg/float(prev)*100,2) if prev else 0
-        q=res.get("indicators",{}).get("quote",[{}])[0]
-        # Update master name from Yahoo
-        yahoo_name=meta.get("shortName") or meta.get("longName","")
-        if yahoo_name and symbol in _us_master: _us_master[symbol]["name"]=yahoo_name
-        return{
-            "symbol":symbol,"name":yahoo_name or _us_master.get(symbol,{}).get("name",symbol),
-            "exchange":meta.get("fullExchangeName") or meta.get("exchangeName",""),
-            "sector":_us_master.get(symbol,{}).get("sector",""),
-            "price":round(float(price),4),"previous_close":round(float(prev),4),
-            "change":chg,"change_pct":chgp,
-            "open":round(float(meta.get("regularMarketOpen") or price),4),
-            "high":round(float(meta.get("regularMarketDayHigh") or price),4),
-            "low":round(float(meta.get("regularMarketDayLow") or price),4),
-            "volume":int(meta.get("regularMarketVolume") or 0),
-            "fifty_two_week_high":round(float(meta.get("fiftyTwoWeekHigh") or 0),4) or None,
-            "fifty_two_week_low":round(float(meta.get("fiftyTwoWeekLow") or 0),4) or None,
-            "currency":meta.get("currency","USD"),
-            "market_state":meta.get("marketState",""),
-            "quote_time":(datetime.utcfromtimestamp(meta["regularMarketTime"]).strftime("%Y-%m-%d %H:%M UTC")
-                          if meta.get("regularMarketTime") else None),
-            "source":"Yahoo Finance",
-        }
-    except: return None
-
-async def fetch_us_history(symbol: str, client: httpx.AsyncClient, days=400) -> pd.DataFrame:
-    """Yahoo Finance OHLCV history → DataFrame with TW column names for shared indicators."""
-    try:
-        p2=int(datetime.now().timestamp()); p1=int((datetime.now()-timedelta(days=days)).timestamp())
-        url=f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={p1}&period2={p2}&interval=1d"
-        r=await client.get(url,headers={"User-Agent":"Mozilla/5.0"},timeout=15,follow_redirects=True)
-        if r.status_code!=200: raise Exception(f"Yahoo {r.status_code}")
-        res=r.json().get("chart",{}).get("result")
-        if not res: return pd.DataFrame()
-        res=res[0]; ts_list=res.get("timestamp",[])
-        q=res.get("indicators",{}).get("quote",[{}])[0]
-        o,h,l,c,v=(q.get(k,[]) for k in["open","high","low","close","volume"])
-        recs=[{"日期":pd.to_datetime(ts,unit="s",utc=True).tz_convert("America/New_York").date(),
-               "開盤價":float(o[i]) if i<len(o) and o[i] else float(c[i]),
-               "最高價":float(h[i]) if i<len(h) and h[i] else float(c[i]),
-               "最低價":float(l[i]) if i<len(l) and l[i] else float(c[i]),
-               "收盤價":float(c[i]),"成交股數":int(v[i]) if i<len(v) and v[i] else 0}
-              for i,ts in enumerate(ts_list) if i<len(c) and c[i] is not None]
-        if not recs: return pd.DataFrame()
-        df=pd.DataFrame(recs); df["日期"]=pd.to_datetime(df["日期"])
-        return df.sort_values("日期").reset_index(drop=True)
-    except:
-        return pd.DataFrame()
-
-async def fetch_us_profile(symbol: str) -> dict:
-    """Fetch company profile from Yahoo Finance."""
-    try:
-        async with httpx.AsyncClient(timeout=10) as cl:
-            r=await cl.get(f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{symbol}?modules=summaryProfile,defaultKeyStatistics,financialData",
-                           headers={"User-Agent":"Mozilla/5.0"},follow_redirects=True)
-            if r.status_code!=200: return {}
-            data=r.json().get("quoteSummary",{}).get("result",[{}])[0] if r.json().get("quoteSummary",{}).get("result") else {}
-            sp=data.get("summaryProfile",{}); dk=data.get("defaultKeyStatistics",{}); fd=data.get("financialData",{})
-            def _v(d,k): v=d.get(k,{}); return v.get("raw") if isinstance(v,dict) else v
-            return{
-                "sector":sp.get("sector",""),"industry":sp.get("industry",""),
-                "full_time_employees":sp.get("fullTimeEmployees"),
-                "website":sp.get("website",""),"country":sp.get("country",""),
-                "market_cap":_v(dk,"marketCap"),"pe_ratio":_v(dk,"forwardPE") or _v(dk,"trailingPE"),
-                "eps":_v(dk,"trailingEps"),"book_value":_v(dk,"bookValue"),
-                "price_to_book":_v(dk,"priceToBook"),"beta":_v(dk,"beta"),
-                "shares_outstanding":_v(dk,"sharesOutstanding"),
-                "total_revenue":_v(fd,"totalRevenue"),
-                "revenue_growth":_v(fd,"revenueGrowth"),
-                "gross_margins":_v(fd,"grossMargins"),
-                "operating_margins":_v(fd,"operatingMargins"),
-                "profit_margins":_v(fd,"profitMargins"),
-                "return_on_equity":_v(fd,"returnOnEquity"),
-                "debt_to_equity":_v(fd,"debtToEquity"),
-                "current_ratio":_v(fd,"currentRatio"),
-            }
-    except: return {}
-
-# ── US Market Context ────────────────────────────────────────────────────────
-_us_ctx_cache: dict={}; _us_ctx_ts: float=0.0; US_CTX_TTL=180
-
-async def fetch_us_market_context() -> dict:
-    """US Market Context with explanation and graceful partial fallback."""
-    global _us_ctx_cache,_us_ctx_ts
-    if _us_ctx_cache and (time.time()-_us_ctx_ts)<US_CTX_TTL: return _us_ctx_cache
-    syms={"spy":"SPY","qqq":"QQQ","soxx":"^SOX","iwm":"IWM","vix":"^VIX","us10y":"^TNX","dxy":"DX-Y.NYB","btc":"BTC-USD"}
-    result={k:None for k in syms}
-    errors=[]
-    try:
-        async with httpx.AsyncClient(timeout=8) as cl:
-            for key,sym in syms.items():
-                try:
-                    r=await cl.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?interval=1d&range=5d",
-                                   headers={"User-Agent":"Mozilla/5.0"},follow_redirects=True)
-                    if r.status_code!=200:
-                        errors.append({"component":key,"symbol":sym,"error":f"HTTP {r.status_code}"}); continue
-                    res=r.json().get("chart",{}).get("result")
-                    if not res:
-                        errors.append({"component":key,"symbol":sym,"error":"no result"}); continue
-                    closes=res[0].get("indicators",{}).get("quote",[{}])[0].get("close",[])
-                    valid=[c for c in closes if c is not None]
-                    if valid:
-                        result[key]={"price":round(float(valid[-1]),2),
-                                     "change_pct":round((float(valid[-1])-float(valid[-2]))/float(valid[-2])*100,2) if len(valid)>1 and valid[-2] else 0}
-                    else:
-                        errors.append({"component":key,"symbol":sym,"error":"no close"})
-                except Exception as e:
-                    errors.append({"component":key,"symbol":sym,"error":str(e)[:120]})
-    except Exception as e:
-        errors.append({"component":"client","error":str(e)[:120]})
-
-    score=50; explanations=[]; notes=[]
-    spy=result.get("spy"); qqq=result.get("qqq"); soxx=result.get("soxx"); iwm=result.get("iwm")
-    vix=result.get("vix"); us10y=result.get("us10y"); dxy=result.get("dxy"); btc=result.get("btc")
-    def chg(x): return (x or {}).get("change_pct") or 0
-    def price(x, default=None): return (x or {}).get("price", default)
-    if spy:
-        delta=8 if chg(spy)>0 else -8; score+=delta; explanations.append({"name":"SPY","impact":delta,"text":f"SPY {chg(spy):+.2f}% {'supports risk-on' if delta>0 else 'weakens broad market tone'}"})
-    if qqq:
-        delta=10 if chg(qqq)>0 else -10; score+=delta; explanations.append({"name":"QQQ","impact":delta,"text":f"QQQ {chg(qqq):+.2f}% {'supports tech/growth' if delta>0 else 'pressures tech/growth'}"})
-    if soxx:
-        delta=8 if chg(soxx)>0 else -8; score+=delta; explanations.append({"name":"SOXX/SOX","impact":delta,"text":f"Semiconductor index {chg(soxx):+.2f}% {'supports chip names' if delta>0 else 'pressures semiconductor names'}"})
-    if iwm:
-        delta=4 if chg(iwm)>0 else -4; score+=delta; explanations.append({"name":"IWM","impact":delta,"text":f"Small caps {chg(iwm):+.2f}%"})
-    if vix:
-        v=float(price(vix,20))
-        if v<15: delta=15; txt="VIX low; risk appetite healthy"
-        elif v<20: delta=8; txt="VIX normal; risk environment acceptable"
-        elif v<30: delta=-12; txt="VIX elevated; reduce high-beta risk"
-        else: delta=-25; txt="VIX fear level; avoid aggressive entries"
-        score+=delta; explanations.append({"name":"VIX","impact":delta,"text":f"{txt} ({v:.1f})"}); notes.append(f"VIX {v:.1f}")
-    if us10y:
-        y=float(price(us10y,4))
-        if y>4.8: delta=-10; txt="US10Y high; growth stocks pressured"
-        elif y<4.0: delta=5; txt="US10Y lower; growth stocks supported"
-        else: delta=0; txt="US10Y neutral"
-        score+=delta; explanations.append({"name":"US10Y","impact":delta,"text":f"{txt} ({y:.2f})"})
-    if dxy:
-        dx=chg(dxy)
-        delta=-5 if dx>0.4 else (3 if dx<-0.4 else 0)
-        score+=delta; explanations.append({"name":"DXY","impact":delta,"text":f"DXY {dx:+.2f}% {'strong dollar headwind' if delta<0 else 'dollar not a headwind' if delta>0 else 'neutral'}"})
-    if btc:
-        bp=chg(btc)
-        delta=5 if bp>2 else (-5 if bp<-5 else 0)
-        score+=delta; explanations.append({"name":"BTC","impact":delta,"text":f"BTC {bp:+.2f}% {'supports crypto-beta names' if delta>0 else 'pressures crypto-beta names' if delta<0 else 'neutral'}"})
-    market_score=max(0,min(100,round(score)))
-    sentiment="Bullish 🟢" if market_score>=65 else("Neutral ⚪" if market_score>=45 else "Bearish 🔴")
-    status="ok" if len(errors)<=2 else ("partial" if len(errors)<len(syms) else "degraded")
-    ctx={"market_score":market_score,"sentiment":sentiment,"note":" | ".join(notes[:4]),
-         "components":result,"explanations":explanations,"status":status,"errors":errors[:8],
-         "updated_at":datetime.now().isoformat()}
-    _us_ctx_cache=ctx; _us_ctx_ts=time.time(); return ctx
-
-# ── US AI Signal ────────────────────────────────────────────────────────────
-def build_us_ai_signal(row: pd.Series, cp: float, chg_pct: float,
-                       vol_ratio: float, price_df: pd.DataFrame | None,
-                       market_ctx: dict | None, symbol: str) -> dict:
-    """V12 US AI signal — full 100-pt with market context."""
-    market_ctx=market_ctx or {}
-    if cp<=0: return _empty_ai("WATCH","No price data available")
-
-    ts_data=compute_technical_score(row,cp,vol_ratio,chg_pct,price_df)
-    ts=ts_data["technical_score"]
-    overheat=detect_overheat(row,cp,chg_pct,price_df)
-    fb=detect_false_breakout(row,cp,vol_ratio,price_df)
-
-    if ts>=75 and not overheat and not fb: signal="BUY"
-    elif ts>=52: signal="WATCH"
-    else: signal="AVOID"
-    if overheat and signal=="BUY": signal="WATCH"
-    if fb and signal=="BUY": signal="WATCH"
-
-    plan=build_trade_plan(row,cp,signal,price_df)
-    rr=plan["risk_reward_ratio"]; tv=plan["trade_valid"]
-    if not tv and signal=="BUY": signal="WATCH"
-
-    def _g(col): return float(row[col]) if col in row.index and pd.notna(row.get(col)) else None
-    adx=_g("ADX"); ma20=_g("MA20"); atr=_g("ATR")
-    atr_pct=(atr/cp*100) if atr and cp>0 else None
-    ma20_dev=((cp-ma20)/ma20*100) if ma20 and ma20>0 else None
-    stock_type=_us_master.get(symbol,{}).get("type","Stock")
-    strat=determine_strategy_type(row,cp,vol_ratio,overheat,fb,adx,stock_type)
-
-    # Classify by sector for strategy subtype
-    sector=_us_master.get(symbol,{}).get("sector","")
-    if "Semiconductor" in sector or symbol in("NVDA","AMD","AVGO","SMCI","MU","QCOM"):
-        strat=strat if strat in("Overheated","False Breakout Risk","Range Bound") else "AI / Semiconductor Momentum"
-    elif stock_type=="ETF":
-        strat="ETF Trend"
-    elif symbol in("AAPL","MSFT","AMZN","GOOGL","META") and strat=="Trend Following":
-        strat="Mega Cap Trend"
-
-    market_score=market_ctx.get("market_score",50)
-    vol_score=min(100,max(0,int(vol_ratio*50))) if vol_ratio else 50
-    rr_score=compute_rr_score(rr)
-    risk_score=compute_risk_score(overheat,fb,tv,rr,atr_pct,ma20_dev)
-
-    if strat in("Mega Cap Trend","ETF Trend"): setup_score=80 if ts>=65 else 55
-    elif strat=="AI / Semiconductor Momentum": setup_score=75 if ts>=65 and not overheat else 45
-    elif strat in("Pullback Entry","Reversal Bounce"): setup_score=70 if tv else 40
-    elif strat=="Overheated": setup_score=20
-    else: setup_score=55
-
-    dq="full" if price_df is not None and len(price_df)>=60 else "partial"
-    final=compute_final_score(ts,setup_score,rr_score,market_score,vol_score,risk_score,dq)
-    conf=min(100,final)
-
-    es=plan["entry_status"]
-    if tv:
-        if overheat or (ma20_dev and ma20_dev>8): es="TOO_EXTENDED"
-        elif plan["entry_price"] and abs(cp-plan["entry_price"])/cp*100<=3: es="ENTERABLE"
-        else: es="WAIT_PULLBACK"
-
-    scan_cat=classify_scan_category(signal,es,tv,overheat,fb,final,ts,market_score,risk_score,conf)
-    # US requires market_score >= 55 for ENTERABLE
-    if scan_cat=="ENTERABLE" and market_score<55: scan_cat="NEAR_MISS"
-
-    if signal=="BUY" and tv and es=="ENTERABLE" and rr and rr>=1.5: trade_status="BUY_NOW"
-    elif signal=="BUY": trade_status="BUY_PULLBACK"
-    elif signal=="WATCH": trade_status="WATCH"
-    else: trade_status="AVOID"
-
-    entry_reason=[]; risk_reason=list(plan.get("risk_reason",[]))+overheat[:2]+fb[:1]
-    if ts>=70: entry_reason.append(f"Technical score {ts}/100")
-    if strat: entry_reason.append(f"Strategy: {strat}")
-    if rr and rr>=1.5: entry_reason.append(f"RR {rr}x ≥ 1.5")
-    if market_score>=65: entry_reason.append(f"Market context bullish ({market_score}/100)")
-    if market_score<45: risk_reason.append(f"Weak market context ({market_score}/100)")
-
-    summary=(f"Tech {ts}/100 | {strat} | Market {market_score}/100 | "
-             +("Entry conditions met." if signal=="BUY" and tv else
-                "Signals positive but unconfirmed, watch for pullback." if signal=="WATCH" else
-                "Technical conditions weak, avoid for now."))
-
-    return{
-        "signal":signal,"confidence":conf,"score_quality":dq,
-        "entry_price":plan["entry_price"],"entry_zone_low":plan["entry_zone_low"],
-        "entry_zone_high":plan["entry_zone_high"],"target_price":plan["target_price"],
-        "stop_loss":plan["stop_loss"],"risk_reward_ratio":rr,
-        "trade_status":trade_status,"entry_status":es,
-        "entry_status_text":{"ENTERABLE":"✅ Enterable","WAIT_PULLBACK":"⏳ Wait Pullback",
-                              "TOO_EXTENDED":"⚠️ Too Extended","BAD_SETUP":"⚠️ Invalid Setup","NO_DATA":"— No Data"}.get(es,"—"),
-        "can_enter":es=="ENTERABLE","trade_valid":tv,
-        "strategy_type":strat,"technical_score":ts,"technical_breakdown":ts_data["breakdown"],
-        "setup_score":setup_score,"rr_score":rr_score,"market_score":market_score,
-        "volume_score":vol_score,"risk_score":risk_score,"final_score":final,
-        "scan_category":scan_cat,"overheat_flags":overheat,"false_breakout_flags":fb,"risk_flags":[],
-        "recent_support":plan["recent_support"],"recent_resistance":plan["recent_resistance"],
-        "support_zone":plan["support_zone"],"resistance_zone":plan["resistance_zone"],
-        "entry_reason":entry_reason[:4],"risk_reason":risk_reason[:4],
-        "summary":summary,"holding_days":"5-15 days" if signal=="BUY" else "Watch only",
-        "market_context_score":market_score,
-        "disclaimer":"⚠️ For reference only, not investment advice",
-    }
-
-# ── US Full Stock Fetch ──────────────────────────────────────────────────────
-async def _fetch_us_full(symbol: str) -> dict:
-    now=time.time()
-    if symbol in _us_full_cache:
-        cached,ts=_us_full_cache[symbol]
-        if now-ts<US_FULL_TTL: return cached
-    async with httpx.AsyncClient() as cl:
-        quote,df,market_ctx=await asyncio.gather(
-            fetch_us_quote(symbol,cl),
-            fetch_us_history(symbol,cl,400),
-            fetch_us_market_context(),
-        )
-    if not quote:
-        return{"market":"us","symbol":symbol,"name":_us_master.get(symbol,{}).get("name",symbol),
-               "error":"美股資料暫時無法取得，請稍後重試","data_quality":"poor",
-               "chart_data":[],"ai_signal":_empty_ai("WATCH","Quote unavailable")}
-
-    cp=float(quote["price"]); chg_pct=float(quote.get("change_pct") or 0)
-    vol_ratio=1.0
-    if not df.empty:
-        try:
-            avg=df.tail(20)["成交股數"].mean(); lat=float(df.iloc[-1]["成交股數"])
-            if avg>0: vol_ratio=round(lat/avg,2)
-        except: pass
-
-    # Compute indicators and AI
-    ai=_empty_ai("WATCH","Insufficient history")
-    if not df.empty:
-        df2=compute_all_indicators(df.copy()); latest=df2.iloc[-1]
-        ai=build_us_ai_signal(latest,cp,chg_pct,vol_ratio,df,market_ctx,symbol)
-    else:
-        # Minimal AI from quote
-        ep=round(cp,4); sl=round(cp*0.96,4); tp=round(cp*1.06,4)
-        rr=round((tp-ep)/(ep-sl),2)
-        ai={**_empty_ai("WATCH","No history — reference only"),
-            "entry_price":ep,"entry_zone_low":round(ep*0.995,4),"entry_zone_high":round(ep*1.005,4),
-            "target_price":tp,"stop_loss":sl,"risk_reward_ratio":rr,"score_quality":"poor",
-            "market_score":market_ctx.get("market_score",50)}
-
-    # Chart data
-    chart_data=[]
-    if not df.empty:
-        df3=compute_all_indicators(df.copy())
-        for _,row in df3.tail(120).iterrows():
-            chart_data.append({"date":row["日期"].strftime("%Y-%m-%d"),
-                "open":_f(row.get("開盤價"),4),"high":_f(row.get("最高價"),4),
-                "low":_f(row.get("最低價"),4),"close":_f(row.get("收盤價"),4),
-                "volume":int(row["成交股數"]) if pd.notna(row.get("成交股數")) else 0,
-                "ma5":_f(row.get("MA5"),4),"ma20":_f(row.get("MA20"),4),"ma60":_f(row.get("MA60"),4),
-                "rsi":_f(row.get("RSI")),"macd":_f(row.get("MACD"),4),
-                "signal_line":_f(row.get("Signal"),4),"hist":_f(row.get("Hist"),4)})
-
-    result={
-        "market":"us","symbol":symbol,
-        "name":quote.get("name") or _us_master.get(symbol,{}).get("name",symbol),
-        "exchange":quote.get("exchange",""),"sector":quote.get("sector",""),
-        "industry":_us_master.get(symbol,{}).get("sector",""),
-        "price":quote["price"],"change":quote.get("change"),"change_pct":quote.get("change_pct"),
-        "open":quote.get("open"),"high":quote.get("high"),"low":quote.get("low"),
-        "volume":quote.get("volume"),"avg_volume":None,
-        "fifty_two_week_high":quote.get("fifty_two_week_high"),
-        "fifty_two_week_low":quote.get("fifty_two_week_low"),
-        "currency":quote.get("currency","USD"),
-        "market_state":quote.get("market_state",""),
-        "quote_time":quote.get("quote_time"),
-        "source":"Yahoo Finance","data_quality":"full" if len(df)>=60 else("partial" if not df.empty else "poor"),
-        "chart_data":chart_data,"market_context":market_ctx,"ai_signal":ai,
-    }
-    _us_full_cache[symbol]=(result,now); return result
-
-async def _fetch_us_lite(symbol: str) -> dict:
-    now=time.time()
-    if symbol in _us_full_cache:
-        cached,ts=_us_full_cache[symbol]
-        if now-ts<US_FULL_TTL:
-            d=cached; ai=d.get("ai_signal",{})
-            return{"market":"us","symbol":symbol,"name":d.get("name",symbol),
-                   "price":d.get("price"),"change_pct":d.get("change_pct"),"change":d.get("change"),
-                   "ai_signal":ai,"lite":True}
-    if symbol in _us_quote_cache:
-        cached,ts=_us_quote_cache[symbol]
-        if now-ts<US_LITE_TTL: return cached
-    async with httpx.AsyncClient() as cl:
-        quote=await fetch_us_quote(symbol,cl)
-    if not quote:
-        return{"market":"us","symbol":symbol,"name":_us_master.get(symbol,{}).get("name",symbol),
-               "price":None,"change_pct":None,"change":None,"ai_signal":_empty_ai(),"lite":True}
-    cp=float(quote["price"]); chg=(quote.get("change_pct") or 0)
-    ep=round(cp,4); sl=round(cp*0.96,4); tp=round(cp*1.06,4); rr=round((tp-ep)/(ep-sl),2)
-    ai_lite={**_empty_ai("WATCH","Lite mode — query full data for analysis"),
-             "entry_price":ep,"entry_zone_low":round(ep*0.995,4),"entry_zone_high":round(ep*1.005,4),
-             "target_price":tp,"stop_loss":sl,"risk_reward_ratio":rr,"score_quality":"partial"}
-    result={"market":"us","symbol":symbol,"name":quote.get("name",symbol),
-            "price":quote["price"],"change_pct":quote.get("change_pct"),"change":quote.get("change"),
-            "ai_signal":ai_lite,"lite":True}
-    _us_quote_cache[symbol]=(result,now); return result
-
-
-
-async def _fetch_us_mobile_tech(symbol: str) -> dict:
-    """V12.9.2 US mobile technical endpoint: fast technical decision without full profile/chart work."""
-    symbol = symbol.upper()
-    try:
-        async with httpx.AsyncClient() as cl:
-            quote_task = asyncio.create_task(fetch_us_quote(symbol, cl))
-            hist_task = asyncio.create_task(fetch_us_history(symbol, cl, days=180))
-            quote = await asyncio.wait_for(quote_task, timeout=6)
-            df = await asyncio.wait_for(hist_task, timeout=10)
-        name = (quote or {}).get("name") or _us_master.get(symbol, {}).get("name", symbol)
-        price = float((quote or {}).get("price") or 0)
-        change_pct = (quote or {}).get("change_pct") or 0
-        ai = _empty_ai("WATCH", "Mobile technical data unavailable")
-        indicators = {}
-        score = {}
-        market_ctx = {"market_score": 50}
-        if df is not None and not df.empty and price > 0:
-            df = compute_all_indicators(df)
-            latest = df.iloc[-1]
-            indicators = _mobile_indicator_payload(df, latest)
-            vol_ratio = _calc_vol_info(df).get("ratio", 1.0)
-            try:
-                market_ctx = await asyncio.wait_for(fetch_us_market_context(), timeout=4)
-            except Exception:
-                market_ctx = {"market_score": 50}
-            ai = build_us_ai_signal(latest, price, change_pct or 0, vol_ratio, df, market_ctx, symbol)
-            ai["score_quality"] = "mobile_technical"
-            ai["summary"] = "Mobile technical quick read: " + (ai.get("summary") or "core technical decision ready.")
-            score = _mobile_score_payload(ai)
-        return {
-            "market": "us", "symbol": symbol, "name": name,
-            "price": price if price else None,
-            "change": (quote or {}).get("change"), "change_pct": (quote or {}).get("change_pct"),
-            "open": (quote or {}).get("open"), "high": (quote or {}).get("high"), "low": (quote or {}).get("low"),
-            "volume": (quote or {}).get("volume"), "quote_time": (quote or {}).get("quote_time"),
-            "exchange": (quote or {}).get("exchange", _us_master.get(symbol, {}).get("exchange", "US")),
-            "sector": _us_master.get(symbol, {}).get("sector", ""),
-            "source": "Mobile Technical · Yahoo Finance",
-            "ai_signal": ai, "indicators": indicators, "score": score,
-            "market_context": market_ctx, "mobile_fast": True, "mobile_technical": True,
-            "lite": True, "technical_ready": bool(indicators), "chart_data": []
-        }
-    except Exception as e:
-        return {"market": "us", "symbol": symbol, "name": _us_master.get(symbol, {}).get("name", symbol),
-                "price": None, "change": None, "change_pct": None, "source": "mobile-technical-error",
-                "ai_signal": _empty_ai("WATCH", "Mobile technical quick read failed: " + str(e)),
-                "indicators": {}, "score": {}, "mobile_fast": True, "mobile_technical": True, "error": str(e)}
-
-# ── US Scan Pools ────────────────────────────────────────────────────────────
-US_CORE_POOL      = ["AAPL","MSFT","NVDA","AMZN","META","GOOGL","TSLA","AMD","AVGO","NFLX"]
-US_GROWTH_POOL    = ["PLTR","SOFI","RIVN","HOOD","COIN","MSTR","ASTS","RKLB","IONQ","SOUN"]
-US_SEMI_POOL      = ["NVDA","AMD","AVGO","SMCI","MU","QCOM","MRVL","AMAT","LRCX","KLAC"]
-US_ETF_POOL       = ["SPY","QQQ","SOXX","IWM","ARKK","TQQQ","SMH"]
-US_FRESH_POOL     = [
-    "CRM","NOW","SNOW","DDOG","NET","PANW","CRWD","SHOP","UBER","ABNB",
-    "CELH","ELF","ENPH","FSLR","NVO","LLY","VRTX","ISRG","DECK","CAVA",
-    "APP","DUOL","MELI","SE","MDB","ZS","OKTA","HIMS","TOST","ROKU",
-    "TEAM","BILL","GTLB","PATH","U","AFRM","UPST","BROS","WING","SHAK",
-    "ONON","RBLX","TTD","FIVN","DOCU","PAYC","PINS","DASH","RCL","CCL",
-    "XLE","XLF","XLK","XLY","XBI","IBB","ARKG","BOTZ","SKYY","HACK"
-]
-US_GROUP_MAP = {
-    "mega": set(US_CORE_POOL),
-    "semiconductor": set(US_SEMI_POOL),
-    "high_beta": set(US_GROWTH_POOL),
-    "etf": set(US_ETF_POOL),
-    "fresh": set(US_FRESH_POOL),
-}
+# ═══════════════════════════════════════════════════════
+# SCAN POOLS / DIVERSITY
+# ═══════════════════════════════════════════════════════
 TW_DISCOVERY_POOL = [
     # Electronics / AI server / PCB / cooling / semiconductor equipment
     "2485","2313","3706","3035","3017","3324","3529","4967","6191","6446",
@@ -1963,7 +1369,6 @@ TW_GROUP_MAP = {
     "mid_small": {"8086","8358","6173","6147","2342","2344","2332","2347","2352","2354","2355","2358","2385","2388","2392","2393","2423","2429"},
     "fresh": set(TW_DISCOVERY_POOL),
 }
-US_SCAN_CACHE: dict[str, tuple[dict, float]] = {}
 TW_SCAN_CACHE: dict[str, tuple[dict, float]] = {}
 SCAN_CACHE_TTL = 300
 
@@ -2040,30 +1445,6 @@ def _sanitize_scan_mode(mode: str | None):
 def _history_hash(history_symbols: str = "") -> str:
     return hashlib.md5((history_symbols or "").encode("utf-8","ignore")).hexdigest()[:10]
 
-def select_us_scan_pool(pool: str = "all", symbols: str = "", limit: int = 50) -> list[str]:
-    pool=(pool or "all").lower().replace("_","-")
-    custom=_unique_symbols(re.split(r"[,\s]+", symbols or ""))
-    seed=_scan_seed(6)
-    if pool in ("watchlist","my-watchlist","custom") and custom:
-        return custom[:limit]
-    if pool in ("mega","mega-cap","core"):
-        base=US_CORE_POOL
-    elif pool in ("ai","semi","semiconductor","ai-semiconductor"):
-        base=US_SEMI_POOL + _rotate_list(US_FRESH_POOL, seed, 8)
-    elif pool in ("growth","high-beta","highbeta"):
-        base=US_GROWTH_POOL + _rotate_list(US_FRESH_POOL, seed+2, 12)
-    elif pool in ("etf","etfs"):
-        base=US_ETF_POOL + _rotate_list(US_FRESH_POOL, seed+3, 8)
-    elif pool in ("fresh","discovery","fresh-discovery"):
-        base=_rotate_list(US_FRESH_POOL + US_GROWTH_POOL + US_SEMI_POOL, seed, limit)
-    elif pool in ("diversified","balanced","all-diverse","all"):
-        base=(US_CORE_POOL[:4] + _rotate_list(US_SEMI_POOL, seed, 6) + _rotate_list(US_GROWTH_POOL, seed+1, 8) +
-              _rotate_list(US_ETF_POOL, seed+2, 4) + _rotate_list(US_FRESH_POOL, seed+3, max(12, limit)))
-    else:
-        base=(US_CORE_POOL[:5] + _rotate_list(US_GROWTH_POOL, seed, 8) + _rotate_list(US_SEMI_POOL, seed+1, 8) +
-              _rotate_list(US_ETF_POOL, seed+2, 4) + _rotate_list(US_FRESH_POOL, seed+3, max(15, limit)))
-    return list(dict.fromkeys(base))[:limit]
-
 def select_tw_scan_pool(pool: str = "all", symbols: str = "", limit: int = 50) -> list[str]:
     """V12.9.2 Taiwan pool selector with true discovery mix.
     Core 30% + user watchlist/custom 20% + theme rotation 30% + random/exploration 20%.
@@ -2128,7 +1509,7 @@ def _parse_history_symbols(history_symbols: str = "") -> set[str]:
 
 def _diversity_group(market: str, sym: str) -> str:
     s = str(sym or "").upper()
-    maps = US_GROUP_MAP if market == "us" else TW_GROUP_MAP
+    maps = TW_GROUP_MAP
     for k, vals in maps.items():
         if s in vals: return k
     return "other"
@@ -2383,12 +1764,11 @@ async def _fname(sid:str)->str:
 # ══════════════════════════════════════════════════════════════════════════════
 @app.on_event("startup")
 async def startup_event():
+    # Render 免費方案重啟後磁碟是空的：先從 Firestore 還原觀察名單、權重、訊號歷史
+    try: await asyncio.wait_for(asyncio.to_thread(cloudstore.pull_all,[WATCHLIST_FILE,TW_WEIGHTS_FILE,TW_HISTORY_FILE]),timeout=20)
+    except Exception: pass
     loaded=_lfm()
     if not loaded or _ims(): asyncio.create_task(fetch_stock_master_list())
-    _load_us_master()
-    # Background: update US master if stale
-    if time.time()-_us_master_ts>86400:
-        asyncio.create_task(_bg_update_us_master())
 
 # ══════════════════════════════════════════════════════════════════════════════
 # API — TW Watchlist
@@ -2840,150 +2220,6 @@ def api_debug_learning_v128():
             "apis": ["POST /api/learning/summary", "POST /api/learning/calibrate", "POST /api/learning/suggest-weights", "POST /api/learning/apply-weights", "GET /api/learning/status"],
             "time": datetime.now().isoformat()}
 
-# ══════════════════════════════════════════════════════════════════════════════
-# API — US Stocks
-# ══════════════════════════════════════════════════════════════════════════════
-@app.get("/api/us/suggest")
-async def us_suggest(q:str=Query("",min_length=1)):
-    results=search_us_master(q,limit=10)
-    if not results:
-        sym=q.strip().upper()
-        if re.match(r'^[A-Za-z.\-]{1,12}$',sym):
-            try:
-                async with httpx.AsyncClient() as cl:
-                    qt=await fetch_us_quote(sym,cl)
-                if qt: results=[{"symbol":sym,"name":qt.get("name",sym),"exchange":qt.get("exchange","US"),"type":"Stock","sector":""}]
-            except: pass
-    return{"results":results,"query":q}
-
-@app.get("/api/us/stock/{symbol}")
-async def us_get_stock(symbol:str):
-    if not re.match(r'^[A-Za-z.\-]{1,12}$',symbol): raise HTTPException(400,detail="Invalid US stock symbol")
-    return await _fetch_us_full(symbol.upper())
-
-@app.get("/api/us/stock-lite/{symbol}")
-async def us_get_stock_lite(symbol:str):
-    if not re.match(r'^[A-Za-z.\-]{1,12}$',symbol): raise HTTPException(400,detail="Invalid US stock symbol")
-    return await _fetch_us_lite(symbol.upper())
-
-
-@app.get("/api/us/stock-mobile/{symbol}")
-async def us_get_stock_mobile(symbol:str):
-    if not re.match(r'^[A-Za-z.\-]{1,12}$',symbol): raise HTTPException(400,detail="Invalid US stock symbol")
-    # US stock-lite is already quote-first and fast, so reuse it for mobile.
-    d=await _fetch_us_lite(symbol.upper())
-    d["mobile_fast"]=True
-    d["source"]=d.get("source") or "Yahoo Finance"
-    return d
-
-@app.get("/api/us/stock-mobile-tech/{symbol}")
-async def us_get_stock_mobile_tech(symbol:str):
-    if not re.match(r'^[A-Za-z.\-]{1,12}$',symbol): raise HTTPException(400,detail="Invalid US stock symbol")
-    return await _fetch_us_mobile_tech(symbol.upper())
-
-@app.get("/api/us/market-context")
-async def us_market_context():
-    try: return await fetch_us_market_context()
-    except Exception as e: return{"error":str(e),"market_score":50,"sentiment":"Unknown"}
-
-@app.get("/api/us/profile/{symbol}")
-async def us_profile(symbol:str):
-    if not re.match(r'^[A-Za-z.\-]{1,12}$',symbol): raise HTTPException(400,detail="Invalid symbol")
-    profile=await fetch_us_profile(symbol.upper())
-    master_info=get_us_master().get(symbol.upper(),{})
-    return{"symbol":symbol.upper(),"name":master_info.get("name",symbol),"profile":profile}
-
-async def _us_scan_core(min_score:int=60,max_stocks:int=50,mode:str="full",pool_name:str="all",symbols:str="",use_cache:bool=True,diversity_mode:str="balanced",history_symbols:str=""):
-    """V12.9.2 US AI scan core — real diversity fix + safe mode parsing."""
-    t0=time.time()
-    mode, mode_warn = _sanitize_scan_mode(mode)
-    diversity_mode, div_warn = _sanitize_diversity_mode(diversity_mode)
-    pool=select_us_scan_pool(pool_name, symbols, max_stocks)
-    cache_key=f"us:{mode}:{pool_name}:{','.join(pool)}:{min_score}:{max_stocks}:{diversity_mode}:{_history_hash(history_symbols)}"
-    if use_cache:
-        hit=_scan_cache_get(US_SCAN_CACHE, cache_key)
-        if hit: return hit
-    try:
-        market_ctx=await asyncio.wait_for(fetch_us_market_context(),timeout=8)
-    except Exception as e:
-        market_ctx={"market_score":50,"sentiment":"Unknown","error":str(e)}
-    market_score=market_ctx.get("market_score",50)
-    enterable=[];watch_closely=[];pullback=[];breakout_watch=[];risk_watch=[];avoid=[];near_miss=[];errors=[]
-    attempted=0; classified=0; current_symbol=None
-    for sym in pool:
-        current_symbol=sym; attempted += 1
-        try:
-            r=await _fetch_us_full(sym)
-            if r.get("error"):
-                errors.append({"symbol":sym,"error":str(r.get("error"))}); continue
-            ai=r.get("ai_signal",{}) or {}; conf=ai.get("confidence") or 0; final=ai.get("final_score") or 0; cat=ai.get("scan_category","AVOID")
-            item={"symbol":sym,"name":r.get("name",sym),"market":"us","price":r.get("price"),"change_pct":r.get("change_pct"),
-                  "signal":ai.get("signal","WATCH"),"confidence":conf,"trade_status":ai.get("trade_status","WATCH"),
-                  "entry_status":ai.get("entry_status","NO_DATA"),"entry_status_text":ai.get("entry_status_text","—"),"can_enter":ai.get("can_enter",False),"trade_valid":ai.get("trade_valid",False),
-                  "strategy_type":ai.get("strategy_type",""),"technical_score":ai.get("technical_score"),"final_score":final,"market_score":ai.get("market_score",market_score),
-                  "risk_score":ai.get("risk_score",50),"rr_score":ai.get("rr_score",0),"overheat_flags":ai.get("overheat_flags",[]),"false_breakout_flags":ai.get("false_breakout_flags",[]),
-                  "entry_price":ai.get("entry_price"),"entry_zone_low":ai.get("entry_zone_low"),"entry_zone_high":ai.get("entry_zone_high"),"target_price":ai.get("target_price"),
-                  "stop_loss":ai.get("stop_loss"),"risk_reward_ratio":ai.get("risk_reward_ratio"),"recent_support":ai.get("recent_support"),"recent_resistance":ai.get("recent_resistance"),
-                  "reasons":ai.get("entry_reason",[]) or ai.get("reasons",[]),"risk_reason":ai.get("risk_reason",[]),"summary":ai.get("summary","")}
-            if conf < min_score:
-                item.setdefault("risk_reason",[]).append(f"Confidence {conf}/100 below scan threshold {min_score}")
-                if final>=65 and (item.get("technical_score") or 0)>=65 and (item.get("risk_score") or 0)>=50:
-                    cat="WATCH_CLOSELY"
-                elif final>=55 or (item.get("technical_score") or 0)>=55: cat="NEAR_MISS"
-                else: cat="AVOID"
-            elif cat=="NEAR_MISS" and final>=65 and (item.get("technical_score") or 0)>=65 and (item.get("risk_score") or 0)>=50:
-                cat="WATCH_CLOSELY"
-            item["scan_category"]=cat
-            if cat=="ENTERABLE": enterable.append(item)
-            elif cat=="WATCH_CLOSELY": watch_closely.append(item)
-            elif cat=="PULLBACK": pullback.append(item)
-            elif cat=="BREAKOUT_WATCH": breakout_watch.append(item)
-            elif cat=="RISK_WATCH": risk_watch.append(item)
-            elif cat=="NEAR_MISS": near_miss.append(item)
-            else: avoid.append(item)
-            classified += 1
-        except Exception as e:
-            errors.append({"symbol":sym,"error":str(e)[:160]})
-    def sort_e(x): return (-(x.get("final_score") or 0),-(x.get("risk_reward_ratio") or 0),-(x.get("confidence") or 0))
-    def sort_p(x): return (-(x.get("technical_score") or 0),-(x.get("confidence") or 0),-(x.get("final_score") or 0))
-    for arr in (enterable,watch_closely,pullback,breakout_watch,risk_watch,near_miss,avoid): arr.sort(key=sort_e if arr is enterable else sort_p)
-    found=len(enterable)+len(watch_closely)+len(pullback)+len(breakout_watch)+len(risk_watch)+len(near_miss)
-    msg="No stocks meet entry criteria currently. Watch Closely / Near Miss candidates are shown below." if not enterable else f"Found {len(enterable)} enterable candidates!"
-    duration=round(time.time()-t0,1)
-    payload={"market":"us","scan_mode":mode,"pool":pool_name,"pool_size":len(pool),"updated_at":datetime.now().isoformat(),
-            "scanned":len(pool),"attempted":attempted,"classified":classified,"failed":len(errors),"found":found,"current_symbol":current_symbol,
-            "market_score":market_score,"duration_seconds":duration,"scan_label":scan_mode_label(mode,pool_name,len(pool)),
-            "summary":{"scanned":len(pool),"attempted":attempted,"classified":classified,"failed":len(errors),
-                       "enterable_count":len(enterable),"watch_closely_count":len(watch_closely),"pullback_count":len(pullback),
-                       "breakout_watch_count":len(breakout_watch),"risk_watch_count":len(risk_watch),"avoid_count":len(avoid),"near_miss_count":len(near_miss),
-                       "found":found,"market_score":market_score,"sentiment":market_ctx.get("sentiment",""),"message":msg,"mode":mode,"pool":pool_name},
-            "enterable":enterable,"watch_closely":watch_closely,"pullback":pullback,"breakout_watch":breakout_watch,
-            "risk_watch":risk_watch,"avoid":avoid,"near_miss":near_miss,"errors":errors,"error_count":len(errors)}
-    if mode_warn or div_warn:
-        payload["mode_warning"] = "; ".join([x for x in [mode_warn, div_warn] if x])
-    payload=_rebuild_diversified_payload(payload,"us",_parse_history_symbols(history_symbols),diversity_mode)
-    return _scan_cache_set(US_SCAN_CACHE, cache_key, payload)
-
-@app.get("/api/us/scan")
-async def us_ai_scan(min_score:int=Query(60,ge=0,le=100),max_stocks:int=Query(50,ge=5,le=80),pool:str="all",symbols:str="",mode:str="full",diversity_mode:str="balanced",history_symbols:str=""):
-    return await _us_scan_core(min_score,max_stocks,mode,pool,symbols,True,diversity_mode,history_symbols)
-
-@app.get("/api/us/scan/quick")
-async def us_scan_quick(pool:str="all",symbols:str="",min_score:int=Query(55,ge=0,le=100),max_stocks:int=Query(20,ge=5,le=40),diversity_mode:str="balanced",history_symbols:str=""):
-    return await _us_scan_core(min_score,max_stocks,"quick",pool,symbols,True,diversity_mode,history_symbols)
-
-@app.get("/api/us/scan/full")
-async def us_scan_full(pool:str="all",symbols:str="",min_score:int=Query(60,ge=0,le=100),max_stocks:int=Query(50,ge=10,le=80),diversity_mode:str="balanced",history_symbols:str=""):
-    return await _us_scan_core(min_score,max_stocks,"full",pool,symbols,True,diversity_mode,history_symbols)
-
-@app.get("/api/us/scan/watchlist")
-async def us_scan_watchlist(symbols:str="",min_score:int=Query(55,ge=0,le=100),max_stocks:int=Query(50,ge=1,le=100),diversity_mode:str="watchlist-priority",history_symbols:str=""):
-    return await _us_scan_core(min_score,max_stocks,"watchlist","watchlist",symbols,False,diversity_mode,history_symbols)
-
-@app.get("/api/us/scan/diversified")
-async def us_scan_diversified(pool:str="diversified",symbols:str="",min_score:int=Query(55,ge=0,le=100),max_stocks:int=Query(60,ge=10,le=100),mode:str="full",diversity_mode:str="balanced",history_symbols:str=""):
-    return await _us_scan_core(min_score,max_stocks,mode,pool,symbols,True,diversity_mode,history_symbols)
-
 @app.get("/api/debug/recommendation-history")
 def api_debug_recommendation_history():
     return {"version":APP_VERSION,"note":"Per-user recommendation history is stored client-side/localStorage or Firestore by the frontend. Backend diversified scan accepts history_symbols to apply novelty/repeat penalties.","fields":["symbol/stock_id","market","scan_category","shown_at","diversity_group","diversified_score"]}
@@ -2996,34 +2232,11 @@ def api_scan_status():
         for k,(payload,ts) in list(cache.items())[-12:]:
             out.append({"key":k,"age_seconds":round(now-ts,1),"market":payload.get("market"),"mode":payload.get("scan_mode"),"pool":payload.get("pool"),"classified":payload.get("classified"),"failed":payload.get("failed")})
         return out
-    return {"version":APP_VERSION,"scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE),"us_cache":stat(US_SCAN_CACHE)}
+    return {"version":APP_VERSION,"scan_cache_ttl":SCAN_CACHE_TTL,"tw_cache":stat(TW_SCAN_CACHE)}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # API — DATA HEALTH / DIAGNOSTICS
 # ══════════════════════════════════════════════════════════════════════════════
-async def _check_us_data_health() -> dict:
-    checks={}
-    async with httpx.AsyncClient(timeout=8,headers={"User-Agent":"Mozilla/5.0"},follow_redirects=True) as cl:
-        try:
-            q=await fetch_us_quote("AAPL",cl)
-            checks["yahoo_quote"]={"status":"ok" if q and q.get("price") else "fail","symbol":"AAPL","price":(q or {}).get("price")}
-        except Exception as e: checks["yahoo_quote"]={"status":"fail","error":str(e)[:120]}
-        try:
-            h=await fetch_us_history("AAPL",cl,days=90)
-            checks["yahoo_history"]={"status":"ok" if h is not None and not h.empty else "fail","rows":0 if h is None else int(len(h))}
-        except Exception as e: checks["yahoo_history"]={"status":"fail","error":str(e)[:120]}
-    try:
-        master=get_us_master()
-        age=round((time.time()-_us_master_ts)/3600,2) if _us_master_ts else None
-        checks["symbol_master"]={"status":"ok" if master else "fail","count":len(master),"age_hours":age,"file":str(US_MASTER_FILE.name)}
-    except Exception as e: checks["symbol_master"]={"status":"fail","error":str(e)[:120]}
-    try:
-        ctx=await fetch_us_market_context()
-        checks["market_context"]={"status":ctx.get("status","ok"),"market_score":ctx.get("market_score"),"errors":ctx.get("errors",[])[:3]}
-    except Exception as e: checks["market_context"]={"status":"fail","error":str(e)[:120]}
-    overall="ok" if all(v.get("status") in ("ok","partial") for v in checks.values()) else "partial"
-    return {"market":"us","overall":overall,"checks":checks,"updated_at":datetime.now().isoformat()}
-
 async def _check_tw_data_health() -> dict:
     checks={}
     try:
@@ -3040,10 +2253,6 @@ async def _check_tw_data_health() -> dict:
     except Exception as e: checks["macro"]={"status":"partial","error":str(e)[:120]}
     overall="ok" if all(v.get("status") in ("ok","partial") for v in checks.values()) else "partial"
     return {"market":"tw","overall":overall,"checks":checks,"updated_at":datetime.now().isoformat()}
-
-@app.get("/api/us/data-health")
-async def api_us_data_health():
-    return await _check_us_data_health()
 
 @app.get("/api/tw/data-health")
 async def api_tw_data_health():
@@ -3076,21 +2285,7 @@ async def api_health_full():
             return str(v)
 
     errors = []
-    us = {"market": "us", "overall": "unknown", "checks": {}, "updated_at": datetime.now().isoformat()}
     tw = {"market": "tw", "overall": "unknown", "checks": {}, "updated_at": datetime.now().isoformat()}
-
-    try:
-        us = await asyncio.wait_for(_check_us_data_health(), timeout=18)
-    except Exception as e:
-        errors.append({"scope": "us_data_health", "error": str(e)[:300]})
-        us = {
-            "market": "us",
-            "overall": "fail",
-            "checks": {
-                "endpoint": {"status": "fail", "error": str(e)[:180]}
-            },
-            "updated_at": datetime.now().isoformat()
-        }
 
     try:
         tw = await asyncio.wait_for(_check_tw_data_health(), timeout=18)
@@ -3111,22 +2306,19 @@ async def api_health_full():
         "frontend_expected": APP_VERSION,
         "time": datetime.now().isoformat(),
         "backend": {
-            "title": "V12.9.2 Multi-Portfolio Watchlist Manager",
+            "title": "HERO HQ 台股 API",
             "version": APP_VERSION
         },
+        "storage": cloudstore.status(),
         "line": {
             "configured": bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
             "enabled": ENABLE_LINE_ALERTS
         },
         "cache": {
-            "us_quote_ttl": globals().get("US_LITE_TTL", 30),
-            "us_history_ttl": globals().get("US_FULL_TTL", 600),
-            "us_market_context_ttl": globals().get("US_CTX_TTL", 180),
             "tw_full_cache_seconds": 300,
             "tw_lite_cache_seconds": 30
         },
         "data_health": {
-            "us": us,
             "tw": tw
         },
         "errors": errors
@@ -3197,10 +2389,7 @@ async def api_trade_plan_check(
     price = None; name = symbol; source = None; error = None
     try:
         if market == "us":
-            async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as cl:
-                q = await fetch_us_quote(symbol, cl)
-            if q:
-                price = q.get("price"); name = q.get("name") or symbol; source = q.get("source")
+            error = "美股功能已移除（v14 起只支援台股）"
         else:
             q = await fetch_tw_quote(symbol)
             if q:
@@ -3301,10 +2490,7 @@ async def api_position_check(
     price = None; name = symbol; source = None; error = None
     try:
         if market == "us":
-            async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as cl:
-                q = await fetch_us_quote(symbol, cl)
-            if q:
-                price = q.get("price"); name = q.get("name") or symbol; source = q.get("source")
+            error = "美股功能已移除（v14 起只支援台股）"
         else:
             q = await fetch_tw_quote(symbol)
             if q:
@@ -3505,10 +2691,10 @@ def health():
            "dev_mode":DEV_MODE,"line_configured":bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_TO_ID),
            "line_enabled":ENABLE_LINE_ALERTS,"realtime_source":"TWSE MIS",
            "price_sources":"Yahoo Finance → TWSE Official → FinMind",
-           "us_master_count":len(_us_master),"tw_master_count":len(STOCK_MASTER),
+           "tw_master_count":len(STOCK_MASTER),
            "features":["V12.9.2 Multi-Portfolio Watchlist Manager","AI Picker Pro","Mobile Fast Data",
-                       "TW Engine + US Engine + Shared Engine",
-                       "6-zone scan output","US Market Context","Symbol Master 200+",
+                       
+                       "6-zone scan output","Symbol Master 200+",
                        "validate_trade_plan","compute_final_score","LINE alerts","Quick/Full AI Scan","Watch Closely zone","scan pool selector","scan cache diagnostics","Trade Plan Center","trade plan status checker","Watchlist UI polish","Portfolio Center","position status checker","smart position alerts","Trade Journal","Performance Review","AI Backtest Learning","Report Center","CSV export","AI Discovery Diversity","Fresh Discovery","repeat_penalty","novelty_score","sector_quota","TW diversity history parity"]}
 
 
