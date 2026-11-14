@@ -14,7 +14,7 @@ import cloudstore
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-APP_VERSION = "14.0.1"  # 每次發版只改這一行；前端在 public/js/app.js 的 FRONTEND_VERSION
+APP_VERSION = "14.1.0"  # 每次發版只改這一行；前端在 public/js/app.js 的 FRONTEND_VERSION
 
 app = FastAPI(title="HERO HQ 台股 API", version=APP_VERSION)
 _raw = os.getenv("ALLOWED_ORIGINS",

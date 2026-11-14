@@ -4,7 +4,8 @@ Render 免費方案沒有永久磁碟：主機休眠、重啟或重新部署後�
 做法：本機檔案仍是日常讀寫的地方；每次寫檔後把內容推到 Firestore
 （集合 server_state，一檔一份文件），啟動時若本機檔不存在就從 Firestore 拉回。
 
-啟用條件：環境變數 FIREBASE_SERVICE_ACCOUNT 內含服務帳戶金鑰 JSON。
+啟用條件：環境變數 FIREBASE_SERVICE_ACCOUNT 內含服務帳戶金鑰 JSON，
+或 Render Secret File /etc/secrets/FIREBASE_SERVICE_ACCOUNT。
 未設定時所有函式都是 no-op，行為與原本只寫檔相同。
 只用既有套件（httpx、PyJWT），不引入 firebase-admin。
 """
@@ -24,6 +25,7 @@ COLLECTION = "server_state"
 MAX_BYTES = 900_000          # Firestore 單一文件上限約 1 MiB
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 SCOPE = "https://www.googleapis.com/auth/datastore"
+SECRET_FILES = ["/etc/secrets/FIREBASE_SERVICE_ACCOUNT", str(Path(__file__).resolve().parent / "FIREBASE_SERVICE_ACCOUNT")]
 
 _lock = threading.Lock()
 _token: tuple[str, float] | None = None
@@ -34,6 +36,14 @@ _transport: httpx.BaseTransport | None = None   # tests inject a MockTransport
 
 def _account() -> dict | None:
     raw = os.getenv("FIREBASE_SERVICE_ACCOUNT", "").strip()
+    if not raw:   # Render「Secret Files」：檔案會出現在 /etc/secrets/<檔名> 與 App 根目錄
+        for f in SECRET_FILES:
+            try:
+                raw = Path(f).read_text(encoding="utf-8").strip()
+            except OSError:
+                continue
+            if raw:
+                break
     if not raw:
         return None
     try:
