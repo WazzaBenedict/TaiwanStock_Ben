@@ -1,0 +1,9 @@
+    .tm-form input,.tm-form select{background:#0d1728;border:1px solid var(--line);border-radius:7px;color:var(--text);padding:7px 10px;font-family:var(--mono);font-size:13px;outline:none}
+    .tm-form input:not([style*=width]){width:130px}
+    .tm-form label{font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px}
+    .tm-bar{display:flex;height:22px;border-radius:6px;overflow:hidden;margin:8px 0;font-family:var(--mono);font-size:11px;color:#06101f;font-weight:700}
+    .tm-bar div{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden}
+    .tm-kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:8px 0}
+    .tm-kv div{background:#0d1728;border:1px solid var(--line);border-radius:8px;padding:8px}
+    .tm-kv b{display:block;font-size:16px;color:var(--text)} .tm-kv span{font-size:11px;color:var(--muted);font-family:var(--mono)}
+    .tm-verdict{border-left:3px solid var(--cyan);padding:6px 10px;margin:8px 0;font-size:13px;line-height:1.7}
