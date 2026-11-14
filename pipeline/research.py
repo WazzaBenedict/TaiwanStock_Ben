@@ -135,6 +135,40 @@ RULES = [
 ]
 
 
+# 2026-11-14 資料搜集的摘要。grade：A 學術論文或官方統計；B 媒體轉述官方數字或工作論文；C 業者回測。
+EVIDENCE = [
+    {"topic": "當沖的整體結果", "grade": "B", "year": "2020–2025",
+     "text": "證交所與金管會公布的統計顯示，當沖客扣掉稅費後每年合計都是淨損：2024 年約 246 億元，2025 年約 272 億元。扣成本前其實是賺的，是手續費和交易稅把它變成虧損。"},
+    {"topic": "有多少人能穩定獲利", "grade": "A", "year": "1992–2006（資料較舊）",
+     "text": "Barber、Lee、Liu、Odean 研究台灣全部當沖帳戶：每年整體都虧，能預期隔年繼續獲利的不到 1%；2020 年的後續論文估計 97% 的人長期會虧。過去有長期獲利紀錄，是唯一有用的預測指標。"},
+    {"topic": "降稅之後", "grade": "B", "year": "2016–2017",
+     "text": "Chen 與 Lin（2025 工作論文）：當沖稅減半後小帳戶交易量增加 45%，年虧損從約 6% 擴大到約 9%。平均每筆扣成本前只賺 0.28%，而元大 6 折一買一賣的成本約 0.32%。"},
+    {"topic": "停損與上限有沒有用", "grade": "A", "year": "2014–2022",
+     "text": "自動停損能逼自己認賠，減少「賺一點就賣、賠了死抱」（RFS 2017 實驗）；外部強制的部位上限改善了散戶績效（Heimer 與 Imas 2022）。停損本身不會創造獲利，它的作用是限制虧損擴大。"},
+    {"topic": "月營收選股", "grade": "C", "year": "2010–2026",
+     "text": "營收公布後股價確實會續漲（Chen 與 Yu 2022 有學術佐證），但做成只買不放空的策略，報酬 17.7% 對 0050 的 16.4%，風險調整後反而輸，成本每年吃掉約 7 個百分點。適合當篩選條件，不適合單獨當策略。"},
+    {"topic": "動能與追強勢股", "grade": "A", "year": "1987–2019",
+     "text": "台股是少數整體沒有動能效應的市場（Fu 與 Hsieh 2024），一月還會反轉。追過去半年最強的股票沒有穩定優勢。"},
+    {"topic": "投信買超", "grade": "C", "year": "2015–2026",
+     "text": "投信買超比外資買超有參考性，但單獨使用報酬 9.7%，遠輸 0050 的 20.6%。持有 6 到 15 天才勉強打平成本。"},
+    {"topic": "處置股", "grade": "C", "year": "2011–2026",
+     "text": "過去處置期間進場曾是很大的優勢，但 2026 年 8 月 10 日新制（處置期縮短為 5 天、約 2 分鐘撮合一次）之後，141 筆交易平均只剩 +0.35%，低於成本。這個做法已經失效。"},
+    {"topic": "正2（00631L）長期持有", "grade": "B", "year": "2014–2026",
+     "text": "年化報酬 33.4% 對 0050 的 20.7%，但最大跌幅 55% 對 34%，跌下去後花了 492 個交易日才回到原點。報酬是用更大的波動換來的。"},
+    {"topic": "高股息 ETF 除息前", "grade": "B", "year": "到 2025 年 12 月",
+     "text": "臺灣銀行季刊統計 187 次除息：除息前 10 天累計多漲 1.42%，除息當天跌 0.89%。2025 年 7 月收益平準金新制後效果可能變弱，尚無新數據。"},
+]
+
+# 需要定期複查的規則與日期
+RULE_WATCH = [
+    {"date": "2026-08-10", "text": "處置股新制已上路：處置期 5 個營業日，約每 2 分鐘撮合一次。處置股不能當沖。"},
+    {"date": "2026-12-07", "text": "盤中零股改為 08:30 開始收單、09:00 第一次撮合（目前是 09:10）。零股不能當沖。"},
+    {"date": "2026-12-18", "text": "006208（富邦台50）受益人會議表決分割，結果未定。"},
+    {"date": "2026-12-31", "text": "債券 ETF 免證交稅到這天為止，延長案審議中。"},
+    {"date": "2027-12-31", "text": "現股當沖交易稅減半（0.15%）到這天為止。"},
+]
+
+
 def _stats(rows: list[dict]) -> dict:
     n = len(rows)
     if not n:
@@ -272,7 +306,7 @@ def build() -> dict:
             except Exception as e:
                 errors[r["id"]] = f"{type(e).__name__}: {str(e)[:100]}"
     out = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "today": today, "live_start": LIVE_START,
-           "oos_days": OOS_DAYS, "min_n": MIN_N, "trade_size": TRADE_SIZE, "fee_discount": fees.fee_discount, "cards": cards, "errors": errors,
+           "oos_days": OOS_DAYS, "min_n": MIN_N, "trade_size": TRADE_SIZE, "fee_discount": fees.fee_discount, "cards": cards, "errors": errors, "evidence": EVIDENCE, "rule_watch": RULE_WATCH, "evidence_date": "2026-11-14",
            "counts": {k: sum(1 for c in cards if c["label"] == k) for k in ("可用", "研究中", "未通過")}}
     try:
         log = track_changes(cards, today)

@@ -23,6 +23,14 @@ var LAB=(function(){
     });
     var ch=data.changes||[];
     h+='<div class="lb-sub-t">標籤變動紀錄</div>'+(ch.length?'<ul class="lb-list">'+ch.slice().reverse().map(function(x){return '<li>'+e(x.date)+'　'+e(x.name)+'：'+e(x.from)+' 變成 '+e(x.to)+'</li>';}).join("")+'</ul>':'<div class="lb-na">還沒有變動。規則被升級或淘汰時會記在這裡。</div>');
+    var ev=data.evidence||[],rw=data.rule_watch||[],gname={A:"學術或官方",B:"媒體轉述或工作論文",C:"業者回測"};
+    if(ev.length){
+      h+='<div class="lb-sub-t">外部研究怎麼說（'+e(data.evidence_date||"")+' 整理）</div>';
+      ev.forEach(function(x){h+='<details class="lb-ev"><summary><span class="lb-grade g'+e(x.grade)+'">'+e(gname[x.grade]||x.grade)+'</span>'+e(x.topic)+'</summary><div class="lb-ev-t">'+e(x.text)+'<span class="lb-hint">　資料期間：'+e(x.year)+'</span></div></details>';});
+    }
+    if(rw.length){
+      h+='<div class="lb-sub-t">規則變動與複查日期</div><ul class="lb-list">'+rw.map(function(x){return '<li><span class="lb-date'+(x.date<=data.today?" past":"")+'">'+e(x.date)+'</span>'+e(x.text)+'</li>';}).join("")+'</ul>';
+    }
     h+='<div class="lb-note">怎麼判定：每筆約 '+(data.trade_size||50000).toLocaleString("en-US")+' 元，扣元大手續費（'+data.fee_discount+' 折）與交易稅，再和同一筆錢同期放 0050 比。樣本外至少 '+data.min_n+' 筆才下結論；扣成本後虧損或輸給 0050 就是「未通過」；樣本內、樣本外都贏 0050 且差距穩定才是「可用」。「上線後」從 '+e(data.live_start)+' 起每個交易日自動累積。價格未含股利。這是歷史統計，不是獲利保證。</div>';
     box.innerHTML=h;
   }
