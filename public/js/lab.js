@@ -6,7 +6,7 @@ var LAB=(function(){
   function pc(v){if(v==null||isNaN(v))return '<span class="lb-na">—</span>';return '<span class="'+(v>0?"up":v<0?"down":"")+'">'+(v>0?"+":"")+Number(v).toFixed(2)+'%</span>';}
   function seg(title,s,hint,vs){vs=vs||"0050";
     if(!s||!s.n)return '<div class="lb-seg"><div class="lb-seg-t">'+title+'</div><div class="lb-na">還沒有資料</div><div class="lb-hint">'+hint+'</div></div>';
-    return '<div class="lb-seg"><div class="lb-seg-t">'+title+'（'+s.n+(vs==="0050"?' 筆':' 期')+'）</div><div>每筆平均 '+pc(s.avg_net_pct)+'</div><div>比 0050 '+pc(s.avg_excess_pct)+'</div><div class="lb-hint">勝率 '+s.win_rate_pct+'%　'+hint+'</div></div>';
+    return '<div class="lb-seg"><div class="lb-seg-t">'+title+'（'+s.n+(vs==="0050"?' 筆':' 期')+'）</div><div>'+(vs==="0050"?'每筆':'每期')+'平均 '+pc(s.avg_net_pct)+'</div><div>比 '+e(vs)+' '+pc(s.avg_excess_pct)+'</div><div class="lb-hint">勝率 '+s.win_rate_pct+'%　'+hint+'</div></div>';
   }
   function render(){
     var box=$("labBody");if(!box)return;

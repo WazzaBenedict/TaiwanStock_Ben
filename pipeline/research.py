@@ -486,7 +486,7 @@ def build() -> dict:
                 pool_notes = update_pool(cl, pool, bench[-1]["d"])
                 pbars = {}
                 for c in pool["codes"]:
-                    bs = yahoo(cl, c, "5y")
+                    bs = yahoo(cl, c, "10y")
                     if bs:
                         pbars[c] = bs
                 if len(pbars) < len(pool["codes"]) * 0.8:
