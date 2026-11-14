@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>HERO HQ 台股 AI 英雄指揮中心 V14.1.0</title>
+<title>HERO HQ 台股 AI 英雄指揮中心 V14.2.0</title>
 <meta name="theme-color" content="#0a0e1f"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -17,8 +17,9 @@
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/app.css?v=14.1.0">
-<link rel="stylesheet" href="css/today.css?v=14.1.0">
+<link rel="stylesheet" href="css/app.css?v=14.2.0">
+<link rel="stylesheet" href="css/today.css?v=14.2.0">
+<link rel="stylesheet" href="css/ledger.css?v=14.2.0">
 </head>
 <body>
 
@@ -41,7 +42,7 @@
       使用 Google 帳號登入
     </button>
     <div id="loginError"></div>
-    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:12px">版本 <b class="app-ver">V14.1.0</b></div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:12px">版本 <b class="app-ver">V14.2.0</b></div>
   </div>
 </div>
 
@@ -51,7 +52,7 @@
     <span class="live-dot"></span>
     <span class="hq-brand">HERO<span>HQ</span></span>
     <span class="hq-brand-sub">台股 AI 英雄指揮中心</span>
-    <span class="ver app-ver" title="目前版本">V14.1.0</span>
+    <span class="ver app-ver" title="目前版本">V14.2.0</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="mkt-switcher us-only">
@@ -71,7 +72,7 @@
     </div>
     <div class="version-warn" id="versionWarn"></div>
     <div class="health-grid" id="healthGrid">
-      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V14.1.0</b></div>
+      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V14.2.0</b></div>
       <div class="health-chip"><span>Backend</span><b id="hBackend">—</b></div>
       <div class="health-chip"><span>Firestore</span><b id="hFirestore">待登入</b></div>
       <div class="health-chip"><span>Yahoo</span><b id="hYahoo">—</b></div>
@@ -94,7 +95,7 @@
   <button class="nav-tab" data-page="p-positions"><span class="ni">🛡️</span><span class="nl">持倉</span></button>
   <button class="nav-tab" data-page="p-market"><span class="ni">🌐</span><span class="nl">市場</span></button>
   <button class="nav-tab" data-page="p-learn"><span class="ni">🧠</span><span class="nl">AI學習</span></button>
-  <button class="nav-tab" data-page="p-journal"><span class="ni">📘</span><span class="nl">日誌</span></button>
+  <button class="nav-tab" data-page="p-ledger"><span class="ni">📒</span><span class="nl">帳本</span></button>
   <button class="nav-tab" data-page="p-account"><span class="ni">👤</span><span class="nl">帳戶</span></button>
 </nav>
 
@@ -119,7 +120,7 @@
   <div class="hq-floor-title"><span>快速出動</span></div>
   <div class="hq-quick" id="hqQuick"></div>
   <details class="hq-notes" id="hqNotes">
-    <summary>📰 <b class="app-ver">V14.1.0</b> 更新內容</summary>
+    <summary>📰 <b class="app-ver">V14.2.0</b> 更新內容</summary>
     <ul id="hqNotesList"></ul>
   </details>
   <div class="fee-set" id="feeSet">
@@ -528,6 +529,66 @@
 
 
 <!-- ═══ Trade Journal / Performance / Report Center Page ═══ -->
+<div class="page" id="p-ledger">
+  <div class="section">
+    <div class="section-title">
+      <div class="section-title-left">📒 帳本：你的真實交易 vs 0050</div>
+      <button class="ghost sm" id="lgRefresh">重新計算</button>
+    </div>
+    <div class="lg-status" id="lgStatus"></div>
+    <div class="lg-verdict" id="lgVerdict"></div>
+    <div class="lg-grid" id="lgSummary"></div>
+    <div class="lg-chart"><canvas id="lgChart"></canvas></div>
+    <div id="lgNotes"></div>
+  </div>
+  <div class="section">
+    <div class="section-title"><div class="section-title-left">➕ 新增成交</div></div>
+    <div class="lg-form">
+      <label>日期<input type="date" id="lgDate"></label>
+      <label>時間（選填）<input type="time" id="lgTime"></label>
+      <label>股票代號<input type="text" id="lgCode" inputmode="numeric" placeholder="例如 2409" maxlength="7"></label>
+      <label>買賣<select id="lgSide"><option value="buy">買進</option><option value="sell">賣出</option></select></label>
+      <label>成交價<input type="number" id="lgPrice" step="0.01" min="0" inputmode="decimal"></label>
+      <label>數量<input type="number" id="lgShares" step="1" min="1" inputmode="numeric"></label>
+      <label>單位<select id="lgUnit"><option value="share">股</option><option value="lot">張（1,000 股）</option></select></label>
+      <label>計畫價（選填）<input type="number" id="lgPlan" step="0.01" min="0" inputmode="decimal"></label>
+      <label>實際手續費（選填）<input type="number" id="lgFee" step="1" min="0" inputmode="numeric" placeholder="不填就用元大費率估"></label>
+      <label>實際交易稅（選填）<input type="number" id="lgTax" step="1" min="0" inputmode="numeric" placeholder="不填就自動估"></label>
+      <label style="grid-column:span 2">備註（選填）<input type="text" id="lgNote" maxlength="200"></label>
+    </div>
+    <button id="lgAdd" class="lg-primary">新增這筆成交</button>
+    <details class="lg-more" style="margin-top:12px">
+      <summary>📥 匯入元大對帳單（CSV 或貼上表格）</summary>
+      <div class="lg-sub">選一個 CSV 檔，或在元大網頁、Excel 把成交明細整段複製後貼到下面。需要有成交日期、股票、買賣別、成交價、股數這些欄位，手續費和交易稅有的話會直接採用。重複匯入同一份不會重複計算。</div>
+      <input type="file" id="lgFile" accept=".csv,.txt,.tsv,text/csv,text/plain" style="margin-top:8px">
+      <textarea id="lgPaste" class="lg-paste" placeholder="或把表格內容貼在這裡"></textarea>
+      <button id="lgImportBtn" class="ghost">先預覽</button>
+      <div id="lgImportPreview" style="margin-top:8px"></div>
+    </details>
+  </div>
+  <div class="section">
+    <div class="section-title"><div class="section-title-left">🛡️ 紀律檢查</div></div>
+    <div id="lgViol"></div>
+  </div>
+  <div class="section">
+    <div class="section-title"><div class="section-title-left">📅 每週結算（當沖獲利轉 0050）</div></div>
+    <div id="lgWeekly"></div>
+  </div>
+  <div class="section">
+    <div class="section-title"><div class="section-title-left">📌 未平倉</div></div>
+    <div id="lgPos"></div>
+  </div>
+  <div class="section">
+    <div class="section-title"><div class="section-title-left">📄 已出場交易</div></div>
+    <div id="lgTrades"></div>
+  </div>
+  <div class="section">
+    <div class="section-title"><div class="section-title-left">🧾 成交紀錄 <span class="d-badge" id="lgFillCount">0 筆</span></div>
+      <button class="ghost sm" data-hq-go="p-journal">舊版交易日誌</button></div>
+    <div id="lgFills"></div>
+  </div>
+</div><!-- /p-ledger -->
+
 <div class="page" id="p-journal">
   <div class="section">
     <div class="section-title">
@@ -595,7 +656,7 @@
     </div>
     <div id="rkLog" style="font-family:var(--mono);font-size:12px;margin-top:6px"></div>
   </div>
-  <script src="js/dt-risk.js?v=14.1.0"></script>
+  <script src="js/dt-risk.js?v=14.2.0"></script>
   <div class="section" id="dtScanSection">
     <div class="section-title"><div class="section-title-left">🎯 當沖候選（先買後賣） <span class="d-badge">扣成本後的歷史成績，非投資建議</span></div>
       <div class="row" style="gap:6px"><button class="ghost sm" id="btnDtScan">掃描</button><button class="ghost sm" id="btnDtLevels">更新今日價位</button></div></div>
@@ -610,8 +671,8 @@
       <th>今日 進場</th><th>停損</th><th>停利</th><th>狀態</th><th></th></tr></thead><tbody></tbody></table></div>
     <div id="dtFoot" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px"></div>
   </div>
-  <link rel="stylesheet" href="css/daytrade.css?v=14.1.0">
-  <script src="js/dt-screen.js?v=14.1.0"></script>
+  <link rel="stylesheet" href="css/daytrade.css?v=14.2.0">
+  <script src="js/dt-screen.js?v=14.2.0"></script>
   <div class="section" id="tmSection">
     <div class="section-title"><div class="section-title-left">⏳ 台股時光機 <span class="d-badge">研究／模擬，非投資建議</span></div></div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px">
@@ -638,8 +699,8 @@
     <div id="tmOut" style="display:none"></div>
     <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:10px">方法改寫自 Jake Schincariol 的 trader-timemachine（MIT 授權）。</div>
   </div>
-  <link rel="stylesheet" href="css/timemachine.css?v=14.1.0">
-  <script src="js/timemachine.js?v=14.1.0"></script>
+  <link rel="stylesheet" href="css/timemachine.css?v=14.2.0">
+  <script src="js/timemachine.js?v=14.2.0"></script>
 </div>
 
 <div class="page" id="p-account">
@@ -854,11 +915,12 @@
 <div class="footer">
   ⚠️ 本工具僅供技術分析學習參考，不構成任何投資建議。台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
   資料來源：TWSE MIS · Yahoo Finance · TWSE Official · FinMind · Google News RSS（均為免費公開）<br>
-  HERO HQ 台股 AI 英雄指揮中心 <span class="app-ver">V14.1.0</span>
+  HERO HQ 台股 AI 英雄指揮中心 <span class="app-ver">V14.2.0</span>
 </div>
 
-<script src="js/app.js?v=14.1.0"></script>
-<script src="js/today.js?v=14.1.0"></script>
+<script src="js/app.js?v=14.2.0"></script>
+<script src="js/today.js?v=14.2.0"></script>
+<script src="js/ledger.js?v=14.2.0"></script>
 <div id="toast" class="toast"></div>
 </body>
 </html>
