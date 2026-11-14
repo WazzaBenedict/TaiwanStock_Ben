@@ -35,6 +35,19 @@ def store(monkeypatch):
     return docs, calls
 
 
+@pytest.fixture(autouse=True)
+def no_secret_files(monkeypatch, tmp_path):
+    monkeypatch.setattr(cloudstore, "SECRET_FILES", [str(tmp_path / "absent")])
+
+
+def test_reads_render_secret_file(monkeypatch, tmp_path):
+    monkeypatch.delenv("FIREBASE_SERVICE_ACCOUNT", raising=False)
+    f = tmp_path / "FIREBASE_SERVICE_ACCOUNT"
+    f.write_text(json.dumps({"client_email": "a@b", "private_key": "k", "project_id": "p"}), encoding="utf-8")
+    monkeypatch.setattr(cloudstore, "SECRET_FILES", [str(tmp_path / "absent"), str(f)])
+    assert cloudstore.enabled() is True
+
+
 def test_disabled_without_key(monkeypatch, tmp_path):
     monkeypatch.delenv("FIREBASE_SERVICE_ACCOUNT", raising=False)
     f = tmp_path / "watchlist.json"
