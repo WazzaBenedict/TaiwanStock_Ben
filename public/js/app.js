@@ -7,7 +7,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="14.1.0";
+var FRONTEND_VERSION="14.2.0";
 // 美股功能先收起來（程式碼保留）。要恢復請改成 true。
 var ENABLE_US=false;
 
@@ -27,6 +27,7 @@ function initFeeSetting(){
     if(typeof CURRENT_ID!=="undefined"&&CURRENT_ID&&typeof loadTradePlanV2==="function")loadTradePlanV2(CURRENT_ID);};}
 }
 var RELEASE_NOTES=[
+  "V14.2：新增「帳本」頁（取代原本的日誌分頁）。記錄真實成交後，自動扣元大手續費與交易稅算出淨損益，並和同一筆錢同期放在 0050 比較；附紀律檢查（每筆上限、每日與累計停損、13:00 後不進場、不先賣後買）和每週當沖獲利轉 0050 的結算。可手動輸入，也可匯入對帳單 CSV 或直接貼上表格。",
   "V14.1：總部最上方新增「今日」卡：每個交易日 06:50、13:45、19:00 自動更新，顯示今日結論、0050 開盤預估、大盤風險燈、隔夜行情、觀察名單、新聞，並累計開盤預估命中率。不必等後端喚醒；英雄的對話框會講當天的真實數字。",
   "V14.0.1：後端移除美股程式（少了約 830 行），系統檢查更快；觀察名單、權重、訊號歷史可備份到雲端，主機休眠後不再消失（需在 Render 設定金鑰後生效）。",
   "V14.0：地基整理。畫面與功能不變；網頁拆成獨立的樣式與腳本檔，移除舊版資料夾，之後合併到主線就會自動發布網頁，不必再開家用電腦。",
@@ -65,9 +66,9 @@ var HEROES=[
   {id:"nexus",page:"p-learn",room:"AI 研究所",roomEn:"AI CORE",cell:[1,2],name:"智核",code:"NEXUS",icon:"🧠",type:"synth",
    color:"#80ed99",suit:"#2a3f5f",skin:"#9fb3c8",cape:"#3d5a80",
    role:"合成人｜AI 學習：評估信號、調整權重"},
-  {id:"archive",page:"p-journal",room:"檔案室",roomEn:"ARCHIVE",cell:[2,2],name:"巨力博士",code:"TITAN",icon:"📘",type:"titan",
+  {id:"archive",page:"p-ledger",room:"帳本室",roomEn:"ARCHIVE",cell:[2,2],name:"巨力博士",code:"TITAN",icon:"📘",type:"titan",
    color:"#f4a261",suit:"#4a6fa5",skin:"#8fa37a",hair:"#2b2b2b",
-   role:"巨力博士｜交易日誌：勝率、R 倍數、匯出報告"}
+   role:"巨力博士｜帳本：真實成交、對照 0050、紀律檢查"}
 ];
 var HERO_BY_PAGE={};HEROES.forEach(function(h){if(!HERO_BY_PAGE[h.page])HERO_BY_PAGE[h.page]=h;});
 
@@ -743,6 +744,7 @@ function showPage(pageId) {
   document.querySelectorAll(".nav-tab").forEach(function(b){if(b.dataset.page===pageId)b.classList.add("active");});
   if(pageId==="p-market"&&currentUser){loadMacro();loadSentiment();}
   if(pageId==="p-account") renderAccountUI(currentUser);
+  if(pageId==="p-ledger"&&window.LEDGER) LEDGER.open();
   try{renderHeroStrip(pageId); if(pageId==="p-hq") renderHQ();}catch(e){console.warn("hero ui",e);}
   if(pageId==="p-plans") { loadTradePlans().then(function(){renderTradePlans(); refreshTradePlans(false);}); }
 }

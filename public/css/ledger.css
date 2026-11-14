@@ -1,0 +1,32 @@
+/* 帳本（v14.2） */
+.lg-status{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:8px;min-height:18px}
+.lg-status.warn,.lg-sub.warn{color:var(--yellow)}
+.lg-status.bad{color:#ef4444}
+.lg-verdict{font-size:16px;font-weight:900;line-height:1.5;margin-bottom:10px}
+.lg-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.lg-box{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
+.lg-label{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em}
+.lg-big{font-size:22px;font-weight:900;line-height:1.35;font-family:var(--mono)}
+.lg-sub{font-size:12px;color:var(--muted);line-height:1.6}
+.lg-na{color:var(--muted)}
+.lg-chart{position:relative;height:220px;margin:6px 0 10px;display:none}
+.lg-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:6px}
+.lg-table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12px;white-space:nowrap}
+.lg-table th,.lg-table td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:right}
+.lg-table th{color:var(--muted);font-weight:600}
+.lg-table th:first-child,.lg-table td:first-child{text-align:left}
+.lg-empty{color:var(--muted);font-size:13px;padding:10px 0}
+.lg-ok{color:#22c55e;font-size:13px;font-weight:700;padding:4px 0}
+.lg-list{list-style:none;padding:0;margin:0 0 6px;font-size:13px;line-height:1.7}
+.lg-list li{padding:6px 0;border-bottom:1px solid var(--line)}
+.lg-tag{display:inline-block;font-family:var(--mono);font-size:11px;border-radius:4px;padding:1px 6px;margin-right:8px}
+.lg-tag.bad{background:#ef4444;color:#fff}
+.lg-form{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+.lg-form label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--muted);min-width:0}
+.lg-form input,.lg-form select,.lg-paste{width:100%;min-height:40px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:14px;font-family:var(--mono);box-sizing:border-box}
+.lg-paste{min-height:90px;font-size:12px;margin:8px 0}
+.lg-more summary{cursor:pointer;font-size:13px;font-weight:700;min-height:36px;display:flex;align-items:center}
+.lg-primary{min-height:42px;padding:8px 18px;font-weight:900;margin-top:4px}
+.lg-del{background:none;border:0;box-shadow:none;color:var(--muted);font-size:12px;text-decoration:underline;cursor:pointer;min-height:28px;padding:2px 4px}
+.lg-del:hover{color:#ef4444}
+@media(max-width:760px){.lg-grid{grid-template-columns:1fr 1fr}.lg-form{grid-template-columns:1fr 1fr}.lg-big{font-size:19px}}
