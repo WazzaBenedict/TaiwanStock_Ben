@@ -7,13 +7,10 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="14.3.2";
+var FRONTEND_VERSION="15.0.0";
 // 美股功能先收起來（程式碼保留）。要恢復請改成 true。
 var ENABLE_US=false;
 
-// ══ V13.1 HERO HQ — 會走動的英雄辦公室 ══
-// 角色依常見超級英雄「類型」設計（鋼鐵裝甲、盾牌隊長、雷霆戰士、神祕法師、弓箭手、特務、
-// 合成人、巨力科學家、情報總監），全部是原創造型與名字，不使用任何既有角色的名稱、標誌或服裝設計。
 // ══ V13.2 交易成本：元大證券電子下單（全 App 共用，折扣可設定）══
 function feeDisc(){try{var v=Number(localStorage.getItem("tw_fee_discount"));return v>0&&v<=1?v:0.6;}catch(e){return 0.6;}}
 function feeQS(sep){return (sep||"&")+"fee_discount="+feeDisc();}
@@ -27,6 +24,7 @@ function initFeeSetting(){
     if(typeof CURRENT_ID!=="undefined"&&CURRENT_ID&&typeof loadTradePlanV2==="function")loadTradePlanV2(CURRENT_ID);};}
 }
 var RELEASE_NOTES=[
+  "V15.0：介面全面改版。拿掉英雄主題，換成簡潔的專業風格；手機底部只留總覽、當沖、個股、帳本四個常用分頁，其餘收在「更多」；首頁可以直接輸入代號查個股，常用功能一鍵到；換頁與數字有平順的動態（系統設定減少動態時會自動關閉）",
   "V14.3.2：研究室新增兩條選股規則，每天自動補資料並重新檢驗：「月營收加速前 10 名」與「跟投信買超前 5 名」。股票池是成交值前 150 檔，因為是事後挑的熱門股，這兩條改成要贏過「股票池平均」才算數，而且同一天進場的合併成一期計算。",
   "V14.3.1：研究室新增三條有文獻依據的規則（長期持有正2、正2 搭配 200 日線、高股息 ETF 除息前行情），並加上「外部研究怎麼說」十則證據摘要與「規則變動與複查日期」。持有類規則改用還原股利的價格比較。",
   "V14.3：「AI學習」改成「研究室」。每個交易日自動重算 8 條規則的評分表（當沖、隔夜、大跌後接、200 日線），全部扣元大成本並和 0050 比較，分成樣本內、樣本外、上線後三段；標籤（可用／研究中／未通過）由程式依固定門檻判定，變動會留下紀錄。",
@@ -45,187 +43,6 @@ var RELEASE_NOTES=[
   "點走動中的英雄或他的工作室，就會打開對應功能；下方也有快速出動按鈕",
   "V13.0：英雄指揮中心首頁、手機底部導覽列、美股功能先收起來、右上角版本號"
 ];
-// room: [col,row] in a 3×3 open-plan floor
-var HEROES=[
-  {id:"volt",page:"p-timemachine",room:"閃擊室",roomEn:"STRIKE",cell:[0,0],name:"疾電",code:"VOLT",icon:"⚡",type:"thunder",
-   color:"#ffd23f",suit:"#5b6b82",skin:"#f2c29b",cape:"#1f8a9e",hair:"#e9c46a",
-   role:"雷霆戰士｜當沖候選：今日進場、停損、停利價位"},
-  {id:"argus",page:"p-trade",room:"分析室",roomEn:"INTEL LAB",cell:[1,0],name:"天眼",code:"ARGUS",icon:"🔍",type:"armor",
-   color:"#4cc9f0",suit:"#1d3557",skin:"#c0c7d1",
-   role:"裝甲天才｜個股分析＋交易計畫卡：進場價、何時賣、股數"},
-  {id:"chrono",page:"p-timemachine",scroll:"tmSection",room:"時空艙",roomEn:"TIME POD",cell:[2,0],name:"時砂",code:"CHRONO",icon:"⏳",type:"mystic",
-   color:"#b197fc",suit:"#3c1f6e",skin:"#f0c8a8",cape:"#d4a017",hair:"#2b2118",
-   role:"時空法師｜台股時光機：重播盤中走勢"},
-  {id:"swift",page:"p-plans",room:"追蹤站",roomEn:"TRACKING",cell:[0,1],name:"迅影",code:"SWIFT",icon:"🎯",type:"archer",
-   color:"#2ec4b6",suit:"#1b4d3e",skin:"#e8b48f",hair:"#6b4423",
-   role:"神射手｜交易追蹤：盯住入場區、目標與停損"},
-  {id:"haven",page:"p-account",room:"指揮中心",roomEn:"COMMAND",cell:[1,1],name:"總管",code:"HAVEN",icon:"👤",type:"director",
-   color:"#adb5bd",suit:"#1c1f26",skin:"#a8734f",hair:"#111",
-   role:"情報總監｜帳戶、雲端同步與系統狀態"},
-  {id:"bastion",page:"p-positions",room:"防衛室",roomEn:"DEFENSE",cell:[2,1],name:"鐵壁",code:"BASTION",icon:"🛡️",type:"shield",
-   color:"#e63946",suit:"#7a1e2b",skin:"#e8b48f",hair:"#c9a227",
-   role:"盾牌隊長｜持倉風控：損益、跌破停損警示"},
-  {id:"vanguard",page:"p-market",room:"情報室",roomEn:"WAR ROOM",cell:[0,2],name:"夜鶯",code:"NIGHTINGALE",icon:"🌐",type:"spy",
-   color:"#ff8c42",suit:"#16161d",skin:"#f2c29b",hair:"#b5452b",
-   role:"王牌特務｜大盤環境、市場情緒與 AI 選股掃描"},
-  {id:"nexus",page:"p-learn",room:"研究室",roomEn:"AI CORE",cell:[1,2],name:"智核",code:"NEXUS",icon:"🧠",type:"synth",
-   color:"#80ed99",suit:"#2a3f5f",skin:"#9fb3c8",cape:"#3d5a80",
-   role:"合成人｜研究室：每天自動檢驗策略，更新評分"},
-  {id:"archive",page:"p-ledger",room:"帳本室",roomEn:"ARCHIVE",cell:[2,2],name:"巨力博士",code:"TITAN",icon:"📘",type:"titan",
-   color:"#f4a261",suit:"#4a6fa5",skin:"#8fa37a",hair:"#2b2b2b",
-   role:"巨力博士｜帳本：真實成交、對照 0050、紀律檢查"}
-];
-var HERO_BY_PAGE={};HEROES.forEach(function(h){if(!HERO_BY_PAGE[h.page])HERO_BY_PAGE[h.page]=h;});
-
-// Full-body chibi sprite, viewBox 0 0 60 92. Limbs are in .lg1/.lg2/.ar1/.ar2 so CSS can animate the walk.
-function heroBody(h){
-  var k="#05070f",c=h.color,su=h.suit,sk=h.skin,hr=h.hair||"#222",t=h.type,S=' stroke="'+k+'" stroke-width="2"';
-  var back="",front="",headTop="",face="",emblem="",armL="",armR="",torsoW=26,torsoX=17,bootC=k;
-  // eyes + mouth (default face)
-  face='<ellipse cx="25" cy="21" rx="2" ry="2.6" fill="'+k+'"/><ellipse cx="35" cy="21" rx="2" ry="2.6" fill="'+k+'"/><path d="M26 28 Q30 31 34 28" fill="none" stroke="'+k+'" stroke-width="1.8" stroke-linecap="round"/>';
-  if(t==="thunder"){ // winged silver helm, flowing cape, war hammer
-    back='<path d="M17 34 L43 34 L52 84 L8 84Z" fill="'+h.cape+'"'+S+'/>';
-    headTop='<path d="M17 18 Q18 5 30 5 Q42 5 43 18 Q36 12 30 12 Q24 12 17 18Z" fill="#cfd6df"'+S+'/><path d="M17 14 L6 6 L10 16Z M43 14 L54 6 L50 16Z" fill="#eef2f6"'+S+'/><path d="M17 22 Q14 34 18 40 M43 22 Q46 34 42 40" stroke="'+hr+'" stroke-width="4" fill="none"/>';
-    emblem='<circle cx="25" cy="42" r="3" fill="#cfd6df"'+S+'/><circle cx="35" cy="42" r="3" fill="#cfd6df"'+S+'/><circle cx="25" cy="50" r="3" fill="#cfd6df"'+S+'/><circle cx="35" cy="50" r="3" fill="#cfd6df"'+S+'/>';
-    armR='<rect x="49" y="46" width="3" height="16" fill="#8d6e63"'+S+'/><rect x="43" y="58" width="15" height="9" rx="1.5" fill="#9aa5b1"'+S+'/><path d="M47 60 L52 60 L49 64Z" fill="'+c+'"/>';
-  } else if(t==="armor"){ // full tech armor, glowing chest core, faceplate
-    headTop='<rect x="16" y="6" width="28" height="28" rx="11" fill="'+su+'"'+S+'/><path d="M20 16 L40 16 L38 30 Q30 34 22 30Z" fill="#c0c7d1"'+S+'/>';
-    face='<rect x="22" y="19" width="6" height="2.6" rx="1" fill="'+c+'"/><rect x="32" y="19" width="6" height="2.6" rx="1" fill="'+c+'"/><path d="M26 27 L34 27" stroke="'+k+'" stroke-width="1.5"/>';
-    emblem='<circle cx="30" cy="44" r="5" fill="#e0fbff"'+S+'/><circle cx="30" cy="44" r="8" fill="none" stroke="'+c+'" stroke-width="2" opacity=".7"/><path d="M19 38 L24 36 M41 38 L36 36" stroke="#c0c7d1" stroke-width="2.5"/>';
-    armR='<circle cx="47" cy="56" r="3" fill="#e0fbff" stroke="'+c+'" stroke-width="2"/>';
-    bootC="#c0c7d1";
-  } else if(t==="mystic"){ // high-collar cloak, glowing time amulet, rune circle
-    back='<path d="M15 32 L45 32 L50 84 L10 84Z" fill="#8c1c3a"'+S+'/><path d="M14 30 Q12 18 20 24 L20 34Z M46 30 Q48 18 40 24 L40 34Z" fill="#8c1c3a"'+S+'/>';
-    headTop='<path d="M17 20 Q16 6 30 6 Q44 6 43 20 Q38 10 30 12 Q22 10 17 20Z" fill="'+hr+'"'+S+'/><path d="M18 17 Q17 12 20 11" stroke="#ddd" stroke-width="2" fill="none"/><path d="M42 17 Q43 12 40 11" stroke="#ddd" stroke-width="2" fill="none"/>';
-    face+='<path d="M27 31 Q30 33 33 31" stroke="'+hr+'" stroke-width="2.5" fill="none"/>';
-    emblem='<circle cx="30" cy="40" r="4.5" fill="'+h.cape+'"'+S+'/><circle cx="30" cy="40" r="2" fill="#7cff6b"/><rect x="28" y="44" width="4" height="16" fill="'+h.cape+'"/>';
-    armR='<circle cx="49" cy="58" r="7" fill="none" stroke="#ffb703" stroke-width="2" stroke-dasharray="3 2"/>';
-  } else if(t==="archer"){ // hood mask, quiver, recurve bow
-    back='<rect x="38" y="30" width="7" height="22" rx="2" fill="#6b4423" transform="rotate(20 41 41)"'+S+'/><path d="M40 28 L43 22 M43 29 L47 24" stroke="'+c+'" stroke-width="2"/>';
-    headTop='<path d="M16 22 Q15 5 30 5 Q45 5 44 22 Q38 12 30 13 Q22 12 16 22Z" fill="'+hr+'"'+S+'/>';
-    face='<path d="M19 18 L41 18 L40 24 L20 24Z" fill="'+su+'"/><ellipse cx="25" cy="21" rx="2.2" ry="1.6" fill="#fff"/><ellipse cx="35" cy="21" rx="2.2" ry="1.6" fill="#fff"/><path d="M26 28 Q30 30 34 28" fill="none" stroke="'+k+'" stroke-width="1.8"/>';
-    emblem='<path d="M24 40 L30 46 L36 40" fill="none" stroke="'+c+'" stroke-width="3"/>';
-    armL='<path d="M6 34 Q-2 50 6 66" fill="none" stroke="#6b4423" stroke-width="3"/><path d="M6 34 L6 66" stroke="#ddd" stroke-width="1"/>';
-  } else if(t==="director"){ // long dark coat, headset
-    back='<path d="M15 34 L45 34 L48 82 L12 82Z" fill="#111"'+S+'/>';
-    headTop='<path d="M17 16 Q18 6 30 6 Q42 6 43 16 Q36 11 30 11 Q24 11 17 16Z" fill="'+hr+'"'+S+'/><path d="M16 20 Q16 6 30 6" fill="none" stroke="#555" stroke-width="2"/><rect x="13" y="18" width="5" height="8" rx="2" fill="#333"'+S+'/><path d="M16 26 Q18 30 24 30" stroke="#333" stroke-width="1.5" fill="none"/>';
-    face+='<path d="M24 31 Q30 34 36 31" stroke="#333" stroke-width="2" fill="none"/>';
-    emblem='<path d="M30 34 L30 60" stroke="#444" stroke-width="2"/><rect x="33" y="40" width="6" height="4" fill="'+c+'"/>';
-  } else if(t==="shield"){ // winged-fin helm, round shield with hexagon (no star)
-    headTop='<path d="M16 22 Q15 5 30 5 Q45 5 44 22 L40 18 Q30 12 20 18Z" fill="'+su+'"'+S+'/><path d="M16 16 L10 10 L15 20Z M44 16 L50 10 L45 20Z" fill="#eee"'+S+'/>';
-    emblem='<path d="M30 38 L35 41 L35 47 L30 50 L25 47 L25 41Z" fill="#eee"'+S+'/><path d="M17 52 L43 52" stroke="#eee" stroke-width="3"/>';
-    armL='<circle cx="9" cy="50" r="11" fill="#c1121f"'+S+'/><circle cx="9" cy="50" r="7.5" fill="#eee"'+S+'/><circle cx="9" cy="50" r="4" fill="#1d3557"'+S+'/>';
-  } else if(t==="spy"){ // sleek black suit, long red hair, wrist gauntlets
-    back='<path d="M16 16 Q12 34 18 44 L22 30Z M44 16 Q48 34 42 44 L38 30Z" fill="'+hr+'"'+S+'/>';
-    headTop='<path d="M16 22 Q14 4 30 5 Q46 4 44 22 Q40 10 30 12 Q22 12 16 22Z" fill="'+hr+'"'+S+'/>';
-    emblem='<path d="M17 55 L43 55" stroke="#555" stroke-width="3"/><circle cx="30" cy="55" r="3" fill="'+c+'"'+S+'/>';
-    armL='<rect x="9" y="47" width="9" height="4" fill="'+c+'"/>';armR='<rect x="42" y="47" width="9" height="4" fill="'+c+'"/>';
-  } else if(t==="synth"){ // synthetic: smooth head with circuit lines, short cape
-    back='<path d="M17 34 L43 34 L47 76 L13 76Z" fill="'+h.cape+'"'+S+'/>';
-    headTop='<path d="M22 10 L22 16 L28 16 M38 10 L38 16 L32 16 M30 8 L30 14" stroke="'+c+'" stroke-width="1.6" fill="none"/>';
-    face='<ellipse cx="25" cy="21" rx="2.4" ry="2" fill="'+c+'"/><ellipse cx="35" cy="21" rx="2.4" ry="2" fill="'+c+'"/><path d="M26 28 L34 28" stroke="'+k+'" stroke-width="1.6"/>';
-    emblem='<path d="M30 36 L30 58 M22 44 L38 44" stroke="'+c+'" stroke-width="1.8"/><circle cx="30" cy="44" r="3" fill="'+c+'"/>';
-  } else if(t==="titan"){ // huge strong scientist in torn lab coat
-    torsoW=34;torsoX=13;
-    headTop='<path d="M17 18 Q14 4 30 5 Q46 4 43 18 L38 12 L34 15 L30 10 L26 15 L22 12Z" fill="'+hr+'"'+S+'/>';
-    face='<path d="M22 19 L28 21 M38 19 L32 21" stroke="'+k+'" stroke-width="2"/><ellipse cx="25" cy="22.5" rx="1.8" ry="2" fill="'+k+'"/><ellipse cx="35" cy="22.5" rx="1.8" ry="2" fill="'+k+'"/><rect x="25" y="27" width="10" height="3" rx="1" fill="#fff"'+S+'/>';
-    emblem='<path d="M13 34 L22 34 L19 62 L13 62Z M47 34 L38 34 L41 62 L47 62Z" fill="#f4f4f4"'+S+'/><rect x="35" y="38" width="3" height="6" fill="#2a9d8f"/>';
-  }
-  var arm=function(x,cls,extra){return '<g class="'+cls+'"><rect x="'+x+'" y="34" width="8" height="21" rx="4" fill="'+(t==="armor"?su:(t==="titan"?sk:su))+'"'+S+'/><circle cx="'+(x+4)+'" cy="56" r="3.6" fill="'+(t==="armor"?"#c0c7d1":(t==="spy"||t==="director"?sk:(t==="titan"?sk:"#2b2b2b")))+'"'+S+'/>'+(extra||"")+'</g>';};
-  var leg=function(x,cls){return '<g class="'+cls+'"><rect x="'+x+'" y="58" width="9" height="22" rx="3" fill="'+(t==="titan"?"#5a3d7a":su)+'"'+S+'/><rect x="'+(x-1)+'" y="76" width="11" height="7" rx="3" fill="'+bootC+'"'+S+'/></g>';};
-  var lx=t==="titan"?6:9, rx=t==="titan"?46:43;
-  return '<svg class="hb" viewBox="-4 0 68 92" role="img" aria-label="'+h.name+'">'+
-    '<ellipse cx="30" cy="86" rx="16" ry="3.5" fill="#000" opacity=".35"/>'+
-    back+leg(20,"lg1")+leg(31,"lg2")+
-    arm(lx,"ar1",armL)+
-    '<rect x="'+torsoX+'" y="32" width="'+torsoW+'" height="29" rx="7" fill="'+su+'"'+S+'/>'+emblem+
-    arm(rx,"ar2",armR)+
-    '<rect x="26" y="29" width="8" height="6" fill="'+sk+'"'+S+'/>'+
-    '<circle cx="30" cy="20" r="14" fill="'+sk+'"'+S+'/>'+headTop+face+
-    '</svg>';
-}
-function heroSVG(h){return heroBody(h);}
-
-// ── Walking office engine ──────────────────────────────────────────
-var OFFICE={built:false,sprites:[],raf:0,last:0,bubbleT:0};
-var OFFICE_SPOTS=[{x:.5,y:.5,label:"會議桌"},{x:.5,y:.36,label:"咖啡機"},{x:.18,y:.5,label:"白板"},{x:.82,y:.5,label:"窗邊"}];
-function officeRoomRect(cell){ // fractions of the floor, rooms with corridor gaps
-  var gx=.025,gy=.03,w=(1-gx*4)/3,hgt=(1-gy*4)/3;
-  return {x:gx+cell[0]*(w+gx),y:gy+cell[1]*(hgt+gy),w:w,h:hgt};
-}
-function officeDesk(h){var r=officeRoomRect(h.cell);return {x:r.x+r.w*.5,y:r.y+r.h*.72};}
-function officePickTarget(sp){
-  var h=sp.h,r=Math.random(),pt,dwell;
-  if(r<.5){pt=officeDesk(h);pt.x+=(Math.random()-.5)*.06;sp.atDesk=true;dwell=3500+Math.random()*4000;}
-  else if(r<.8){var o=HEROES[Math.floor(Math.random()*HEROES.length)],rr=officeRoomRect(o.cell);pt={x:rr.x+rr.w*(.25+Math.random()*.5),y:rr.y+rr.h*(.5+Math.random()*.35)};sp.atDesk=(o===h);sp.visiting=o;dwell=1800+Math.random()*2500;}
-  else{var s=OFFICE_SPOTS[Math.floor(Math.random()*OFFICE_SPOTS.length)];pt={x:s.x+(Math.random()-.5)*.08,y:s.y+(Math.random()-.5)*.06};sp.atDesk=false;sp.visiting=null;sp.spot=s.label;dwell=1500+Math.random()*2500;}
-  sp.tx=pt.x;sp.ty=pt.y;sp.dwell=dwell;sp.walking=true;
-}
-function buildOffice(){
-  var floor=$I("hqOffice");if(!floor)return;
-  var html='<div class="of-floor"></div>';
-  HEROES.forEach(function(h){
-    var r=officeRoomRect(h.cell);
-    html+='<div class="of-room" style="left:'+(r.x*100)+'%;top:'+(r.y*100)+'%;width:'+(r.w*100)+'%;height:'+(r.h*100)+'%;--hc:'+h.color+'" data-hq-go="'+h.page+'"'+(h.scroll?' data-hq-scroll="'+h.scroll+'"':'')+' role="button" tabindex="0" aria-label="'+h.room+'：'+h.role+'">'+
-      '<span class="of-room-lbl">'+h.icon+' '+h.room+'<small>'+h.roomEn+'</small></span>'+
-      '<span class="of-desk"><span class="of-screen"></span></span></div>';
-  });
-  html+='<div class="of-table" style="left:43%;top:46%"></div><div class="of-coffee" style="left:47.5%;top:30%">☕</div><div class="of-plant" style="left:2%;top:33%">🪴</div><div class="of-plant" style="left:94%;top:66%">🪴</div>';
-  floor.innerHTML=html;
-  OFFICE.sprites=HEROES.map(function(h,i){
-    var el=document.createElement("button");
-    el.className="of-hero";el.type="button";el.style.setProperty("--hc",h.color);
-    el.setAttribute("data-hq-go",h.page);if(h.scroll)el.setAttribute("data-hq-scroll",h.scroll);
-    el.setAttribute("aria-label",h.name+" "+h.code+"："+h.role);
-    el.innerHTML='<span class="of-bubble"></span>'+heroBody(h)+'<span class="of-tag">'+h.name+'</span>';
-    floor.appendChild(el);
-    var d=officeDesk(h);
-    var sp={h:h,el:el,x:d.x,y:d.y,tx:d.x,ty:d.y,dwell:800+i*500,walking:false,face:1,atDesk:true};
-    return sp;
-  });
-  OFFICE.built=true;
-}
-function officeBubble(){
-  var ph=marketPhase(),cands=OFFICE.sprites.filter(function(s){return !s.walking;});
-  if(!cands.length)return;
-  var s=cands[Math.floor(Math.random()*cands.length)],b=s.el.querySelector(".of-bubble");if(!b)return;
-  var real=(window.TODAY_HERO_LINES||{})[s.h.id];var txt=s.atDesk?((real&&Math.random()<.65)?real:heroLine(s.h,ph)):(s.visiting?("找"+s.visiting.name+"討論中…"):(s.spot==="咖啡機"?"先來杯咖啡☕":"休息一下，馬上回座"));
-  b.textContent=txt;s.el.classList.add("talk");
-  setTimeout(function(){s.el.classList.remove("talk");},3200);
-}
-function officePlace(sp,W,H){
-  var px=sp.x*W,py=sp.y*H,sc=.85+sp.y*.3;
-  sp.el.style.transform="translate("+(px)+"px,"+(py)+"px) translate(-50%,-100%) scale("+sc.toFixed(3)+")";
-  sp.el.style.zIndex=String(10+Math.round(sp.y*100));
-  sp.el.classList.toggle("walking",!!sp.walking);
-  sp.el.classList.toggle("flip",sp.face<0);
-}
-function officeTick(ts){
-  OFFICE.raf=0;
-  var page=$I("p-hq"),floor=$I("hqOffice");
-  if(!page||!page.classList.contains("active")||!floor||document.hidden){OFFICE.last=0;return;}
-  var W=floor.clientWidth,H=floor.clientHeight,dt=OFFICE.last?Math.min(.1,(ts-OFFICE.last)/1000):0;OFFICE.last=ts;
-  var reduce=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  OFFICE.sprites.forEach(function(sp){
-    if(reduce){sp.walking=false;officePlace(sp,W,H);return;}
-    if(sp.walking){
-      var dx=(sp.tx-sp.x)*W,dy=(sp.ty-sp.y)*H,dist=Math.sqrt(dx*dx+dy*dy),step=Math.max(38,W*.07)*dt;
-      if(Math.abs(dx)>1)sp.face=dx>0?1:-1;
-      if(dist<=step||dist<1){sp.x=sp.tx;sp.y=sp.ty;sp.walking=false;}
-      else{sp.x+=dx/dist*step/W;sp.y+=dy/dist*step/H;}
-    } else {
-      sp.dwell-=dt*1000;
-      if(sp.dwell<=0)officePickTarget(sp);
-    }
-    officePlace(sp,W,H);
-  });
-  OFFICE.bubbleT-=dt*1000;
-  if(OFFICE.bubbleT<=0){OFFICE.bubbleT=2600+Math.random()*1800;if(!reduce||Math.random()<.5)officeBubble();}
-  officeStart();
-}
-function officeStart(){if(!OFFICE.raf)OFFICE.raf=requestAnimationFrame(officeTick);}
-document.addEventListener("visibilitychange",function(){if(!document.hidden)officeStart();});
-window.addEventListener("resize",function(){officeStart();});
 
 function twNow(){
   var d=new Date();
@@ -244,54 +61,59 @@ function marketPhase(){
   if(t.mins<14*60+30) return {key:"post",label:"收盤後",t:t};
   return {key:"night",label:"夜間",t:t};
 }
-var PHASE_LINES={
-  "closed":{brief:"今天休市。適合讓史官整理日誌、時砂用時光機複盤上週的當沖規則。",volt:"休市中，下個交易日開盤前再掃。",argus:"可以慢慢研究自選股的交易計畫。"},
-  "pre":{brief:"盤前任務：先讓疾電掃當沖候選，再請天眼確認自選股的交易計畫卡（進場／停損／何時賣）。",volt:"開盤前先跑一次候選掃描。",argus:"先看交易計畫卡，價位抄好。"},
-  "open-soon":{brief:"快開盤了！疾電的候選名單和今日價位先準備好，09:15 後才看開盤區間突破。",volt:"09:00 開盤，09:15 後看突破。",argus:"限價單價位確認了嗎？"},
-  "live":{brief:"盤中值勤中：疾電盯當沖價位，迅影盯交易追蹤，鐵壁注意持倉停損。當沖記得 13:25 前出場。",volt:"盤中：按停損停利執行，不追價。",argus:"盤中可隨時查個股。"},
-  "post":{brief:"收盤了。鐵壁更新持倉損益，史官記錄今天的交易，時砂可以重播今天的走勢。",volt:"收盤後可用今天資料準備明天名單。",argus:"用收盤價更新交易計畫。"},
-  "night":{brief:"夜間：適合複盤與準備明天。明早開盤前回來找疾電和天眼。",volt:"明早開盤前再掃一次最準。",argus:"今晚可以先看看交易計畫卡。"}
+var PHASE_BRIEF={
+  "closed":"今天休市。適合整理帳本、複盤上週的交易，看看研究室哪些規則還站得住。",
+  "pre":"盤前：先看今日報告與風險燈，再確認自選股的交易計畫（進場、停損、何時賣）。",
+  "open-soon":"快開盤了。價位先抄好，09:15 後才看開盤區間突破，不追價。",
+  "live":"盤中：照計畫的停損停利執行，13:00 後不再進場，當沖 13:25 前出場。",
+  "post":"收盤了。把今天的成交記進帳本，檢查持倉停損。",
+  "night":"夜間：適合複盤與準備明天，明早開盤前回來看今日報告。"
 };
-function heroLine(h,ph){
-  var L=PHASE_LINES[ph.key]||{};
-  if(L[h.id]) return L[h.id];
-  return {chrono:"選一檔股票和日期，我帶你回到那天盤中。",swift:"加入追蹤的股票我會幫你盯價位。",bastion:"持倉跌破停損我會第一個喊。",vanguard:"大盤順風還是逆風，先問我。",nexus:"交易越多，我學得越準。",archive:"每筆交易都記下來，才知道哪招有效。",haven:"同步、帳戶、系統狀態都在這。"}[h.id]||"待命中。";
-}
+var HOME_ACTIONS=[
+  {page:"p-timemachine",ic:"bolt",t:"當沖候選",d:"今日進場、停損、停利價位"},
+  {page:"p-ledger",ic:"book",t:"記一筆交易",d:"帳本：實際損益與紀律"},
+  {page:"p-positions",ic:"shield",t:"檢查持倉",d:"損益與停損警示"},
+  {page:"p-plans",ic:"target",t:"交易追蹤",d:"盯進場與出場價位"},
+  {page:"p-learn",ic:"flask",t:"研究室",d:"哪些規則真的有效"},
+  {page:"p-market",ic:"globe",t:"市場總覽",d:"大盤、總經與情緒"}
+];
+function icon(n){return '<svg class="ic" aria-hidden="true"><use href="#i-'+n+'"/></svg>';}
 function goHero(page,scrollId){
   showPage(page);
   if(scrollId){setTimeout(function(){var el=$I(scrollId);if(el)el.scrollIntoView({behavior:"smooth",block:"start"});},60);}
   else{try{window.scrollTo({top:0,behavior:"smooth"});}catch(e){window.scrollTo(0,0);}}
 }
+var NAV_SEC={"p-plans":1,"p-positions":1,"p-market":1,"p-learn":1,"p-account":1,"p-journal":1};
+function navMore(open){
+  var n=$I("mainNav"),b=$I("navMore"),sc=$I("navScrim");if(!n)return;
+  if(open==null)open=!n.classList.contains("more-open");
+  n.classList.toggle("more-open",open);if(sc)sc.classList.toggle("on",open);if(b)b.setAttribute("aria-expanded",open?"true":"false");
+}
+function navSync(pageId){
+  var b=$I("navMore");if(b)b.classList.toggle("active",!!NAV_SEC[pageId]);
+  navMore(false);
+  var p=$I(pageId);if(p){p.classList.remove("enter");void p.offsetWidth;p.classList.add("enter");}
+}
+// 數字從 0 跑到目標值；只處理「+1.23%」這種單純的數字
+function countUp(root){
+  if(!root||(window.matchMedia&&matchMedia("(prefers-reduced-motion:reduce)").matches))return;
+  root.querySelectorAll(".td-big span.up,.td-big span.down,[data-count]").forEach(function(el){
+    var m=/^([+\-]?)(\d+(?:\.(\d+))?)(%?)$/.exec((el.textContent||"").trim());if(!m||el.__counted)return;el.__counted=1;
+    var end=parseFloat(m[2]),dec=(m[3]||"").length,t0=null,final=el.textContent;
+    function step(ts){if(t0==null)t0=ts;var k=Math.min(1,(ts-t0)/700),e=1-Math.pow(1-k,3);el.textContent=m[1]+(end*e).toFixed(dec)+m[4];if(k<1)requestAnimationFrame(step);else el.textContent=final;}
+    requestAnimationFrame(step);
+  });
+}
 function renderHQ(){
   var ph=marketPhase();
-  var pe=$I("hqPhase");if(pe){pe.textContent=ph.label;pe.className="hq-phase"+(ph.key==="live"||ph.key==="open-soon"?" live":"");}
+  var pe=$I("hqPhase");if(pe){pe.textContent=ph.label;pe.className="hm-phase"+(ph.key==="live"||ph.key==="open-soon"?" live":"");}
   var ce=$I("hqClock");if(ce)ce.textContent="台北 "+ph.t.label;
-  var be=$I("hqBrief");if(be)be.textContent=(window.TODAY&&TODAY.conclusion)?("今日結論｜"+TODAY.conclusion):("指揮官簡報｜"+((PHASE_LINES[ph.key]||{}).brief||""));
-  var la=$I("hqLeadAvatar");if(la&&!la.firstChild)la.innerHTML=heroBody(HEROES[4]);
-  var ms=$I("hqMissions");
-  if(ms){
-    var hot=(ph.key==="pre"||ph.key==="open-soon"||ph.key==="live");
-    var missions=[
-      {page:"p-timemachine",icon:"⚡",t:"當沖候選＋今日價位",d:"疾電：進場／停損／停利",hot:hot},
-      {page:"p-trade",icon:"🔍",t:"查個股・交易計畫卡",d:"天眼：進場價、何時賣",hot:hot},
-      {page:"p-positions",icon:"🛡️",t:"檢查持倉停損",d:"鐵壁：損益與警示",hot:false}
-    ];
-    ms.innerHTML=missions.map(function(m){return '<button class="hq-mission'+(m.hot?' hot':'')+'" data-hq-go="'+m.page+'"><span class="mi">'+m.icon+'</span><span><b>'+m.t+'</b><small>'+m.d+'</small></span></button>';}).join("");
-  }
-  if(!OFFICE.built)buildOffice();
-  officeStart();
+  var de=$I("hqDate");if(de){try{de.textContent=new Intl.DateTimeFormat("zh-TW",{timeZone:"Asia/Taipei",month:"long",day:"numeric",weekday:"long"}).format(new Date());}catch(e){}}
+  var be=$I("hqBrief");if(be)be.textContent=(window.TODAY&&TODAY.conclusion)?TODAY.conclusion:(PHASE_BRIEF[ph.key]||"");
   var qk=$I("hqQuick");
-  if(qk&&!qk.firstChild)qk.innerHTML=HEROES.map(function(h){return '<button style="--hc:'+h.color+'" data-hq-go="'+h.page+'"'+(h.scroll?' data-hq-scroll="'+h.scroll+'"':'')+'><span class="qa">'+heroBody(h)+'</span>'+h.icon+' '+h.name+'</button>';}).join("");
+  if(qk&&!qk.firstChild)qk.innerHTML=HOME_ACTIONS.map(function(m){return '<button class="hm-act" data-hq-go="'+m.page+'"><span class="hm-act-ic">'+icon(m.ic)+'</span><span class="hm-act-tx"><b>'+m.t+'</b><small>'+m.d+'</small></span>'+icon("chev")+'</button>';}).join("");
   initFeeSetting();
   var nl=$I("hqNotesList");if(nl&&!nl.firstChild)nl.innerHTML=RELEASE_NOTES.map(function(x){return "<li>"+x+"</li>";}).join("");
-}
-function renderHeroStrip(pageId){
-  var el=$I("heroStrip");if(!el)return;
-  var h=HERO_BY_PAGE[pageId];
-  if(!h||pageId==="p-hq"){el.style.display="none";return;}
-  el.style.display="flex";el.style.borderColor=h.color;
-  el.innerHTML=heroSVG(h)+'<div><div><span class="hs-name">'+h.icon+' '+h.name+'</span><span class="hs-code" style="color:'+h.color+'">'+h.code+'</span></div><div class="hs-role">'+h.role+'</div></div>'+
-    '<button class="ghost sm hs-home" data-hq-go="p-hq">🏢 回總部</button>';
 }
 function applyFeatureFlags(){
   try{if(window.innerWidth<760){var hp=$I("systemHealthPanel"),hb=$I("btnHealthToggle");if(hp)hp.classList.add("compact");if(hb)hb.textContent="展開";}}catch(e){}
@@ -304,13 +126,22 @@ function applyFeatureFlags(){
 }
 
 document.addEventListener("click",function(e){
-  var g=e.target&&e.target.closest&&e.target.closest("[data-hq-go]");
+  var t=e.target&&e.target.closest?e.target:null;if(!t)return;
+  if(t.closest("#navMore")){e.preventDefault();navMore();return;}
+  if(t.closest("#navScrim")){navMore(false);return;}
+  var g=t.closest("[data-hq-go]");
   if(g){e.preventDefault();goHero(g.getAttribute("data-hq-go"),g.getAttribute("data-hq-scroll"));}
 });
 document.addEventListener("keydown",function(e){
+  if(e.key==="Escape"){navMore(false);return;}
   if(e.key!=="Enter"&&e.key!==" ")return;
   var g=e.target&&e.target.getAttribute&&e.target.getAttribute("role")==="button"&&e.target.hasAttribute("data-hq-go")?e.target:null;
   if(g){e.preventDefault();goHero(g.getAttribute("data-hq-go"),g.getAttribute("data-hq-scroll"));}
+});
+document.addEventListener("submit",function(e){
+  if(!e.target||e.target.id!=="hmSearch")return;e.preventDefault();
+  var v=($I("hmSid").value||"").trim();if(!v){$I("hmSid").focus();return;}
+  showPage("p-trade");loadStock(v);$I("hmSid").value="";
 });
 setInterval(function(){var p=$I("p-hq");if(p&&p.classList.contains("active"))renderHQ();},60000);
 
@@ -751,7 +582,7 @@ function showPage(pageId) {
   if(pageId==="p-account") renderAccountUI(currentUser);
   if(pageId==="p-ledger"&&window.LEDGER) LEDGER.open();
   if(pageId==="p-learn"&&window.LAB) LAB.open();
-  try{renderHeroStrip(pageId); if(pageId==="p-hq") renderHQ();}catch(e){console.warn("hero ui",e);}
+  try{if(pageId==="p-hq") renderHQ(); navSync(pageId);}catch(e){console.warn("home ui",e);}
   if(pageId==="p-plans") { loadTradePlans().then(function(){renderTradePlans(); refreshTradePlans(false);}); }
 }
 
@@ -2104,7 +1935,7 @@ function renderJournal(){
   var sb=$I('strategyStatsBox');if(sb){sb.innerHTML=sum.strategy_stats.length?'<table class="strategy-table"><thead><tr><th>策略</th><th>交易</th><th>勝率</th><th>損益</th><th>平均 R</th></tr></thead><tbody>'+sum.strategy_stats.map(function(s){return'<tr><td>'+esc(s.strategy_type)+'</td><td>'+s.trades+'</td><td>'+s.win_rate+'%</td><td>'+s.pnl+'</td><td>'+(s.avg_r==null?'—':s.avg_r)+'</td></tr>';}).join('')+'</tbody></table>':'<div class="empty">尚無策略統計</div>';}
   generateReportText(false);
 }
-function generateReportText(show){var s=journalSummary();var best=s.strategy_stats[0]?s.strategy_stats[0].strategy_type:'—';var txt='HERO HQ V'+FRONTEND_VERSION+' 交易績效報告\n生成時間：'+new Date().toLocaleString('zh-TW')+'\n\n總交易數：'+s.total+'\n勝率：'+s.win_rate+'%\n總損益：'+s.total_pnl+'\n平均報酬：'+s.avg_return_pct+'%\n平均 R：'+s.avg_r_multiple+'\n最佳策略：'+best+'\n\nAI 回顧：'+(s.total?'目前已累積交易樣本，可開始觀察哪些 strategy_type 較適合你。若平均 R 低於 1，建議檢查是否太早出場或 RR 不足。':'目前尚無已結束交易，先從持倉管理結束交易後累積樣本。');setTxt('reportText',txt);if(show)toast('報告已產生','ok');return txt;}
+function generateReportText(show){var s=journalSummary();var best=s.strategy_stats[0]?s.strategy_stats[0].strategy_type:'—';var txt='台股作戰室 V'+FRONTEND_VERSION+' 交易績效報告\n生成時間：'+new Date().toLocaleString('zh-TW')+'\n\n總交易數：'+s.total+'\n勝率：'+s.win_rate+'%\n總損益：'+s.total_pnl+'\n平均報酬：'+s.avg_return_pct+'%\n平均 R：'+s.avg_r_multiple+'\n最佳策略：'+best+'\n\nAI 回顧：'+(s.total?'目前已累積交易樣本，可開始觀察哪些 strategy_type 較適合你。若平均 R 低於 1，建議檢查是否太早出場或 RR 不足。':'目前尚無已結束交易，先從持倉管理結束交易後累積樣本。');setTxt('reportText',txt);if(show)toast('報告已產生','ok');return txt;}
 function exportJournalCsv(){var rows=journalSummary().rows;if(!rows.length){toast('沒有日誌可匯出','warn');return;}var cols=['market','symbol','name','entry_price','exit_price','shares','pnl','return_pct','r_multiple','strategy_type','exit_reason','exit_date'];var csv=[cols.join(',')].concat(rows.map(function(r){r=calcTrade(r);return cols.map(function(c){return '"'+String(r[c]==null?'':r[c]).replace(/"/g,'""')+'"';}).join(',');})).join('\n');var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='aipicker_trade_journal_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href);}
 async function copyReport(){var txt=generateReportText(false);try{await navigator.clipboard.writeText(txt);toast('報告已複製','ok');}catch(e){prompt('複製以下報告',txt);}}
 

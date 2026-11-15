@@ -14,9 +14,9 @@ import cloudstore
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-APP_VERSION = "14.3.2"  # 每次發版只改這一行；前端在 public/js/app.js 的 FRONTEND_VERSION
+APP_VERSION = "15.0.0"  # 每次發版只改這一行；前端在 public/js/app.js 的 FRONTEND_VERSION
 
-app = FastAPI(title="HERO HQ 台股 API", version=APP_VERSION)
+app = FastAPI(title="台股作戰室 API", version=APP_VERSION)
 _raw = os.getenv("ALLOWED_ORIGINS",
     "http://localhost:5500,http://127.0.0.1:5500,"
     "https://taiwanstock-ben.web.app,https://taiwanstock-ben.firebaseapp.com")
@@ -2313,7 +2313,7 @@ async def api_health_full():
         "frontend_expected": APP_VERSION,
         "time": datetime.now().isoformat(),
         "backend": {
-            "title": "HERO HQ 台股 API",
+            "title": "台股作戰室 API",
             "version": APP_VERSION
         },
         "storage": cloudstore.status(),

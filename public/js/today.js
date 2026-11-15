@@ -10,19 +10,6 @@ var TODAY=null;
     var day=new Date(t.getTime()+8*36e5).toISOString().slice(5,10).replace("-","/");
     return {text:day+" "+hh+" 更新",stale:h>30,hours:h};
   }
-  function heroLines(d){
-    var L={},g=d.gap_estimate||{},r=d.risk||{},hl=d.hit_log||{},w=d.watchlist||[];
-    var night=(d.overnight||{}).night,sox=((d.overnight||{}).us||[]).filter(function(x){return x.symbol==="^SOX";})[0];
-    if(g.ok)L.vanguard=(night&&night.fresh?"夜盤 "+(night.pct>0?"+":"")+night.pct+"%":(sox?"費半 "+(sox.chg_pct>0?"+":"")+sox.chg_pct+"%":"隔夜資料"))+"，0050 預估"+(g.pct>0.15?"開高":g.pct<-0.15?"開低":"平盤")+"。";
-    if(r.ok)L.bastion="大盤"+r.label+"：距 200 日線 "+(r.dist_ma200_pct>0?"+":"")+r.dist_ma200_pct+"%，波動 "+r.vol20_pct+"%。";
-    L.volt="今天的預設是不做當沖，有證據才改。";
-    if(hl.n)L.nexus="開盤預估命中 "+hl.hits+"/"+hl.n+"，基準 "+hl.baseline_hits+"/"+hl.n+"。";
-    else L.nexus="開盤預估的命中率從今天開始累積。";
-    var hot=w.filter(function(x){return x.disposition;});
-    if(hot.length)L.swift="注意："+hot.map(function(x){return x.code;}).join("、")+" 是處置股。";
-    L.haven="資料"+ageText(d.generated_at).text+"。";
-    return L;
-  }
   function render(d){
     var box=$("todayCard");if(!box)return;
     var g=d.gap_estimate||{},r=d.risk||{},ov=d.overnight||{},age=ageText(d.generated_at),hl=d.hit_log||{};
@@ -54,12 +41,12 @@ var TODAY=null;
       nw.forEach(function(n){h+='<li><span class="td-time">'+e(n.time)+'</span> <a href="'+e(n.link)+'" target="_blank" rel="noopener noreferrer">'+e(n.title)+'</a></li>';});
       h+='</ul></details>';
     }
-    box.innerHTML=h;box.style.display="block";
+    box.innerHTML=h;box.style.display="block";box.classList.remove("fresh");void box.offsetWidth;box.classList.add("fresh");if(typeof countUp==="function")countUp(box);
     box.querySelectorAll("[data-td-stock]").forEach(function(b){b.addEventListener("click",function(){
       var id=b.getAttribute("data-td-stock");
       if(typeof loadStock==="function"&&typeof showPage==="function"){showPage("p-trade");loadStock(id);}
     });});
-    var be=$("hqBrief");if(be&&d.conclusion)be.textContent="今日結論｜"+d.conclusion;
+    var be=$("hqBrief");if(be&&d.conclusion)be.textContent=d.conclusion;
   }
   function fail(msg){var box=$("todayCard");if(box){box.innerHTML='<div class="td-head"><span class="td-kicker">今日</span></div><div class="td-sub">'+e(msg)+'</div>';box.style.display="block";}}
   window.loadToday=function(){
@@ -67,7 +54,7 @@ var TODAY=null;
       if(!r.ok)throw new Error("HTTP "+r.status);return r.json();
     }).then(function(d){
       if(!d||!d.generated_at)throw new Error("格式錯誤");
-      TODAY=d;window.TODAY=d;window.TODAY_HERO_LINES=heroLines(d);render(d);if(typeof window.renderGooaye==="function")window.renderGooaye(d);
+      TODAY=d;window.TODAY=d;render(d);if(typeof window.renderGooaye==="function")window.renderGooaye(d);
     }).catch(function(err){fail("今日快照還沒準備好（"+(err.message||err)+"）。排程會在交易日 06:50、13:45、19:00 更新。");});
   };
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",window.loadToday);else window.loadToday();
