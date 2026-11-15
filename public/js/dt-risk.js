@@ -1,8 +1,8 @@
   (function(){
-    var DEF={cash:5000,credit:200000,maxN:50000,day:1000,total:2500};
+    var DEF={cash:5000,credit:200000,maxN:50000,day:1000,total:10000};
     function ld(k,d){try{var v=JSON.parse(localStorage.getItem(k));return v==null?d:v;}catch(e){return d;}}
     function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
-    function cfg(){var c=ld("tw_dt_risk_cfg",{});var o={};for(var k in DEF)o[k]=Number(c[k])>0?Number(c[k]):DEF[k];return o;}
+    function cfg(){var c=ld("tw_dt_risk_cfg",{});if(Number(c.total)===2500){c.total=10000;sv("tw_dt_risk_cfg",c);}var o={};for(var k in DEF)o[k]=Number(c[k])>0?Number(c[k]):DEF[k];return o;}
     function log(){var l=ld("tw_dt_risk_log",[]);return Array.isArray(l)?l:[];}
     function twNow(){var d=new Date(Date.now()+8*3600e3);return {date:d.toISOString().slice(0,10),min:d.getUTCHours()*60+d.getUTCMinutes()};}
     function disc(){return window.feeDisc?feeDisc():0.6;}
@@ -12,7 +12,7 @@
     function totals(){var t=twNow().date,day=0,all=0;log().forEach(function(e){all+=e.p;if(e.d===t)day+=e.p;});return {day:day,all:all};}
     function fill(){var c=cfg();["cash","credit","maxN","day","total"].forEach(function(k){var i=$I("rk"+k.charAt(0).toUpperCase()+k.slice(1));if(i)i.value=c[k];});}
     function drawLog(){var c=cfg(),T=totals(),el=$I("rkLog");if(!el)return;
-      var cls=function(x){return x<0?"dt-neg":"dt-pos";};
+      var cls=function(x){return x>0?"up":x<0?"down":"flat";};
       el.innerHTML='今日損益 <b class="'+cls(T.day)+'">'+nt(T.day)+'</b>（每日停損 '+nt(-c.day)+'）　累計 <b class="'+cls(T.all)+'">'+nt(T.all)+'</b>（總停損 '+nt(-c.total)+'）'+
         (T.all<=-c.total?'<br><b class="dt-neg">⛔ 已到總停損：停止真錢當沖，回到模擬交易。</b>':T.day<=-c.day?'<br><b class="dt-neg">⛔ 今天已到每日停損：收工，明天再說。</b>':'');}
     function check(){

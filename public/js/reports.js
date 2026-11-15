@@ -14,7 +14,7 @@ var REPORTS=(function(){
     var h='<div class="rp-sub">當沖 5 檔候選<span class="rp-hint">規則 '+e(p.version)+'，母體 '+e(p.universe_n)+' 檔，模擬追蹤</span></div><div class="rp-scroll"><table class="rp-table"><thead><tr><th>股票</th><th>昨收</th><th>B 版買進上限</th>'+(has?'<th>開盤</th><th>收盤</th><th>A 版損益</th><th>B 版損益</th>':'<th>波動 ATR</th>')+'</tr></thead><tbody>';
     p.items.forEach(function(x){var r=res[x.code];
       h+='<tr><td><button class="td-link" data-rp-stock="'+e(x.code)+'">'+e(x.code)+'</button> '+e(x.name)+'</td><td>'+e(x.close)+'</td><td>'+e(x.buy_b_max)+'</td>'
-        +(has?(r?'<td>'+e(r.open)+' '+pc(r.gap_pct)+'</td><td>'+e(r.close)+(r.stop_hit?' <span class="rp-warn">停損</span>':'')+'</td><td>'+nt(r.a_net)+'</td><td>'+(r.b_taken?nt(r.b_net):'<span class="rp-na">沒買</span>')+'</td>':'<td colspan="4" class="rp-na">沒有成交資料</td>'):'<td>'+e(x.atr_pct)+'%</td>')+'</tr>';
+        +(has?(r?'<td>'+e(r.open)+' '+pc(r.gap_pct)+'</td><td>'+e(r.close)+(r.stop_hit?' <span class="rp-warn">停損</span>':'')+'</td><td>'+(r.over_cap?'<span class="rp-na">超過上限沒買</span>':nt(r.a_net))+'</td><td>'+(r.b_taken?nt(r.b_net):'<span class="rp-na">沒買</span>')+'</td>':'<td colspan="4" class="rp-na">沒有成交資料</td>'):'<td>'+e(x.atr_pct)+'%</td>')+'</tr>';
     });
     h+='</tbody></table></div><div class="rp-hint">A 版：開盤買、收盤賣。B 版：開盤價不高於「買進上限」才買。兩版都是每檔 1 張、跌破開盤價 3% 停損，損益已扣元大手續費與當沖稅。</div>';
     return h;

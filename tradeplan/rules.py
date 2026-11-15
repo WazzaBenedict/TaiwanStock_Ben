@@ -110,9 +110,14 @@ def make_plan(df: pd.DataFrame, rules: PlanRules = PlanRules(), etf: bool = Fals
     return lv
 
 
+MAX_NOTIONAL = 50_000   # 使用者的單筆買進上限（元），2026-11 起的風控規則
+
+
 def position_size(capital: float, risk_pct: float, entry: float, stop: float,
-                  costs=None, etf: bool | str = False, min_fee: float | None = None) -> dict:
-    """依「單筆最多虧總資金的 risk_pct」算股數（整張 + 零股），停損虧損含元大手續費、證交稅與滑價。"""
+                  costs=None, etf: bool | str = False, min_fee: float | None = None,
+                  max_notional: float | None = MAX_NOTIONAL) -> dict:
+    """依「單筆最多虧總資金的 risk_pct」算股數（整張 + 零股），停損虧損含元大手續費、證交稅與滑價。
+    另外不超過使用者的單筆上限 max_notional（預設 NT$50,000，含手續費）。"""
     from .costs import Costs
     costs = costs or Costs()
     b = costs.broker
@@ -130,14 +135,17 @@ def position_size(capital: float, risk_pct: float, entry: float, stop: float,
         return buy * n + b.fee(buy, n)
 
     per_share = entry * (1 + costs.buy_rate()) - stop * (1 - costs.sell_rate(etf))
-    shares = min(int(budget // per_share), int(capital // (entry * (1 + costs.buy_rate()))))
-    while shares > 0 and (loss(shares) > budget or cash(shares) > capital):
+    limit = min(capital, max_notional) if max_notional else capital
+    shares = min(int(budget // per_share), int(limit // (entry * (1 + costs.buy_rate()))))
+    while shares > 0 and (loss(shares) > budget or cash(shares) > limit):
         shares -= 1
     amount = shares * entry
     fee = b.fee(entry, shares) if shares else 0
     out = {"shares": shares, "lots": shares // 1000, "odd_shares": shares % 1000,
            "amount": round(amount), "risk_amount": round(loss(shares)) if shares else 0,
            "buy_fee": round(fee), "broker": b.name, "fee_discount": b.fee_discount}
+    if max_notional and limit < capital and int(budget // per_share) > shares:
+        out["capped_by"] = f"已依單筆上限 NT${max_notional:,.0f} 縮小股數"
     if shares and fee / max(amount, 1) > b.eff_fee_rate * 1.5:
         out["min_fee_warning"] = f"金額小，最低手續費 {fee:.0f} 元約占 {fee / amount * 100:.2f}%"
     return out

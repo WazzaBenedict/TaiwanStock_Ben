@@ -17,6 +17,7 @@
 """
 from __future__ import annotations
 
+import datetime as _dt
 import math
 import os
 from dataclasses import asdict, dataclass
@@ -40,6 +41,15 @@ SOURCES = [
     {"title": "2026 證券戶推薦：20 家券商手續費比較", "url": "https://www.money101.com.tw/blog/%E6%96%B0%E6%89%8B%E9%96%8B%E6%88%B6%E9%81%B8%E5%93%AA%E5%AE%B6%E5%93%AA%E5%AE%B6%E5%88%B8%E5%95%86%E6%89%8B%E7%BA%8C%E8%B2%BB%E6%9C%80%E4%BE%BF%E5%AE%9C-%E4%B8%8B%E5%96%AE%E8%BB%9F%E9%AB%94"},
     {"title": "現股當沖證交稅減半延長至 2027-12-31（立法院三讀）", "url": "https://www.ctee.com.tw/news/20250101700052-430104"},
 ]
+
+
+# 稅率優惠到期日（含當天）。到期後自動回到一般稅率；若政府再延長，改這兩個日期即可。
+BOND_ETF_EXEMPT_UNTIL = "2026-12-31"
+DAYTRADE_HALF_UNTIL = "2027-12-31"
+
+
+def _tw_today() -> str:
+    return (_dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(hours=8)).strftime("%Y-%m-%d")
 
 
 @dataclass(frozen=True)
@@ -73,11 +83,15 @@ class BrokerFees:
 
     def tax_rate(self, etf: bool | str = False, daytrade: bool = False) -> float:
         """etf 可傳 True / False / "bond"。當沖只適用一般股票（ETF 本來就 0.1%）。"""
+        today = _tw_today()
         if etf == "bond":
-            return 0.0
+            # 債券 ETF 免徵證交稅到 2026-12-31，之後恢復 ETF 稅率
+            return 0.0 if today <= BOND_ETF_EXEMPT_UNTIL else self.tax_etf
         if etf:
             return self.tax_etf
-        return self.tax_daytrade if daytrade else self.tax_stock
+        if daytrade and today <= DAYTRADE_HALF_UNTIL:
+            return self.tax_daytrade
+        return self.tax_stock
 
     def tax(self, price: float, shares: int, etf: bool | str = False, daytrade: bool = False) -> float:
         return float(math.floor(price * shares * self.tax_rate(etf, daytrade)))

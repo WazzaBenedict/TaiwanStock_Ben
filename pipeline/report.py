@@ -66,7 +66,7 @@ def update(arch: dict, snap: dict, now: datetime, picks: dict | None = None, res
         if sec:
             e = days.setdefault(day, {"date": day})
             e["close"] = sec
-            if results and not e.get("results"):
+            if results:   # 19:00 收盤價定稿時重算，蓋掉 13:45 的初步結果
                 e["results"] = results
     ordered = [days[k] for k in sorted(days, reverse=True)][:MAX_DAYS]
     done = [r for d in ordered for r in d.get("results") or []]
@@ -128,7 +128,7 @@ def main(argv: list[str]) -> int:
                 picks = P.build()
             except Exception as e:
                 print("picks failed:", type(e).__name__, str(e)[:160])
-        if ph == "close" and entry.get("picks") and not entry.get("results"):
+        if ph == "close" and entry.get("picks"):
             results = score_day(entry, day) or None
         arch = update(arch, snap, now, picks, results)
     text = json.dumps(arch, ensure_ascii=False, separators=(",", ":"))

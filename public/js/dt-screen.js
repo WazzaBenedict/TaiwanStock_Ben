@@ -1,6 +1,6 @@
   (function(){
     var rows=[];
-    function fmtR(x){if(x==null)return"—";var c=x>0?"dt-pos":"dt-neg";return'<span class="'+c+'">'+(x>0?"+":"")+x.toFixed(2)+'R</span>';}
+    function fmtR(x){if(x==null)return"—";var c=x>0?"up":x<0?"down":"flat";return'<span class="'+c+'">'+(x>0?"+":"")+x.toFixed(2)+'R</span>';}
     function draw(levels){
       var tb=document.querySelector("#dtTable tbody"); if(!tb) return;
       tb.innerHTML=rows.map(function(r){
@@ -29,7 +29,7 @@
         document.getElementById("dtFoot").textContent="* 預估進場價（突破後下一根開盤才確定）。"+d.disclaimer+" 略過 "+(d.skipped||[]).length+" 檔。";
         document.getElementById("dtTable").style.display=rows.length?"table":"none"; draw();
         if(rows.length) levels();
-      }catch(e){msg.textContent="⚠ "+e.message;}
+      }catch(e){msg.textContent=(e&&e.name==="TypeError")||/fetch/i.test(e&&e.message||"")?"⚠ 伺服器還在計算或剛喚醒，約 1 分鐘後再按一次":"⚠ "+e.message;}
     }
     async function levels(){
       if(!rows.length) return scan(false);

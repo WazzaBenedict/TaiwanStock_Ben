@@ -10,8 +10,8 @@
   --r:14px;--r-sm:10px;
   --shadow:0 1px 0 rgba(255,255,255,.03) inset,0 8px 24px -12px rgba(0,0,0,.55);
   --num:'JetBrains Mono','Consolas',monospace;
-  --mono:'Inter','Noto Sans TC','Microsoft JhengHei',system-ui,sans-serif;
-  --body:'Inter','Noto Sans TC','Microsoft JhengHei',system-ui,sans-serif;
+  --mono:'Inter','PingFang TC','Noto Sans TC','Microsoft JhengHei',system-ui,sans-serif;
+  --body:'Inter','PingFang TC','Noto Sans TC','Microsoft JhengHei',system-ui,sans-serif;
   --ease:cubic-bezier(.2,.7,.2,1)
 }
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
@@ -239,3 +239,23 @@ table{font-variant-numeric:tabular-nums}
 .rp-news ul{padding-left:18px;font-size:13px;line-height:1.8;color:var(--text2)}
 .rp-empty{background:var(--panel2);border:1px dashed var(--line2);border-radius:12px;padding:22px 16px;text-align:center;color:var(--muted);font-size:13.5px}
 @media(max-width:760px){.rp-one{display:none}.rp-tags{margin-left:auto}}
+
+/* v15.2.0 團隊優化：手機易用性修正 */
+.mobile-speed-box{display:none;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin:-4px 0 12px}
+.mobile-speed-box.on{display:flex}
+.d-badge,.sync-badge,.ghost.sm{white-space:nowrap}
+.section-title{flex-wrap:wrap}
+.section-title-left{flex-wrap:wrap;min-width:0}
+.live-dot.warn{background:#e0a020;animation:none}
+.live-dot.off{background:#6b7280;animation:none}
+details.lb-fold>summary{list-style:none;cursor:pointer}
+details.lb-fold>summary::-webkit-details-marker{display:none}
+details.lb-fold>summary .lb-head::after{content:"展開 ▾";margin-left:auto;font-size:12px;color:var(--muted)}
+details.lb-fold[open]>summary .lb-head::after{content:"收合 ▴"}
+@media(max-width:760px){
+  .sm{min-height:40px}
+  .quick-nav-btn{min-height:36px;padding:6px 12px}
+  #dtRiskSection input{min-height:40px;padding:6px 10px}
+  .td-link{min-height:40px;min-width:44px;display:inline-flex;align-items:center}
+  .d-badge,.k,.portfolio-chip,.portfolio-note,.bar-tick{font-size:12px}
+}

@@ -3,7 +3,7 @@
   --text:#e5eefc;--muted:#6f86a8;
   --cyan:#00d4ff;--up:#e8384f;--down:#00b86b;--yellow:#fbbf24;--purple:#a78bfa;--flat:#64748b;
   --us-up:#22c55e;--us-down:#ef4444;--us-blue:#2563eb;
-  --r:12px;--mono:'Consolas','IBM Plex Mono',monospace;--body:'Noto Sans TC','Microsoft JhengHei',sans-serif
+  --r:12px;--mono:'Consolas','IBM Plex Mono',monospace;--body:'PingFang TC','Noto Sans TC','Microsoft JhengHei',system-ui,sans-serif
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:radial-gradient(circle at 20% 0%,rgba(255,210,63,.07),transparent 35%),var(--bg);color:var(--text);font-family:var(--body);font-size:14px;min-height:100vh}

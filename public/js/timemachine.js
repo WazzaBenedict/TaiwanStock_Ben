@@ -15,9 +15,9 @@
       msg.textContent="抓取分 K 並重播中…第一次抓 60 天資料可能要 1 分鐘";out.style.display="none";
       try{
         var r=await apiFetch(API+"/api/daytrade/timemachine?"+new URLSearchParams(q).toString(),{},120000);
-        var d=await r.json(); if(!r.ok){msg.textContent="⚠ "+(d.detail||("錯誤 "+r.status));return;}
+        var d=await r.json(); if(!r.ok){var det=String(d.detail||"");msg.textContent="⚠ "+(/no opening-range breakout/i.test(det)?"那天開盤後到 13:00 都沒有突破開盤區間，換一天或自己填進場價":(r.status>=500?"伺服器還在計算或剛喚醒，約 1 分鐘後再按一次":(det||("錯誤 "+r.status))));return;}
         msg.textContent=""; render(d);
-      }catch(e){msg.textContent="⚠ "+e.message;}
+      }catch(e){msg.textContent=(e&&e.name==="TypeError")||/fetch/i.test(e&&e.message||"")?"⚠ 伺服器還在計算或剛喚醒，約 1 分鐘後再按一次":"⚠ "+e.message;}
     }
     function render(d){
       var p=d.plan,m=d.mc,h=d.history,a=d.actual_day,out=document.getElementById("tmOut");

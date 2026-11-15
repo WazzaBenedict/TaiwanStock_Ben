@@ -3,26 +3,28 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>台股作戰室 V15.1.0</title>
+<title>台股作戰室 V15.2.0</title>
 <meta name="theme-color" content="#0b0f17"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet"/>
-<script src="config.js"></script>
+<link rel="preconnect" href="https://taiwanstock-ben-1.onrender.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"/>
+<script defer src="config.js"></script>
+<script>try{fetch("https://taiwanstock-ben-1.onrender.com/health",{mode:"no-cors"}).catch(function(){})}catch(e){}</script>
 <!-- Firebase compat SDKs -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <!-- Lightweight Charts -->
-<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<script defer src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/app.css?v=15.1.0">
-<link rel="stylesheet" href="css/today.css?v=15.1.0">
-<link rel="stylesheet" href="css/ledger.css?v=15.1.0">
-<link rel="stylesheet" href="css/lab.css?v=15.1.0">
-<link rel="stylesheet" href="css/gooaye.css?v=15.1.0">
-<link rel="stylesheet" href="css/pro.css?v=15.1.0">
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="css/app.css?v=15.2.0">
+<link rel="stylesheet" href="css/today.css?v=15.2.0">
+<link rel="stylesheet" href="css/ledger.css?v=15.2.0">
+<link rel="stylesheet" href="css/lab.css?v=15.2.0">
+<link rel="stylesheet" href="css/gooaye.css?v=15.2.0">
+<link rel="stylesheet" href="css/pro.css?v=15.2.0">
 </head>
 <body>
 
@@ -43,7 +45,7 @@
       使用 Google 帳號登入
     </button>
     <div id="loginError"></div>
-    <div class="login-ver">版本 <b class="app-ver">V15.1.0</b></div>
+    <div class="login-ver">版本 <b class="app-ver">V15.2.0</b></div>
   </div>
 </div>
 
@@ -69,14 +71,14 @@
   <div class="logo">
     <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="8" fill="url(#bm2)"/><defs><linearGradient id="bm2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5b9dff"/><stop offset="1" stop-color="#3a5bd9"/></linearGradient></defs><path d="M6.5 18.5l4.5-5 3.5 3 6.5-8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="21" cy="8.5" r="1.8" fill="#fff"/></svg>
     <span class="brand-name">台股作戰室</span>
-    <span class="ver app-ver" title="目前版本">V15.1.0</span>
+    <span class="ver app-ver" title="目前版本">V15.2.0</span>
   </div>
   <div class="hdr-r">
     <div class="mkt-switcher us-only">
       <button class="mkt-btn active-tw" id="btnMktTW">🇹🇼 台股</button>
       <button class="mkt-btn" id="btnMktUS">🇺🇸 US</button>
     </div>
-    <span class="live-dot" title="系統狀態"></span>
+    <span class="live-dot" id="hdrDot" title="系統狀態"></span>
     <span class="clock" id="clock"></span>
   </div>
 </header>
@@ -112,7 +114,7 @@
     <p class="hm-brief" id="hqBrief">載入中…</p>
     <form class="hm-search" id="hmSearch" autocomplete="off">
       <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>
-      <input type="text" id="hmSid" inputmode="search" maxlength="10" placeholder="輸入代號或名稱查個股，例如 2330" aria-label="查個股"/>
+      <input type="text" id="hmSid" inputmode="search" maxlength="10" placeholder="代號或名稱，如 2330" aria-label="查個股"/>
       <button type="submit">查詢</button>
     </form>
   </section>
@@ -122,7 +124,7 @@
   <div class="hm-acts" id="hqQuick"></div>
   <div class="gy" id="gyCard"></div>
   <details class="hm-fold" id="hqNotes">
-    <summary><b class="app-ver">V15.1.0</b> 更新內容</summary>
+    <summary><b class="app-ver">V15.2.0</b> 更新內容</summary>
     <ul id="hqNotesList"></ul>
   </details>
   <details class="hm-fold">
@@ -152,7 +154,7 @@
 <!-- Search -->
 <div class="search-wrap">
   <div class="search-input-wrap">
-    <input type="text" id="sid" placeholder="輸入股票代號或名稱，如 2330" maxlength="10" autocomplete="off"/>
+    <input type="text" id="sid" placeholder="代號或名稱，如 2330" maxlength="10" autocomplete="off"/>
     <div class="suggest-box" id="suggestBox"></div>
   </div>
   <button id="btnSearch">查詢</button>
@@ -295,7 +297,7 @@
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px">
           <div class="aiq"><div class="aiq-lbl">入場價</div><div class="aiq-val" id="aiEp">—</div></div>
           <div class="aiq"><div class="aiq-lbl">目標價</div><div class="aiq-val up" id="aiTp">—</div></div>
-          <div class="aiq"><div class="aiq-lbl">止蝕價</div><div class="aiq-val down" id="aiSl">—</div></div>
+          <div class="aiq"><div class="aiq-lbl">停損價</div><div class="aiq-val down" id="aiSl">—</div></div>
           <div class="aiq"><div class="aiq-lbl">RR 比</div><div class="aiq-val" id="aiRr">—</div></div>
         </div>
         <div id="entryStatusBadge" style="margin-bottom:6px"></div>
@@ -304,7 +306,7 @@
           <div class="tp-row"><span class="tp-lbl">近期支撐</span><span id="tpSupport">—</span></div>
           <div class="tp-row"><span class="tp-lbl">近期壓力</span><span id="tpResistance">—</span></div>
           <div class="tp-row"><span class="tp-lbl">策略型態</span><span id="tpStrategy">—</span></div>
-          <div class="tp-row"><span class="tp-lbl">Final Score</span><span id="tpFinalScore">—</span></div>
+          <div class="tp-row"><span class="tp-lbl">綜合分數</span><span id="tpFinalScore">—</span></div>
         </div>
         <div id="aiSummary" style="font-size:12px;color:var(--muted);line-height:1.6;background:rgba(255,210,63,.04);border:1px solid rgba(255,210,63,.1);border-radius:7px;padding:8px 10px;margin-top:6px"></div>
       </div>
@@ -429,7 +431,7 @@
   </div>
   <details class="lb-old"><summary>舊版 AI 學習（權重調整沒有經過驗證，之後會移除）</summary>
   <div class="section">
-    <div class="section-title">AI 真實學習中心 V12.8
+    <div class="section-title">舊版 AI 學習
       <button class="ghost sm" id="btnWeights" style="margin-left:auto">載入</button>
     </div>
     <div class="row" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">
@@ -496,7 +498,7 @@
 <div class="page" id="p-plans">
   <div class="section">
     <div class="section-title">
-      <div class="section-title-left">交易追蹤中心 <span class="d-badge" id="planTotalBadge">0 plans</span></div>
+      <div class="section-title-left">交易追蹤中心 <span class="d-badge" id="planTotalBadge">0 筆</span></div>
       <div class="row" style="gap:6px">
         <button class="ghost sm" id="btnRefreshPlans">重新檢查</button>
       </div>
@@ -511,7 +513,7 @@
       <button class="quick-nav-btn us-only" data-plan-filter="us">美股</button>
       <button class="quick-nav-btn" data-plan-filter="ENTERABLE_NOW">已進入入場區</button>
       <button class="quick-nav-btn" data-plan-filter="NEAR_TARGET">接近目標</button>
-      <button class="quick-nav-btn" data-plan-filter="NEAR_STOP">接近止損</button>
+      <button class="quick-nav-btn" data-plan-filter="NEAR_STOP">接近停損</button>
     </div>
     <div class="plan-grid" id="tradePlanGrid"></div>
     <div class="empty" id="tradePlanEmpty" style="display:none">尚未加入交易追蹤<br><span class="mini">查詢股票後按「加入交易追蹤」，或從 AI 選股候選進一步載入後加入。</span></div>
@@ -523,7 +525,7 @@
 <div class="page" id="p-positions">
   <div class="section">
     <div class="section-title">
-      <div class="section-title-left">持倉管理 <span class="d-badge" id="positionTotalBadge">0 positions</span></div>
+      <div class="section-title-left">持倉管理 <span class="d-badge" id="positionTotalBadge">0 檔</span></div>
       <div class="row" style="gap:6px">
         <button class="ghost sm" id="btnAddPosition">＋新增持倉</button>
         <button class="ghost sm" id="btnRefreshPositions">重新檢查</button>
@@ -538,8 +540,8 @@
       <button class="quick-nav-btn" data-position-filter="tw">台股</button>
       <button class="quick-nav-btn us-only" data-position-filter="us">美股</button>
       <button class="quick-nav-btn" data-position-filter="NEAR_TARGET">接近目標</button>
-      <button class="quick-nav-btn" data-position-filter="NEAR_STOP">接近止損</button>
-      <button class="quick-nav-btn" data-position-filter="STOP_BROKEN">跌破止損</button>
+      <button class="quick-nav-btn" data-position-filter="NEAR_STOP">接近停損</button>
+      <button class="quick-nav-btn" data-position-filter="STOP_BROKEN">跌破停損</button>
     </div>
     <div class="position-grid" id="positionGrid"></div>
     <div class="empty" id="positionEmpty" style="display:none">尚未新增持倉<br><span class="mini">可從交易追蹤按「轉為持倉」，或按「＋新增持倉」手動建立。</span></div>
@@ -611,7 +613,7 @@
 <div class="page" id="p-journal">
   <div class="section">
     <div class="section-title">
-      <div class="section-title-left">交易日誌與績效回顧 <span class="d-badge" id="journalTotalBadge">0 trades</span></div>
+      <div class="section-title-left">交易日誌與績效回顧 <span class="d-badge" id="journalTotalBadge">0 筆</span></div>
       <div class="row" style="gap:6px">
         <button class="ghost sm" id="btnJournalRefresh">重新整理</button>
         <button class="ghost sm" id="btnJournalRepair">修復日誌</button>
@@ -675,7 +677,6 @@
     </div>
     <div id="rkLog" style="font-family:var(--mono);font-size:12px;margin-top:6px"></div>
   </div>
-  <script src="js/dt-risk.js?v=15.1.0"></script>
   <div class="section" id="dtScanSection">
     <div class="section-title"><div class="section-title-left">當沖候選（先買後賣） <span class="d-badge">扣成本後的歷史成績，非投資建議</span></div>
       <div class="row" style="gap:6px"><button class="ghost sm" id="btnDtScan">掃描</button><button class="ghost sm" id="btnDtLevels">更新今日價位</button></div></div>
@@ -690,8 +691,7 @@
       <th>今日 進場</th><th>停損</th><th>停利</th><th>狀態</th><th></th></tr></thead><tbody></tbody></table></div>
     <div id="dtFoot" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px"></div>
   </div>
-  <link rel="stylesheet" href="css/daytrade.css?v=15.1.0">
-  <script src="js/dt-screen.js?v=15.1.0"></script>
+  <link rel="stylesheet" href="css/daytrade.css?v=15.2.0">
   <div class="section" id="tmSection">
     <div class="section-title"><div class="section-title-left">台股時光機 <span class="d-badge">研究／模擬，非投資建議</span></div></div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px">
@@ -699,7 +699,7 @@
       只做「先買後賣」。不填進場價時，系統用「開盤區間突破」規則自動產生計畫。模擬不是預測，多數散戶當沖長期是虧的。
     </div>
     <div class="row tm-form" style="gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <input id="tmId" placeholder="股票代號 如 2330" maxlength="7"/>
+      <input id="tmId" placeholder="股票代號" maxlength="7"/>
       <input id="tmDate" type="date"/>
       <input id="tmEntry" type="number" step="0.01" placeholder="進場價（選填）"/>
       <input id="tmTime" placeholder="進場時間 10:15"/>
@@ -718,8 +718,7 @@
     <div id="tmOut" style="display:none"></div>
     <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:10px">方法改寫自 Jake Schincariol 的 trader-timemachine（MIT 授權）。</div>
   </div>
-  <link rel="stylesheet" href="css/timemachine.css?v=15.1.0">
-  <script src="js/timemachine.js?v=15.1.0"></script>
+  <link rel="stylesheet" href="css/timemachine.css?v=15.2.0">
 </div>
 
 <div class="page" id="p-account">
@@ -761,7 +760,7 @@
       <div class="row" style="gap:6px"><button class="ghost sm" id="btnHealthToggle">收合</button><button class="ghost sm" id="btnHealthRefresh">重新檢查</button></div>
     </div>
     <div class="health-grid" id="healthGrid">
-      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V15.1.0</b></div>
+      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V15.2.0</b></div>
       <div class="health-chip"><span>Backend</span><b id="hBackend">—</b></div>
       <div class="health-chip"><span>Firestore</span><b id="hFirestore">待登入</b></div>
       <div class="health-chip"><span>Yahoo</span><b id="hYahoo">—</b></div>
@@ -948,15 +947,19 @@
 <div class="footer">
   本工具僅供技術分析學習參考，不構成任何投資建議。台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
   資料來源：TWSE MIS · Yahoo Finance · TWSE Official · FinMind · Google News RSS（均為免費公開）<br>
-  台股作戰室 <span class="app-ver">V15.1.0</span>
+  台股作戰室 <span class="app-ver">V15.2.0</span>
 </div>
 
-<script src="js/app.js?v=15.1.0"></script>
-<script src="js/gooaye.js?v=15.1.0"></script>
-<script src="js/today.js?v=15.1.0"></script>
-<script src="js/ledger.js?v=15.1.0"></script>
-<script src="js/lab.js?v=15.1.0"></script>
-<script src="js/reports.js?v=15.1.0"></script>
+<script defer src="js/app.js?v=15.2.0"></script>
+<script defer src="js/gooaye.js?v=15.2.0"></script>
+<script defer src="js/today.js?v=15.2.0"></script>
+<script defer src="js/ledger.js?v=15.2.0"></script>
+<script defer src="js/lab.js?v=15.2.0"></script>
+<script defer src="js/reports.js?v=15.2.0"></script>
+<!-- 這幾個模組用到 app.js 的共用函式（$I、API…），defer 時必須排在 app.js 之後 -->
+<script defer src="js/dt-risk.js?v=15.2.0"></script>
+<script defer src="js/dt-screen.js?v=15.2.0"></script>
+<script defer src="js/timemachine.js?v=15.2.0"></script>
 <div id="toast" class="toast"></div>
 </body>
 </html>
