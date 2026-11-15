@@ -42,6 +42,8 @@ jobs:
           echo "::warning::今日快照產生失敗，沿用線上舊檔。"
           mkdir -p public/data
           curl -fsS -m 30 https://taiwanstock-ben.web.app/data/today.json -o public/data/today.json || rm -f public/data/today.json
+          # 檔案不存在時網站會回首頁 HTML（200），要確認真的是 JSON 才保留
+          python -c 'import json,sys; json.load(open(sys.argv[1]))' public/data/today.json 2>/dev/null || rm -f public/data/today.json
       - name: Build daily report archive
         id: report
         continue-on-error: true
@@ -53,6 +55,8 @@ jobs:
           echo "::warning::每日報告存檔失敗，沿用線上舊檔。"
           mkdir -p public/data
           curl -fsS -m 30 https://taiwanstock-ben.web.app/data/reports.json -o public/data/reports.json || rm -f public/data/reports.json
+          # 檔案不存在時網站會回首頁 HTML（200），要確認真的是 JSON 才保留
+          python -c 'import json,sys; json.load(open(sys.argv[1]))' public/data/reports.json 2>/dev/null || rm -f public/data/reports.json
       - name: Build research scorecard
         id: research
         continue-on-error: true
@@ -63,6 +67,8 @@ jobs:
           echo "::warning::研究室評分表產生失敗，沿用線上舊檔。"
           mkdir -p public/data
           curl -fsS -m 30 https://taiwanstock-ben.web.app/data/research.json -o public/data/research.json || rm -f public/data/research.json
+          # 檔案不存在時網站會回首頁 HTML（200），要確認真的是 JSON 才保留
+          python -c 'import json,sys; json.load(open(sys.argv[1]))' public/data/research.json 2>/dev/null || rm -f public/data/research.json
       - name: Skip notice
         if: env.HAS_KEY != 'true'
         run: echo "::warning::FIREBASE_SERVICE_ACCOUNT 尚未設定，略過發布。"

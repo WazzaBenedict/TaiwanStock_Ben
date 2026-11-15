@@ -24,7 +24,7 @@ function initFeeSetting(){
     if(typeof CURRENT_ID!=="undefined"&&CURRENT_ID&&typeof loadTradePlanV2==="function")loadTradePlanV2(CURRENT_ID);};}
 }
 var RELEASE_NOTES=[
-  "V15.2：團隊體檢與優化。打開更快（不再下載大型中文字型、腳本延後載入、後端提早喚醒）；回訪直接進總覽，自選股先顯示上次價格；個股 K 線圖修好、手機查詢後自動捲到結果；當沖總停損改成 10,000 元（帳本與風控都同步）；交易計畫建議股數不超過單筆上限 50,000 元；時光機的 ETF 改用 0.1% 證交稅；債券 ETF 免稅到 2026-12-31 後自動恢復課稅；當沖 5 檔在 19:00 用定稿收盤價重算；介面英文與用詞統一成中文（停損、偏多／觀察／避開），按鈕放大好點",
+  "V15.2：團隊體檢與優化。打開更快（不再下載大型中文字型、腳本延後載入、後端提早喚醒）；回訪直接進總覽，自選股先顯示上次價格；個股 K 線圖修好、手機查詢後自動捲到結果；當沖總停損改成 10,000 元（帳本與風控都同步）；交易計畫建議股數不超過單筆上限 50,000 元；時光機的 ETF 改用 0.1% 證交稅；債券 ETF 免稅到 2026-12-31 後自動恢復課稅；當沖 5 檔在 19:00 用定稿收盤價重算；00631L 這類英文結尾的 ETF 可以查詢與加入自選；個股成交量少算 1000 倍的錯誤修正；持倉沒填目標或停損也能更新價格；帳本紀律檢查改用你在當沖風控存的上限；介面英文與用詞統一成中文（停損、偏多／觀察／避開），按鈕放大好點",
   "V15.1：每日報告自動匯入。交易日 06:50 的盤前報告與 13:45 的收盤總結會自動存進「報告」頁，保留最近 60 天；同時每天列出當沖 5 檔候選，收盤後自動對答案並累計模擬損益（已扣元大成本，屬模擬追蹤，不是買賣建議）",
   "V15.0：介面全面改版。拿掉英雄主題，換成簡潔的專業風格；手機底部只留總覽、當沖、個股、帳本四個常用分頁，其餘收在「更多」；首頁可以直接輸入代號查個股，常用功能一鍵到；換頁與數字有平順的動態（系統設定減少動態時會自動關閉）",
   "V14.3.2：研究室新增兩條選股規則，每天自動補資料並重新檢驗：「月營收加速前 10 名」與「跟投信買超前 5 名」。股票池是成交值前 150 檔，因為是事後挑的熱門股，這兩條改成要贏過「股票池平均」才算數，而且同一天進場的合併成一期計算。",
@@ -433,7 +433,7 @@ function normalizeWatchlist(raw) {
     var sid,sname;
     if(typeof item==="string"){sid=item.trim();sname=getLocalName(sid)||sid;}
     else if(item&&typeof item==="object"){sid=String(item.stock_id||item.id||"").trim();sname=item.stock_name||item.name||getLocalName(sid)||sid;}
-    if(sid&&/^\d{4,6}$/.test(sid)&&!seen.has(sid)){seen.add(sid);r.push({stock_id:sid,stock_name:sname});}
+    if(sid&&/^\d{4,6}[A-Z]?$/.test(sid)&&!seen.has(sid)){seen.add(sid);r.push({stock_id:sid,stock_name:sname});}
   });
   return r;
 }
@@ -543,6 +543,7 @@ function hideErr(){var el=$I("err");if(el)el.style.display="none";}
 function f(n,d){d=d||2;return(n==null||isNaN(Number(n)))?"—":Number(n).toFixed(d);}
 function pct(n){if(n==null)return"—";return(Number(n)>0?"+":"")+Number(n).toFixed(2)+"%";}
 function fvol(n){return n?Math.round(n/1000).toLocaleString()+"張":"—";}
+function fvolLots(n){return n?Math.round(n).toLocaleString()+"張":"—";}  // 已經是張數（證交所即時資料）
 function cc(v){return Number(v)>0?"up":Number(v)<0?"down":"flat";}
 function twcc(v){return Number(v)>0?"tw-up":Number(v)<0?"tw-down":"tw-flat";}
 function uscc(v){return Number(v)>0?"us-up":Number(v)<0?"us-down":"us-flat";}
@@ -580,9 +581,11 @@ function showPage(pageId) {
   document.querySelectorAll(".nav-tab").forEach(function(b){if(b.dataset.page===pageId)b.classList.add("active");});
   if(pageId==="p-market"&&currentUser){loadMacro();loadSentiment();}
   if(pageId==="p-account") renderAccountUI(currentUser);
-  if(pageId==="p-ledger"&&window.LEDGER) LEDGER.open();
-  if(pageId==="p-learn"&&window.LAB) LAB.open();
-  if(pageId==="p-reports"&&window.REPORTS) REPORTS.open();
+  try{
+    if(pageId==="p-ledger"&&window.LEDGER) LEDGER.open();
+    if(pageId==="p-learn"&&window.LAB) LAB.open();
+    if(pageId==="p-reports"&&window.REPORTS) REPORTS.open();
+  }catch(e){console.warn("page open",pageId,e);}
   try{if(pageId==="p-hq") renderHQ(); navSync(pageId);}catch(e){console.warn("home ui",e);}
   if(pageId==="p-plans") { loadTradePlans().then(function(){renderTradePlans(); refreshTradePlans(false);}); }
 }
@@ -714,8 +717,8 @@ function startWLTimer(){
 }
 async function addWL() {
   if(!currentUser){return;}
-  var inp=$I("sid"),id=inp?inp.value.trim():"";
-  if(!/^\d{4,6}$/.test(id)){showErr("請輸入 4~6 位股票代號");return;}
+  var inp=$I("sid"),id=inp?inp.value.trim().toUpperCase():"";
+  if(!/^\d{4,6}[A-Z]?$/.test(id)){showErr("請輸入 4~6 位股票代號");return;}
   if(WL.find(function(x){return x.stock_id===id;})){showErr(id+" 已在自選股");return;}
   WL.push({stock_id:id,stock_name:getLocalName(id)||id});renderWL();await saveWatchlist();await fetchOneWL(id);renderWL();
 }
@@ -875,7 +878,7 @@ function renderTwMobileFast(d){
   var chg=Number(d.change||0);
   setTxt('dClose',d.price!=null?f(d.price):'—');addCls('dClose',cc(chg));
   setTxt('dChg',d.change!=null?(chg>0?'+':'')+f(d.change)+' ('+pct(d.change_pct)+')':'—');addCls('dChg',cc(chg));
-  setTxt('dOpen',d.open!=null?f(d.open):'—');setTxt('dHigh',d.high!=null?f(d.high):'—');setTxt('dLow',d.low!=null?f(d.low):'—');setTxt('dVol',d.volume?fvol(d.volume):'—');
+  setTxt('dOpen',d.open!=null?f(d.open):'—');setTxt('dHigh',d.high!=null?f(d.high):'—');setTxt('dLow',d.low!=null?f(d.low):'—');setTxt('dVol',d.volume?fvolLots(d.volume):'—');
   var rtEl=$I('rtInfo');if(rtEl)rtEl.innerHTML='<span class="pill pill-ok">⚡ 手機快速資料</span>';
   var ce=$I('dConc');if(ce){ce.textContent='快速載入完成，完整分析背景更新中';ce.className='conclusion neu';}
   renderAI(ai);
@@ -976,8 +979,8 @@ function renderTradePlanV2(d){
 
 async function doSearch() {
   if(!currentUser) return;
-  var inp=$I("sid"),id=inp?inp.value.trim():"";
-  if(!/^\d{4,6}$/.test(id)){showErr("請輸入 4~6 位股票代號");return;}
+  var inp=$I("sid"),id=inp?inp.value.trim().toUpperCase():"";
+  if(!/^\d{4,6}[A-Z]?$/.test(id)){showErr("請輸入股票代號，例如 2330 或 00631L");return;}
   clearTimeout(suggestTimer);_dashScrolledFor=null;var box=$I("suggestBox");if(box)box.style.display="none";
   hideErr();CURRENT_ID=id;var btId=$I("btId");if(btId)btId.value=id;
   loadTradePlanV2(id);
@@ -1064,7 +1067,7 @@ function renderStock(d) {
   setTxt("dOpen",f(p.open));
   var hiEl=$I("dHigh");if(hiEl){hiEl.textContent=f(p.high);hiEl.className="up";}
   var loEl=$I("dLow");if(loEl){loEl.textContent=f(p.low);loEl.className="down";}
-  setTxt("dVol",fvol(rt&&rt.volume||vol.latest_volume));
+  setTxt("dVol",vol.latest_volume?fvol(vol.latest_volume):(rt&&rt.volume?fvolLots(rt.volume):"—"));
   var rtEl=$I("rtInfo");if(rtEl)rtEl.innerHTML=rt&&rt.price!=null?'<span class="pill pill-ok">⚡ '+(rt.source||"TWSE MIS")+'</span>':'<span class="pill pill-warn">休市，顯示日線</span>';
   var vaEl=$I("volAlert");if(vaEl)vaEl.innerHTML=vol.alert?'<span class="pill pill-warn">⚠️ 成交量異常放大（'+vol.ratio+'x）</span>':'<span class="pill pill-ok">成交量正常（'+(vol.ratio||1)+'x）</span>';
   var ra=$I("rsiAlert");if(ra)ra.innerHTML=d.rsi_alert?'<span class="pill '+((d.rsi_alert||"").includes("過熱")?"pill-hot":"pill-warn")+'">'+d.rsi_alert+'</span>':"";
@@ -1269,7 +1272,7 @@ async function testLine() {
 async function runBt() {
   var idEl=$I("btId"),dEl=$I("btDays"),sEl=$I("btScore");
   var id=(idEl?idEl.value.trim():"")||CURRENT_ID;var days=dEl?dEl.value:5;var score=sEl?sEl.value:75;
-  if(!id||!/^\d{4,6}$/.test(id)){alert("請輸入正確股票代號");return;}
+  if(!id||!/^\d{4,6}[A-Z]?$/.test(id)){alert("請輸入正確股票代號");return;}
   var loading=$I("btLoading"),result=$I("btResult");
   if(loading)loading.style.display="block";if(result)result.style.display="none";
   try {
@@ -1837,7 +1840,9 @@ async function refreshPositions(showMsg){
     for(var i=0;i<(POSITIONS[m]||[]).length;i++){
       var p=POSITIONS[m][i],sym=p.symbol||p.stock_id;
       try{
-        var url=API+'/api/position/check?market='+encodeURIComponent(m)+'&symbol='+encodeURIComponent(sym)+'&avg_price='+encodeURIComponent(p.avg_price||'')+'&shares='+encodeURIComponent(p.shares||'')+'&target='+encodeURIComponent(p.target_price||'')+'&stop='+encodeURIComponent(p.stop_loss||'');
+        // 沒填的欄位不要送空字串，否則後端回 422、價格不會更新
+        var qs=new URLSearchParams({market:m,symbol:sym});[['avg_price',p.avg_price],['shares',p.shares],['target',p.target_price],['stop',p.stop_loss]].forEach(function(kv){if(kv[1]!=null&&kv[1]!=='')qs.append(kv[0],kv[1]);});
+        var url=API+'/api/position/check?'+qs.toString();
         var r=await apiFetch(url,{},12000); if(r.ok){var d=await r.json();p.current_price=d.price;p.price=d.price;p.name=d.name||p.name;var ps=d.position_status||{};p.status=ps.status||p.status;p.unrealized_pnl=ps.unrealized_pnl;p.unrealized_pnl_pct=ps.unrealized_pnl_pct;p.risk_amount=ps.risk_amount;p.distance_to_target_pct=ps.distance_to_target_pct;p.distance_to_stop_pct=ps.distance_to_stop_pct;p.alerts=ps.alerts||[];p.checked_at=d.checked_at;}
         else { POSITIONS[m][i]=localCheckPosition(p); }
       }catch(e){POSITIONS[m][i]=localCheckPosition(p);}

@@ -646,7 +646,7 @@ async def fetch_stock_master_list():
                             sid=str(row.get("公司代號","") or row.get("有價證券代號","")).strip()
                             name=str(row.get("公司簡稱","") or row.get("有價證券名稱","")).strip()
                         else: continue
-                        if re.match(r"^\d{4,6}$",sid) and name: master[sid]={"name":name,"market":mkt}
+                        if re.match(r"^\d{4,6}[A-Z]?$",sid) and name: master[sid]={"name":name,"market":mkt}
                 except: pass
     except: pass
     for sid,name in STOCK_NAME_MAP.items():
@@ -1461,7 +1461,7 @@ def select_tw_scan_pool(pool: str = "all", symbols: str = "", limit: int = 50) -
     seed=_scan_seed(6)
     custom=[]
     for x in re.split(r"[,\s]+", symbols or ""):
-        if re.match(r"^\d{4,6}$", x or "") and x not in custom:
+        if re.match(r"^\d{4,6}[A-Z]?$", x or "") and x not in custom:
             custom.append(x)
 
     core_pool = TW_SCAN_POOL[:30]
@@ -1814,12 +1814,12 @@ async def api_stocks_search(q:str=Query("",min_length=1)):
 
 @app.get("/api/stock/{stock_id}")
 async def get_stock(stock_id:str):
-    if not re.match(r"^\d{4,6}$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
+    if not re.match(r"^\d{4,6}[A-Z]?$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
     return await _analyze_stock_core(stock_id)
 
 @app.get("/api/stock-lite/{stock_id}")
 async def get_stock_lite(stock_id:str):
-    if not re.match(r"^\d{4,6}$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
+    if not re.match(r"^\d{4,6}[A-Z]?$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
     try: macro=await asyncio.wait_for(fetch_macro_context(),timeout=5)
     except: macro={}
     return await _analyze_stock_lite(stock_id,macro)
@@ -1827,24 +1827,24 @@ async def get_stock_lite(stock_id:str):
 
 @app.get("/api/stock-mobile/{stock_id}")
 async def get_stock_mobile(stock_id:str):
-    if not re.match(r"^\d{4,6}$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
+    if not re.match(r"^\d{4,6}[A-Z]?$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
     return await _analyze_stock_mobile(stock_id)
 
 @app.get("/api/stock-mobile-tech/{stock_id}")
 async def get_stock_mobile_tech(stock_id:str):
-    if not re.match(r"^\d{4,6}$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
+    if not re.match(r"^\d{4,6}[A-Z]?$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
     return await _analyze_stock_mobile_tech(stock_id)
 
 @app.get("/api/realtime/{stock_id}")
 async def get_realtime(stock_id:str):
-    if not re.match(r"^\d{4,6}$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
+    if not re.match(r"^\d{4,6}[A-Z]?$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
     q=await fetch_tw_quote(stock_id)
     if not q: raise HTTPException(404,detail="找不到即時報價")
     return q
 
 @app.get("/api/analysis-4d/{stock_id}")
 async def get_analysis_4d(stock_id:str):
-    if not re.match(r"^\d{4,6}$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
+    if not re.match(r"^\d{4,6}[A-Z]?$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
     try:
         at=asyncio.create_task(_fname(stock_id))
         df,dsrc=await fetch_tw_history(stock_id,lookback_days=400)
@@ -1990,7 +1990,7 @@ async def check_alerts(body:WatchlistBody):
     try: macro=await asyncio.wait_for(fetch_macro_context(),timeout=6)
     except: macro={}
     for sid in stock_ids:
-        if not re.match(r"^\d{4,6}$",sid): continue
+        if not re.match(r"^\d{4,6}[A-Z]?$",sid): continue
         try:
             r=await _analyze_stock_lite(sid,macro); ai=r.get("ai_signal",{}); sn=r.get("stock_name",sid); cp2=r.get("price") or 0
             results.append({"stock_id":sid,"stock_name":sn,"signal":ai.get("signal","AVOID"),
@@ -2023,7 +2023,7 @@ async def check_alerts(body:WatchlistBody):
 @app.get("/api/backtest/{stock_id}")
 async def run_backtest(stock_id:str,lookback_days:int=400,holding_days:int=5,min_score:int=75,
                        fee_discount:float|None=Query(None,gt=0,le=1)):
-    if not re.match(r"^\d{4,6}$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
+    if not re.match(r"^\d{4,6}[A-Z]?$",stock_id): raise HTTPException(400,detail="股票代號格式錯誤")
     df,_=await fetch_tw_history(stock_id,lookback_days)
     an=await _fname(stock_id); sname=get_stock_name(stock_id,an)
     result=advanced_backtest(df,holding_days=holding_days,min_score=min_score,etf=_tw_is_etf(stock_id),fee_discount=fee_discount)

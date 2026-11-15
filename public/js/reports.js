@@ -5,7 +5,7 @@ var REPORTS=(function(){
   function e(s){return String(s==null?"":s).replace(/[&<>'"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c];});}
   function pc(v,d){if(v==null||isNaN(v))return '<span class="rp-na">—</span>';return '<span class="'+(v>0?"up":v<0?"down":"")+'">'+(v>0?"+":"")+Number(v).toFixed(d==null?2:d)+'%</span>';}
   function nt(v){if(v==null||isNaN(v))return '<span class="rp-na">—</span>';return '<span class="'+(v>0?"up":v<0?"down":"")+'">'+(v>0?"+":v<0?"−":"")+Math.abs(Math.round(v)).toLocaleString("en-US")+'</span>';}
-  function wk(d){try{return "週"+"日一二三四五六".charAt(new Date(d+"T00:00:00+08:00").getDay());}catch(x){return "";}}
+  function wk(d){try{return "週"+"日一二三四五六".charAt(new Date(d+"T12:00:00Z").getUTCDay());}catch(x){return "";}}
   function hm(iso){return iso?String(iso).slice(11,16):"";}
   function picksTable(day){
     var p=day.picks,res={};(day.results||[]).forEach(function(r){res[r.code]=r;});
@@ -20,7 +20,7 @@ var REPORTS=(function(){
     return h;
   }
   function dayHtml(d,open){
-    var pre=d.pre,cl=d.close,h='<details class="rp-day"'+(open?" open":"")+'><summary><span class="rp-date">'+e(d.date.slice(5).replace("-","/"))+' '+wk(d.date)+'</span><span class="rp-tags">'+(pre?'<span class="rp-tag">盤前</span>':'')+(cl?'<span class="rp-tag done">收盤</span>':'')+(d.picks?'<span class="rp-tag pk">5 檔</span>':'')+'</span><span class="rp-one">'+e(pre&&pre.conclusion||(cl?"0050 收盤 "+(cl.close_chg_pct>0?"+":"")+cl.close_chg_pct+"%":""))+'</span></summary><div class="rp-body">';
+    var pre=d.pre,cl=d.close,h='<details class="rp-day"'+(open?" open":"")+'><summary><span class="rp-date">'+e(String(d.date||"").slice(5).replace("-","/"))+' '+wk(d.date)+'</span><span class="rp-tags">'+(pre?'<span class="rp-tag">盤前</span>':'')+(cl?'<span class="rp-tag done">收盤</span>':'')+(d.picks?'<span class="rp-tag pk">5 檔</span>':'')+'</span><span class="rp-one">'+e(pre&&pre.conclusion||(cl?"0050 收盤 "+(cl.close_chg_pct>0?"+":"")+cl.close_chg_pct+"%":""))+'</span></summary><div class="rp-body">';
     if(pre){
       h+='<div class="rp-sub">盤前報告<span class="rp-hint">'+e(hm(pre.at))+' 產生</span></div><div class="rp-concl">'+e(pre.conclusion||"")+'</div><div class="rp-kpis">'
         +'<div class="rp-kpi"><span>0050 開盤預估</span><b>'+(pre.gap&&pre.gap.ok?pc(pre.gap.pct):"—")+'</b></div>'
@@ -57,7 +57,7 @@ var REPORTS=(function(){
     var box=$("rpHome");if(!box)return;
     var d=data&&(data.days||[])[0];
     if(!d){box.innerHTML='<div class="rp-home-h"><b>每日報告</b><button class="ghost sm" data-hq-go="p-reports">全部報告</button></div><div class="rp-hint">第一份報告會在下一個交易日 06:50 後自動出現。</div>';box.style.display="block";return;}
-    var h='<div class="rp-home-h"><b>每日報告</b><span class="rp-hint">'+e(d.date.slice(5).replace("-","/"))+' '+wk(d.date)+(d.close?"，已收盤":"，盤前")+'</span><button class="ghost sm" data-hq-go="p-reports">全部報告</button></div>';
+    var h='<div class="rp-home-h"><b>每日報告</b><span class="rp-hint">'+e(String(d.date||"").slice(5).replace("-","/"))+' '+wk(d.date)+(d.close?"，已收盤":"，盤前")+'</span><button class="ghost sm" data-hq-go="p-reports">全部報告</button></div>';
     if(d.close)h+='<div class="rp-concl">0050 開盤 '+pc(d.close.gap_pct)+'，收盤 '+pc(d.close.close_chg_pct)+'</div>';
     h+=picksTable(d)||'<div class="rp-hint">今天沒有當沖候選。</div>';
     box.innerHTML=h;box.style.display="block";bind(box);

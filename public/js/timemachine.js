@@ -1,6 +1,6 @@
   (function(){
     function v(id){var e=document.getElementById(id);return e?e.value.trim():"";}
-    function lastWeekday(){var d=new Date();d.setDate(d.getDate()-1);while(d.getDay()===0||d.getDay()===6)d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);}
+    function lastWeekday(){var d=new Date();d.setDate(d.getDate()-1);while(d.getDay()===0||d.getDay()===6)d.setDate(d.getDate()-1);var p=function(n){return(n<10?"0":"")+n;};return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());}
     function init(){
       var dt=document.getElementById("tmDate"); if(dt&&!dt.value) dt.value=lastWeekday();
       var dc=document.getElementById("tmDisc"); if(dc&&window.feeDisc) dc.value=feeDisc();
@@ -15,7 +15,7 @@
       msg.textContent="抓取分 K 並重播中…第一次抓 60 天資料可能要 1 分鐘";out.style.display="none";
       try{
         var r=await apiFetch(API+"/api/daytrade/timemachine?"+new URLSearchParams(q).toString(),{},120000);
-        var d=await r.json(); if(!r.ok){var det=String(d.detail||"");msg.textContent="⚠ "+(/no opening-range breakout/i.test(det)?"那天開盤後到 13:00 都沒有突破開盤區間，換一天或自己填進場價":(r.status>=500?"伺服器還在計算或剛喚醒，約 1 分鐘後再按一次":(det||("錯誤 "+r.status))));return;}
+        var d=await r.json(); if(!r.ok){var det=Array.isArray(d.detail)?d.detail.map(function(x){return x&&x.msg||"";}).join("；"):String(d.detail||"");msg.textContent="⚠ "+(/no opening-range breakout/i.test(det)?"那天開盤後到 13:00 都沒有突破開盤區間，換一天或自己填進場價":(r.status>=500?"伺服器還在計算或剛喚醒，約 1 分鐘後再按一次":(det||("錯誤 "+r.status))));return;}
         msg.textContent=""; render(d);
       }catch(e){msg.textContent=(e&&e.name==="TypeError")||/fetch/i.test(e&&e.message||"")?"⚠ 伺服器還在計算或剛喚醒，約 1 分鐘後再按一次":"⚠ "+e.message;}
     }
