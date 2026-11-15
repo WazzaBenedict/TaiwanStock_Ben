@@ -1,5 +1,5 @@
 name: Deploy frontend
-# 發布 public/ 到 Firebase Hosting，並在發布前產生「今日」快照 public/data/today.json。
+# 發布 public/ 到 Firebase Hosting，並在發布前產生「今日」快照 public/data/today.json 與每日報告存檔 public/data/reports.json。
 # 觸發：合併到 main、手動、以及交易日 06:50／13:45／19:00（台北時間）定時更新快照。
 # 需要 repo secret FIREBASE_SERVICE_ACCOUNT；選用 FINMIND_TOKEN（提高夜盤資料額度）。
 # 注意：GitHub 的定時工作可能延遲數分鐘；repo 60 天沒有任何活動時，定時工作會被自動停用。
@@ -42,6 +42,17 @@ jobs:
           echo "::warning::今日快照產生失敗，沿用線上舊檔。"
           mkdir -p public/data
           curl -fsS -m 30 https://taiwanstock-ben.web.app/data/today.json -o public/data/today.json || rm -f public/data/today.json
+      - name: Build daily report archive
+        id: report
+        continue-on-error: true
+        timeout-minutes: 12
+        run: python -m pipeline.report public/data/today.json public/data/reports.json
+      - name: Keep the previous reports if today's failed
+        if: steps.report.outcome != 'success'
+        run: |
+          echo "::warning::每日報告存檔失敗，沿用線上舊檔。"
+          mkdir -p public/data
+          curl -fsS -m 30 https://taiwanstock-ben.web.app/data/reports.json -o public/data/reports.json || rm -f public/data/reports.json
       - name: Build research scorecard
         id: research
         continue-on-error: true
