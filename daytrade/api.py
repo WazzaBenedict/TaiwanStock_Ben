@@ -39,13 +39,22 @@ def timemachine(
         return tm.run(
             stock_id, date, entry=entry, stop=stop, target=target, entry_time=entry_time,
             rule=tm.Rule(orb_minutes, target_r, stop_rule),
-            costs=DayTradeCosts(fee_discount=fee_discount, slip_ticks=slip_ticks),
+            costs=_tm_costs(stock_id, fee_discount, slip_ticks),
             shares=shares, replays=replays, seed=seed, days=days, source=source,
         )
     except tm.TMError as e:
         raise HTTPException(422, str(e))
     except DataError as e:
         raise HTTPException(502, "分 K 資料取得失敗（FinMind 分 K 需要贊助會員，免費改用 Yahoo 只有近 60 天）：%s" % e)
+
+
+def _tm_costs(stock_id: str, fee_discount: float, slip_ticks: int) -> DayTradeCosts:
+    """ETF 當沖沒有減半，證交稅照 ETF 稅率（0.1%，債券 ETF 依 twcosts）；一般股票用當沖 0.15%。"""
+    from twcosts import BrokerFees, is_etf
+    etf = is_etf(stock_id)
+    if etf:
+        return DayTradeCosts(fee_discount=fee_discount, slip_ticks=slip_ticks, tax_rate=BrokerFees().tax_rate(etf))
+    return DayTradeCosts(fee_discount=fee_discount, slip_ticks=slip_ticks)
 
 
 @router.get("/screen")

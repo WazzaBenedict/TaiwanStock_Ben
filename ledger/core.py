@@ -22,7 +22,7 @@ from twcosts import BrokerFees, broker, is_etf
 DEFAULT_RULES = {
     "max_notional": 50000,      # 每筆買進金額上限
     "daily_stop": 1000,         # 當日當沖虧損達此金額後不得再進場
-    "total_stop": 2500,         # 當沖累計虧損達此金額後不得再進場
+    "total_stop": 10000,         # 當沖累計虧損達此金額後不得再進場
     "no_entry_after": "13:00",  # 此時間後不再進場（成交紀錄有時間才檢查）
     "profit_to_0050_pct": 60,   # 每週當沖淨利轉入 0050 的比例
     "cushion_cap": 2000,        # 緩衝金上限，超過的部分也轉入 0050

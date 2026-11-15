@@ -15,11 +15,13 @@ var LAB=(function(){
     var h='<div class="lb-verdict">'+(c["可用"]?'目前有 '+c["可用"]+' 條規則通過檢驗。':'目前沒有任何一條規則通過檢驗。能做的最好選擇仍是持有 0050。')+'</div>';
     h+='<div class="lb-counts"><span class="lb-tag ok">可用 '+(c["可用"]||0)+'</span><span class="lb-tag mid">研究中 '+(c["研究中"]||0)+'</span><span class="lb-tag bad">未通過 '+(c["未通過"]||0)+'</span><span class="lb-age">'+e(data.today)+' 更新，已自動重算 '+(data.runs||1)+' 次</span></div>';
     var order={"可用":0,"研究中":1,"未通過":2};
-    data.cards.slice().sort(function(a,b){return order[a.label]-order[b.label];}).forEach(function(k){
-      h+='<div class="lb-card"><div class="lb-head"><span class="lb-tag '+cls[k.label]+'">'+e(k.label)+'</span><span class="lb-name">'+e(k.name)+'</span><span class="lb-kind">'+e(k.kind)+'</span></div>'
+    (data.cards||[]).slice().sort(function(a,b){return order[a.label]-order[b.label];}).forEach(function(k){
+      // 未通過的規則預設收合，手機上不用滑過一大段
+      var fold=k.label==="未通過";
+      h+=(fold?'<details class="lb-card lb-fold"><summary>':'<div class="lb-card">')+'<div class="lb-head"><span class="lb-tag '+cls[k.label]+'">'+e(k.label)+'</span><span class="lb-name">'+e(k.name)+'</span><span class="lb-kind">'+e(k.kind)+'</span></div>'+(fold?'</summary>':'')
         +'<div class="lb-desc">'+e(k.desc)+'。'+e(k.why)+'。</div>'
         +(k.caution?'<div class="lb-caution">注意：'+e(k.caution)+'。</div>':'')
-        +'<div class="lb-segs">'+seg("上線後",k.live,"規則定稿後才發生，最可信",k.vs)+seg("樣本外",k.oos,"最近兩年",k.vs)+seg("樣本內",k.is,"較早歷史，僅供參考",k.vs)+'</div></div>';
+        +'<div class="lb-segs">'+seg("上線後",k.live,"規則定稿後才發生，最可信",k.vs)+seg("樣本外",k.oos,"最近兩年",k.vs)+seg("樣本內",k.is,"較早歷史，僅供參考",k.vs)+'</div>'+(fold?'</details>':'</div>');
     });
     var ch=data.changes||[];
     h+='<div class="lb-sub-t">標籤變動紀錄</div>'+(ch.length?'<ul class="lb-list">'+ch.slice().reverse().map(function(x){return '<li>'+e(x.date)+'　'+e(x.name)+'：'+e(x.from)+' 變成 '+e(x.to)+'</li>';}).join("")+'</ul>':'<div class="lb-na">還沒有變動。規則被升級或淘汰時會記在這裡。</div>');

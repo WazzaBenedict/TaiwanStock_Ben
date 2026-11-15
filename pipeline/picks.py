@@ -81,6 +81,9 @@ def rank(rows: list[dict], top: int = TOP) -> tuple[list[dict], int]:
              "buy_b_max": floor_tick(r["close"] * B_GAP)} for r in best], len(pool)
 
 
+MAX_NOTIONAL = 50_000   # 單筆買進上限（元）
+
+
 def score(pick: dict, bar: dict, fees: BrokerFees | None = None) -> dict:
     """用交易日當天的 OHLC 算 1 張的模擬損益（元），成本用元大費率模型。"""
     fees = fees or BrokerFees()
@@ -90,10 +93,14 @@ def score(pick: dict, bar: dict, fees: BrokerFees | None = None) -> dict:
     exit_p = floor_tick(stop) if hit else c
     net0 = fees.round_trip(o, exit_p, 1000, daytrade=True)["net_pnl"]
     net1 = fees.round_trip(o + tick(o), exit_p - tick(exit_p), 1000, daytrade=True)["net_pnl"]
-    taken = o <= pick["buy_b_max"]
+    # 開盤跳空讓 1 張超過單筆上限 NT$50,000 時，照規則不買
+    over_cap = o * 1000 > MAX_NOTIONAL
+    taken = o <= pick["buy_b_max"] and not over_cap
+    if over_cap:
+        net0 = net1 = 0
     return {"code": pick["code"], "name": pick["name"], "open": round(o, 2), "close": round(c, 2),
             "gap_pct": round((o / pick["close"] - 1) * 100, 2), "stop_hit": hit,
-            "a_net": round(net0), "a_net_tick1": round(net1), "b_taken": taken,
+            "over_cap": over_cap, "a_net": round(net0), "a_net_tick1": round(net1), "b_taken": taken,
             "b_net": round(net0) if taken else 0, "b_net_tick1": round(net1) if taken else 0}
 
 
@@ -101,7 +108,8 @@ def totals(results: list[dict]) -> dict:
     """累計模擬成績。results：所有已結算的單筆。"""
     out = {}
     for v in ("a", "b"):
-        rows = results if v == "a" else [r for r in results if r.get("b_taken")]
+        ok = [r for r in results if not r.get("over_cap")]
+        rows = ok if v == "a" else [r for r in ok if r.get("b_taken")]
         n = len(rows)
         out[v] = {"n": n, "net": sum(r[v + "_net"] for r in rows), "net_tick1": sum(r[v + "_net_tick1"] for r in rows),
                   "win_rate_pct": round(sum(1 for r in rows if r[v + "_net"] > 0) / n * 100) if n else None}

@@ -1,7 +1,7 @@
 /* 帳本（v14.2）：真實成交 → 扣元大成本的淨損益、對照同期 0050、紀律檢查、每週結算。
    成交紀錄存在 Firestore users/{uid}/trade_journal/ledger_tw，計算在後端 /api/ledger/compute。 */
 var LEDGER=(function(){
-  var fills=[],result=null,loadedUid=null,busy=false,chart=null,pending=null;
+  var fills=[],result=null,loadedUid=null,busy=false,chart=null,pending=null,again=false;
   function $(id){return document.getElementById(id);}
   function e(s){return String(s==null?"":s).replace(/[&<>'"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c];});}
   function money(v,sign){if(v==null||isNaN(v))return '<span class="lg-na">—</span>';var n=Math.round(v),cls=n>0?"up":(n<0?"down":"");return '<span class="'+cls+'">'+(sign!==false&&n>0?"+":"")+n.toLocaleString("en-US")+'</span>';}
@@ -27,20 +27,24 @@ var LEDGER=(function(){
     try{await r.set({fills:fills,updated_at:new Date().toISOString()});return true;}
     catch(x){status("雲端儲存失敗（"+(x.code||x.message)+"），紀錄暫存在這台裝置。","warn");return false;}
   }
+  // 用使用者在「當沖風控」存的上限檢查紀律（沒存過就用預設 50,000／1,000／10,000）
+  function userRules(){try{var c=JSON.parse(localStorage.getItem("tw_dt_risk_cfg")||"{}")||{},r={};
+    if(Number(c.maxN)>0)r.max_notional=Number(c.maxN);if(Number(c.day)>0)r.daily_stop=Number(c.day);
+    if(Number(c.total)>0)r.total_stop=Number(c.total)===2500?10000:Number(c.total);return r;}catch(e){return {};}}
   async function compute(){
-    if(busy)return;busy=true;
+    if(busy){again=true;return;}busy=true;again=false;
     renderFills();
     if(!fills.length){result=null;render();status("還沒有成交紀錄。先在下面新增一筆，或匯入對帳單。");busy=false;return;}
     status("計算中。主機若在休眠，喚醒大約需要一分鐘。");
     try{
       var res=await apiFetch(API+"/api/ledger/compute",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({fills:fills,fee_discount:(typeof feeDisc==="function"?feeDisc():null)})},100000);
+        body:JSON.stringify({fills:fills,fee_discount:(typeof feeDisc==="function"?feeDisc():null),rules:userRules()})},100000);
       if(!res.ok)throw new Error("HTTP "+res.status);
       result=await res.json();render();
       var d=result.data||{};
       status("已計算 "+result.fees.fills+" 筆成交。0050 資料到 "+(d.last_0050_date||"（抓不到）")+"。");
     }catch(x){status("計算失敗："+x.message,"bad");}
-    busy=false;
+    busy=false;if(again){again=false;compute();}
   }
 
   function box(label,big,sub){return '<div class="lg-box"><div class="lg-label">'+label+'</div><div class="lg-big">'+big+'</div><div class="lg-sub">'+(sub||"")+'</div></div>';}

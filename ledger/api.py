@@ -51,7 +51,8 @@ def make_router(fetch_history, name_to_code=None) -> APIRouter:
                 disc = None
         except (TypeError, ValueError):
             disc = None
-        rules = {k: v for k, v in (payload.get("rules") or {}).items() if k in core.DEFAULT_RULES}
+        raw_rules = payload.get("rules")
+        rules = {k: v for k, v in (raw_rules if isinstance(raw_rules, dict) else {}).items() if k in core.DEFAULT_RULES}
         rows, _ = core.normalize(fills)
         days = 400
         if rows:

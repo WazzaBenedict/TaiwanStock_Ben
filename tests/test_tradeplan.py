@@ -121,9 +121,12 @@ def test_costs_make_flat_round_trip_negative():
 
 
 def test_position_size():
-    p = position_size(1_000_000, 0.01, 100.0, 95.0)
+    p = position_size(1_000_000, 0.01, 100.0, 95.0, max_notional=None)
     assert 1700 < p["shares"] < 2000 and p["lots"] == 1
     assert p["risk_amount"] <= 10_000
+    # 預設套用單筆上限 NT$50,000（含手續費）
+    capped = position_size(1_000_000, 0.01, 100.0, 95.0)
+    assert capped["shares"] < 500 and capped["amount"] <= 50_000 and "capped_by" in capped
     # 零股電子下單低消 1 元：小額不會被 20 元低消吃掉
     small = position_size(30_000, 0.01, 100.0, 95.0)
     assert small["odd_shares"] > 0 and "min_fee_warning" not in small and small["buy_fee"] <= 5

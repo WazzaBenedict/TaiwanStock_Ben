@@ -54,7 +54,7 @@ def test_discipline_rules_are_flagged():
              F("2026-11-04", "2409", "sell", 27.0, 1000, time="10:30"),           # 累計過 2,500
              F("2026-11-05", "2409", "buy", 28.0, 1000, time="13:05"),            # 總停損後 + 13:00 後
              F("2026-11-05", "3481", "sell", 40.0, 1000)]                         # 先賣後買
-    r = ledger.compute(fills, BARS)
+    r = ledger.compute(fills, BARS, rules={"total_stop": 2500})  # 用較小的總停損測試規則本身
     rules = sorted(v["rule"] for v in r["violations"])
     assert rules == ["daily_stop", "late_entry", "max_notional", "short_first", "total_stop"]
     assert r["summary"]["violating_trades"]["n"] == 2

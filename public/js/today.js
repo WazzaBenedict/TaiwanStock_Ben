@@ -51,7 +51,7 @@ var TODAY=null;
   function fail(msg){var box=$("todayCard");if(box){box.innerHTML='<div class="td-head"><span class="td-kicker">今日</span></div><div class="td-sub">'+e(msg)+'</div>';box.style.display="block";}}
   window.loadToday=function(){
     return fetch("data/today.json?t="+Math.floor(Date.now()/60000),{cache:"no-store"}).then(function(r){
-      if(!r.ok)throw new Error("HTTP "+r.status);return r.json();
+      if(!r.ok)throw new Error("HTTP "+r.status);return r.json().catch(function(){throw new Error("還沒有資料");});
     }).then(function(d){
       if(!d||!d.generated_at)throw new Error("格式錯誤");
       TODAY=d;window.TODAY=d;render(d);if(typeof window.renderGooaye==="function")window.renderGooaye(d);
