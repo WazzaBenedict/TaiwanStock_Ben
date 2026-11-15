@@ -264,3 +264,9 @@ details.lb-fold[open]>summary .lb-head::after{content:"收合 ▴"}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulation}
 *,*::before,*::after{touch-action:manipulation}
 @media(pointer:coarse){input,select,textarea{font-size:16px!important}}
+/* v15.3.0 當沖 5 檔操作計畫 */
+.rp-plan{font-size:13px;line-height:1.7;color:var(--text);background:var(--panel2);border:1px solid var(--line2);border-radius:var(--r-sm);padding:10px 12px;margin:6px 0 10px}
+.rp-plan b{color:var(--accent)}
+.rp-table th small{font-weight:400;color:var(--muted);font-size:11px}
+.rp-nm{color:var(--muted);font-size:12px}
+@media(max-width:760px){.rp-table th,.rp-table td{padding-left:6px;padding-right:6px}}

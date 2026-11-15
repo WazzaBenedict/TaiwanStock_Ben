@@ -68,3 +68,10 @@ def test_features_need_260_bars():
     assert P.features(bars[:259]) is None
     f = P.features(bars)
     assert abs(f["atr"] - 1 / 30) < 1e-9 and f["h52"] == 1 and f["val20"] == 3e8
+
+
+def test_plan_levels_ticks():
+    from pipeline.picks import plan_levels
+    p = plan_levels(35.75, 0.0236)
+    assert p["entry_limit"] == 35.35 and p["stop_est"] == 34.25 and p["ref_target"] == 36.2
+    assert plan_levels(26.0, 0.0249)["ref_target"] == 26.35
