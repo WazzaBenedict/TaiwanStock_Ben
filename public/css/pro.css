@@ -259,3 +259,8 @@ details.lb-fold[open]>summary .lb-head::after{content:"收合 ▴"}
   .td-link{min-height:40px;min-width:44px;display:inline-flex;align-items:center}
   .d-badge,.k,.portfolio-chip,.portfolio-note,.bar-tick{font-size:12px}
 }
+
+/* v15.2.1 手機雙擊不會放大（兩指縮放仍可用）；輸入框點了不自動放大 */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulation}
+*,*::before,*::after{touch-action:manipulation}
+@media(pointer:coarse){input,select,textarea{font-size:16px!important}}
