@@ -32,6 +32,20 @@ def floor_tick(x: float) -> float:
     return round(math.floor(x / t + 1e-9) * t, 2)
 
 
+def ceil_tick(x: float) -> float:
+    t = tick(x)
+    return round(math.ceil(x / t - 1e-9) * t, 2)
+
+
+def plan_levels(close: float, atr: float) -> dict:
+    """給報告看的操作價位：進場價＝B 版限價、停損約＝進場價×0.97（實際用開盤價×0.97）、
+    參考目標＝進場價＋1 個 ATR（沒有回測，R1 規則仍是收盤賣）。"""
+    lim = floor_tick(close * B_GAP)
+    return {"entry_limit": lim, "entry_time": "08:30-09:00 掛限價，09:00 開盤成交",
+            "stop_est": floor_tick(lim * STOP), "ref_target": ceil_tick(lim * (1 + atr)),
+            "exit_time": "13:25-13:30 收盤集合競價"}
+
+
 def features(bars: list[dict]) -> dict | None:
     """bars：日線 {d,o,h,l,c,v}，由舊到新。資料不足 260 根回傳 None。"""
     if len(bars) < 260:
@@ -78,7 +92,7 @@ def rank(rows: list[dict], top: int = TOP) -> tuple[list[dict], int]:
     best = sorted(pool, key=lambda r: -r["score"])[:top]
     return [{"code": r["code"], "name": r["name"], "mkt": r["mkt"], "close": round(r["close"], 2),
              "score": round(r["score"], 2), "atr_pct": round(r["atr"] * 100, 2),
-             "buy_b_max": floor_tick(r["close"] * B_GAP)} for r in best], len(pool)
+             "buy_b_max": floor_tick(r["close"] * B_GAP), **plan_levels(r["close"], r["atr"])} for r in best], len(pool)
 
 
 MAX_NOTIONAL = 50_000   # 單筆買進上限（元）

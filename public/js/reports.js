@@ -7,16 +7,27 @@ var REPORTS=(function(){
   function nt(v){if(v==null||isNaN(v))return '<span class="rp-na">—</span>';return '<span class="'+(v>0?"up":v<0?"down":"")+'">'+(v>0?"+":v<0?"−":"")+Math.abs(Math.round(v)).toLocaleString("en-US")+'</span>';}
   function wk(d){try{return "週"+"日一二三四五六".charAt(new Date(d+"T12:00:00Z").getUTCDay());}catch(x){return "";}}
   function hm(iso){return iso?String(iso).slice(11,16):"";}
+  // 台股升降單位
+  function tk(p){return p<10?0.01:p<50?0.05:p<100?0.1:p<500?0.5:p<1000?1:5;}
+  function fl(x){var t=tk(x);return +(Math.floor(x/t+1e-9)*t).toFixed(2);}
+  function ce(x){var t=tk(x);return +(Math.ceil(x/t-1e-9)*t).toFixed(2);}
+  // 進場價 = B 版買進上限（掛限價）；停損約 = 進場價 × 0.97（實際以開盤價 × 0.97）；參考目標 = 進場價 + 一日平均波動（ATR），沒有回測過
+  function planCells(x){var lim=Number(x.entry_limit||x.buy_b_max),atr=Number(x.atr_pct)/100;
+    var stop=x.stop_est||fl(lim*0.97),tgt=x.ref_target||(atr>0?ce(lim*(1+atr)):null);
+    return '<td><b>'+e(lim)+'</b></td><td class="down">'+e(stop)+'</td><td>'+(tgt!=null?e(tgt):'—')+'</td>';}
+  function planNote(){return '<div class="rp-plan"><b>入場時間</b>：08:30–09:00 用「進場價」掛限價買 1 張，09:00 開盤集合競價成交；開盤價高於進場價就不會成交，那檔今天就不做。'
+    +'<br><b>出場</b>：盤中跌破開盤價 × 0.97 停損賣出；沒停損就在 13:25–13:30 收盤集合競價賣出（規則 R1 是收盤賣，沒有固定目標價）。'
+    +'<br><b>參考目標</b>：進場價加一天的平均波動，只是「漲到這裡算很順」的參考，<u>沒有回測過</u>，不要當成保證會到的價位。</div>';}
   function picksTable(day){
     var p=day.picks,res={};(day.results||[]).forEach(function(r){res[r.code]=r;});
     if(!p||!p.items||!p.items.length)return "";
     var has=!!(day.results&&day.results.length);
-    var h='<div class="rp-sub">當沖 5 檔候選<span class="rp-hint">規則 '+e(p.version)+'，母體 '+e(p.universe_n)+' 檔，模擬追蹤</span></div><div class="rp-scroll"><table class="rp-table"><thead><tr><th>股票</th><th>昨收</th><th>B 版買進上限</th>'+(has?'<th>開盤</th><th>收盤</th><th>A 版損益</th><th>B 版損益</th>':'<th>波動 ATR</th>')+'</tr></thead><tbody>';
+    var h='<div class="rp-sub">當沖 5 檔候選<span class="rp-hint">規則 '+e(p.version)+'，母體 '+e(p.universe_n)+' 檔，模擬追蹤</span></div><div class="rp-scroll">'+(has?'':planNote())+'<table class="rp-table"><thead><tr><th>股票</th><th>昨收</th>'+(has?'<th>B 版買進上限</th>':'')+(has?'<th>開盤</th><th>收盤</th><th>A 版損益</th><th>B 版損益</th>':'<th>進場價<br><small>限價</small></th><th>停損<br><small>約</small></th><th>參考目標<br><small>未回測</small></th>')+'</tr></thead><tbody>';
     p.items.forEach(function(x){var r=res[x.code];
-      h+='<tr><td><button class="td-link" data-rp-stock="'+e(x.code)+'">'+e(x.code)+'</button> '+e(x.name)+'</td><td>'+e(x.close)+'</td><td>'+e(x.buy_b_max)+'</td>'
-        +(has?(r?'<td>'+e(r.open)+' '+pc(r.gap_pct)+'</td><td>'+e(r.close)+(r.stop_hit?' <span class="rp-warn">停損</span>':'')+'</td><td>'+(r.over_cap?'<span class="rp-na">超過上限沒買</span>':nt(r.a_net))+'</td><td>'+(r.b_taken?nt(r.b_net):'<span class="rp-na">沒買</span>')+'</td>':'<td colspan="4" class="rp-na">沒有成交資料</td>'):'<td>'+e(x.atr_pct)+'%</td>')+'</tr>';
+      h+='<tr><td><button class="td-link" data-rp-stock="'+e(x.code)+'">'+e(x.code)+'</button>'+(has?' ':'<br><small class="rp-nm">')+e(x.name)+(has?'':'</small>')+'</td><td>'+e(x.close)+'</td>'+(has?'<td>'+e(x.buy_b_max)+'</td>':'')
+        +(has?(r?'<td>'+e(r.open)+' '+pc(r.gap_pct)+'</td><td>'+e(r.close)+(r.stop_hit?' <span class="rp-warn">停損</span>':'')+'</td><td>'+(r.over_cap?'<span class="rp-na">超過上限沒買</span>':nt(r.a_net))+'</td><td>'+(r.b_taken?nt(r.b_net):'<span class="rp-na">沒買</span>')+'</td>':'<td colspan="4" class="rp-na">沒有成交資料</td>'):planCells(x))+'</tr>';
     });
-    h+='</tbody></table></div><div class="rp-hint">A 版：開盤買、收盤賣。B 版：開盤價不高於「買進上限」才買。兩版都是每檔 1 張、跌破開盤價 3% 停損，損益已扣元大手續費與當沖稅。</div>';
+    h+='</tbody></table></div><div class="rp-hint">A 版：開盤買、收盤賣。B 版：開盤價不高於「買進上限」（＝進場價）才買。兩版都是每檔 1 張、跌破開盤價 3% 停損，損益已扣元大手續費與當沖稅。</div>';
     return h;
   }
   function dayHtml(d,open){
