@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>HERO HQ 台股 AI 英雄指揮中心 V14.3.2</title>
-<meta name="theme-color" content="#0a0e1f"/>
+<title>台股作戰室 V15.0.0</title>
+<meta name="theme-color" content="#0b0f17"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet"/>
 <script src="config.js"></script>
 <!-- Firebase compat SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -17,132 +17,149 @@
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/app.css?v=14.3.2">
-<link rel="stylesheet" href="css/today.css?v=14.3.2">
-<link rel="stylesheet" href="css/ledger.css?v=14.3.2">
-<link rel="stylesheet" href="css/lab.css?v=14.3.2">
-<link rel="stylesheet" href="css/gooaye.css?v=14.3.2">
+<link rel="stylesheet" href="css/app.css?v=15.0.0">
+<link rel="stylesheet" href="css/today.css?v=15.0.0">
+<link rel="stylesheet" href="css/ledger.css?v=15.0.0">
+<link rel="stylesheet" href="css/lab.css?v=15.0.0">
+<link rel="stylesheet" href="css/gooaye.css?v=15.0.0">
+<link rel="stylesheet" href="css/pro.css?v=15.0.0">
 </head>
 <body>
 
 <!-- Login Overlay -->
 <div id="loginOverlay">
   <div class="login-card">
-    <div class="hq-burst" aria-hidden="true">HERO<span>HQ</span></div>
-    <div class="login-title">台股 AI 英雄指揮中心</div>
-    <div class="login-sub">你的私人 AI 虛擬辦公室</div>
-    <div class="login-desc">九位原創 AI 英雄各管一攤：選股、當沖、時光機、風控、日誌。登入後進入總部。</div>
-    <div class="login-features">
-      ⚡ 疾電 VOLT：當沖候選與今日進場／停損／停利<br>
-      🔍 天眼 ARGUS：個股分析＋交易計畫卡（進場／何時賣）<br>
-      ⏳ 時砂 CHRONO：台股時光機，重播盤中走勢<br>
-      🛡️ 鐵壁 BASTION：持倉風控與停損警示<br>
-      ☁️ Firestore 跨裝置同步
-    </div>
+    <div class="login-brand"><svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="8" fill="url(#bm)"/><defs><linearGradient id="bm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5b9dff"/><stop offset="1" stop-color="#3a5bd9"/></linearGradient></defs><path d="M6.5 18.5l4.5-5 3.5 3 6.5-8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="21" cy="8.5" r="1.8" fill="#fff"/></svg><span>台股作戰室</span></div>
+    <div class="login-title">把每一筆交易算清楚</div>
+    <div class="login-desc">每日報告、交易計畫、帳本與研究室，全部扣完元大手續費與證交稅後再跟 0050 比。</div>
+    <ul class="login-features">
+      <li><svg class="ic"><use href="#i-doc"/></svg>每日報告：開盤預估、大盤風險燈、觀察名單</li>
+      <li><svg class="ic"><use href="#i-search"/></svg>個股分析與交易計畫：進場價、停損、何時賣</li>
+      <li><svg class="ic"><use href="#i-book"/></svg>帳本：匯入元大對帳單，看真實損益與紀律</li>
+      <li><svg class="ic"><use href="#i-flask"/></svg>研究室：每天自動重算哪些規則真的有效</li>
+    </ul>
     <button class="google-btn" id="btnLoginOverlay">
       <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
       使用 Google 帳號登入
     </button>
     <div id="loginError"></div>
-    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:12px">版本 <b class="app-ver">V14.3.2</b></div>
+    <div class="login-ver">版本 <b class="app-ver">V15.0.0</b></div>
   </div>
 </div>
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <defs>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3 5 13.5h6L10 21l8-10.5h-6z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".8"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5 19 6v5.5c0 4.2-2.8 7.6-7 9-4.2-1.4-7-4.8-7-9V6z"/><path d="m9 12 2.2 2.2L15.2 10"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.3 3.8 5.2 3.8 8.5s-1.3 6.2-3.8 8.5c-2.5-2.3-3.8-5.2-3.8-8.5S9.5 5.8 12 3.5z"/></symbol>
+  <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9.5 3.5h5M10.5 3.5v5.8L5.300 18a1.600 1.600 0 0 0 1.4 2.5h10.600a1.600 1.600 0 0 0 1.4-2.5l-5.2-8.700V3.5"/><path d="M7.8 14.5h8.4"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 5.5A1.5 1.5 0 0 1 6.5 4H19v13.5H6.5A1.5 1.5 0 0 0 5 19z"/><path d="M5 19a1.5 1.5 0 0 0 1.5 1.5H19M9 8.5h6M9 12h4"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c1-3.600 4-5.5 7.5-5.5s6.5 1.900 7.5 5.5"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 5.5 6.5 6.5L9 18.5"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M7 3.5h7l4.5 4.5V19a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z"/><path d="M13.5 3.5V8.5h5M9 13h6M9 16.5h4"/></symbol>
+  </defs>
+</svg>
 
 <!-- Header -->
 <header>
   <div class="logo">
-    <span class="live-dot"></span>
-    <span class="hq-brand">HERO<span>HQ</span></span>
-    <span class="hq-brand-sub">台股 AI 英雄指揮中心</span>
-    <span class="ver app-ver" title="目前版本">V14.3.2</span>
+    <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="8" fill="url(#bm2)"/><defs><linearGradient id="bm2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5b9dff"/><stop offset="1" stop-color="#3a5bd9"/></linearGradient></defs><path d="M6.5 18.5l4.5-5 3.5 3 6.5-8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="21" cy="8.5" r="1.8" fill="#fff"/></svg>
+    <span class="brand-name">台股作戰室</span>
+    <span class="ver app-ver" title="目前版本">V15.0.0</span>
   </div>
-  <div style="display:flex;align-items:center;gap:10px">
+  <div class="hdr-r">
     <div class="mkt-switcher us-only">
       <button class="mkt-btn active-tw" id="btnMktTW">🇹🇼 台股</button>
       <button class="mkt-btn" id="btnMktUS">🇺🇸 US</button>
     </div>
+    <span class="live-dot" title="系統狀態"></span>
     <span class="clock" id="clock"></span>
   </div>
 </header>
-
-<!-- System Health / Version Check -->
-<div class="wrap" style="padding-bottom:0">
-  <div class="system-health" id="systemHealthPanel">
-    <div class="system-health-head">
-      <div>🩺 系統狀態 <span id="sysHealthShort">檢查中…</span></div>
-      <div class="row" style="gap:6px"><button class="ghost sm" id="btnHealthToggle">收合</button><button class="ghost sm" id="btnHealthRefresh">重新檢查</button></div>
-    </div>
-    <div class="version-warn" id="versionWarn"></div>
-    <div class="health-grid" id="healthGrid">
-      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V14.3.2</b></div>
-      <div class="health-chip"><span>Backend</span><b id="hBackend">—</b></div>
-      <div class="health-chip"><span>Firestore</span><b id="hFirestore">待登入</b></div>
-      <div class="health-chip"><span>Yahoo</span><b id="hYahoo">—</b></div>
-      <div class="health-chip"><span>TWSE</span><b id="hTwse">—</b></div>
-      <div class="health-chip"><span>雲端備份</span><b id="hBackup">—</b></div>
-    </div>
-  </div>
-</div>
+<div class="wrap vw-wrap"><div class="version-warn" id="versionWarn"></div></div>
 
 <!-- ═══════════════ TW PAGE ════════════════════════════════════════ -->
 <div id="pgTW">
 <div class="wrap">
 
 <!-- TW Nav -->
-<nav class="nav-tabs" aria-label="英雄辦公室">
-  <button class="nav-tab active" data-page="p-hq"><span class="ni">🏢</span><span class="nl">總部</span></button>
-  <button class="nav-tab" data-page="p-timemachine"><span class="ni">⚡</span><span class="nl">當沖</span></button>
-  <button class="nav-tab" data-page="p-trade"><span class="ni">🔍</span><span class="nl">交易</span></button>
-  <button class="nav-tab" data-page="p-plans"><span class="ni">🎯</span><span class="nl">追蹤</span></button>
-  <button class="nav-tab" data-page="p-positions"><span class="ni">🛡️</span><span class="nl">持倉</span></button>
-  <button class="nav-tab" data-page="p-market"><span class="ni">🌐</span><span class="nl">市場</span></button>
-  <button class="nav-tab" data-page="p-learn"><span class="ni">🔬</span><span class="nl">研究室</span></button>
-  <button class="nav-tab" data-page="p-ledger"><span class="ni">📒</span><span class="nl">帳本</span></button>
-  <button class="nav-tab" data-page="p-account"><span class="ni">👤</span><span class="nl">帳戶</span></button>
-</nav>
-
-<!-- Hero on duty strip (filled by renderHeroStrip) -->
-<div class="hero-strip" id="heroStrip" style="display:none"></div>
-
-<!-- ═══ HERO HQ — AI 虛擬辦公室 ═══ -->
-<div class="page active" id="p-hq">
-  <div class="hq-banner">
-    <div class="hq-banner-l">
-      <div class="hq-kicker">AI VIRTUAL OFFICE · 台股專用</div>
-      <h1 class="hq-title">英雄指揮中心</h1>
-      <div class="hq-clock"><span id="hqPhase" class="hq-phase">—</span><span id="hqClock">—</span></div>
-      <div class="hq-brief" id="hqBrief">載入任務簡報中…</div>
-    </div>
-    <div class="hq-banner-r" id="hqLeadAvatar" aria-hidden="true"></div>
+<nav class="nav-tabs" id="mainNav" aria-label="主選單">
+  <button class="nav-tab active" data-page="p-hq"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg><span class="nl">總覽</span></button>
+  <button class="nav-tab" data-page="p-timemachine"><svg class="ic" aria-hidden="true"><use href="#i-bolt"/></svg><span class="nl">當沖</span></button>
+  <button class="nav-tab" data-page="p-trade"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><span class="nl">個股</span></button>
+  <button class="nav-tab" data-page="p-ledger"><svg class="ic" aria-hidden="true"><use href="#i-book"/></svg><span class="nl">帳本</span></button>
+  <div class="nav-sec" id="navSec">
+    <button class="nav-tab sec" data-page="p-plans"><svg class="ic" aria-hidden="true"><use href="#i-target"/></svg><span class="nl">追蹤</span></button>
+    <button class="nav-tab sec" data-page="p-positions"><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg><span class="nl">持倉</span></button>
+    <button class="nav-tab sec" data-page="p-market"><svg class="ic" aria-hidden="true"><use href="#i-globe"/></svg><span class="nl">市場</span></button>
+    <button class="nav-tab sec" data-page="p-learn"><svg class="ic" aria-hidden="true"><use href="#i-flask"/></svg><span class="nl">研究室</span></button>
+    <button class="nav-tab sec" data-page="p-account"><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg><span class="nl">帳戶</span></button>
   </div>
-  <div class="today" id="todayCard" aria-live="polite"></div>
+  <button class="nav-more" id="navMore" aria-expanded="false" aria-controls="navSec"><svg class="ic" aria-hidden="true"><use href="#i-more"/></svg><span class="nl">更多</span></button>
+</nav>
+<div class="nav-scrim" id="navScrim"></div>
+
+<!-- ═══ 總覽 ═══ -->
+<div class="page active" id="p-hq">
+  <section class="hm-hero">
+    <div class="hm-meta"><span class="hm-date" id="hqDate"></span><span id="hqPhase" class="hm-phase">—</span><span class="hm-clock" id="hqClock">—</span></div>
+    <h1 class="hm-title">今日重點</h1>
+    <p class="hm-brief" id="hqBrief">載入中…</p>
+    <form class="hm-search" id="hmSearch" autocomplete="off">
+      <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>
+      <input type="text" id="hmSid" inputmode="search" maxlength="10" placeholder="輸入代號或名稱查個股，例如 2330" aria-label="查個股"/>
+      <button type="submit">查詢</button>
+    </form>
+  </section>
+  <div class="today" id="todayCard" aria-live="polite"><div class="sk sk-line" style="width:30%"></div><div class="sk-grid"><div class="sk sk-box"></div><div class="sk sk-box"></div></div><div class="sk sk-line"></div><div class="sk sk-line" style="width:70%"></div></div>
+  <h2 class="hm-sec-t">常用功能</h2>
+  <div class="hm-acts" id="hqQuick"></div>
   <div class="gy" id="gyCard"></div>
-  <div class="hq-missions" id="hqMissions"></div>
-  <div class="hq-floor-title"><span>英雄辦公室</span><small>英雄會走來走去；點英雄或工作室就出動</small></div>
-  <div class="hq-office" id="hqOffice" aria-label="英雄辦公室"></div>
-  <div class="hq-floor-title"><span>快速出動</span></div>
-  <div class="hq-quick" id="hqQuick"></div>
-  <details class="hq-notes" id="hqNotes">
-    <summary>📰 <b class="app-ver">V14.3.2</b> 更新內容</summary>
+  <details class="hm-fold" id="hqNotes">
+    <summary><b class="app-ver">V15.0.0</b> 更新內容</summary>
     <ul id="hqNotesList"></ul>
   </details>
-  <div class="fee-set" id="feeSet">
-    <span>💰 成本：<b>元大證券 電子下單</b>，手續費 0.1425% ×</span>
-    <input id="feeDiscIn" type="number" inputmode="decimal" min="0.1" max="1" step="0.01" value="0.6" aria-label="手續費折扣（0.6 = 6 折）">
-    <span>（0.6 = 6 折；整股低消 20 元、零股 1 元；證交稅 0.3%、當沖 0.15%、ETF 0.1%）</span>
-    <button class="ghost sm" id="feeDiscBtn">儲存</button><small id="feeDiscMsg" aria-live="polite"></small>
-  </div>
-  <div class="hq-disclaimer">所有訊號皆為研究／模擬用途，非投資建議；回測、勝率、交易計畫、當沖、時光機都已扣上面的成本，下單請自行判斷。</div>
+  <details class="hm-fold">
+    <summary>交易成本設定</summary>
+    <div class="fee-set" id="feeSet">
+      <span>成本：<b>元大證券 電子下單</b>，手續費 0.1425% ×</span>
+      <input id="feeDiscIn" type="number" inputmode="decimal" min="0.1" max="1" step="0.01" value="0.6" aria-label="手續費折扣（0.6 = 6 折）">
+      <button class="ghost sm" id="feeDiscBtn">儲存</button><small id="feeDiscMsg" aria-live="polite"></small>
+      <span class="fee-note">0.6 = 6 折；整股低消 20 元、零股 1 元；證交稅 0.3%、當沖 0.15%、ETF 0.1%</span>
+    </div>
+  </details>
+  <div class="hq-disclaimer">所有訊號皆為研究／模擬用途，非投資建議；回測、勝率、交易計畫、當沖都已扣上面的成本，下單請自行判斷。</div>
 </div>
 
 
 <!-- ═══ TW Trade Page ═══ -->
 <div class="page" id="p-trade">
 
+<!-- Search -->
+<div class="search-wrap">
+  <div class="search-input-wrap">
+    <input type="text" id="sid" placeholder="輸入股票代號或名稱，如 2330" maxlength="10" autocomplete="off"/>
+    <div class="suggest-box" id="suggestBox"></div>
+  </div>
+  <button id="btnSearch">查詢</button>
+  <button class="ghost" id="btnAdd">＋ 加入自選</button>
+</div>
+<div id="err"></div>
+<div class="mobile-speed-box" id="mobileSpeedBox">
+  <span id="mobileSpeedText">手機快速模式準備中…</span>
+  <span class="mobile-speed-actions">
+    <button class="ghost sm" id="btnLoadFullMobile">載入完整分析</button>
+  </span>
+</div>
+
 <!-- V12.9 Portfolio Manager -->
 <div class="portfolio-panel" id="twPortfolioPanel">
   <div class="portfolio-head">
-    <span>📁 台股投資組合</span>
+    <span>台股投資組合</span>
     <div class="portfolio-controls">
       <select class="portfolio-select" id="twPortfolioSelect"></select>
       <button class="ghost sm" id="btnTwPortfolioNew">＋新增組合</button>
@@ -155,42 +172,25 @@
   <div class="portfolio-note" id="twPortfolioNote">第一次升級會自動把舊自選股放入「預設台股組合」，不會刪除舊資料。</div>
 </div>
 
-<!-- Search -->
-<div class="search-wrap">
-  <div class="search-input-wrap">
-    <input type="text" id="sid" placeholder="輸入股票代號或名稱，如 2330" maxlength="10" autocomplete="off"/>
-    <div class="suggest-box" id="suggestBox"></div>
-  </div>
-  <button id="btnSearch">🔍 查詢</button>
-  <button class="ghost" id="btnAdd">＋ 加入自選</button>
-</div>
-<div id="err"></div>
-<div class="mobile-speed-box" id="mobileSpeedBox">
-  <span id="mobileSpeedText">手機快速模式準備中…</span>
-  <span class="mobile-speed-actions">
-    <button class="ghost sm" id="btnLoadFullMobile">載入完整分析</button>
-  </span>
-</div>
-
 <!-- TW Watchlist -->
 <div class="section">
   <div class="section-title">
     <div class="section-title-left">
-      ⭐ 台股自選股
+      台股自選股
       <span class="d-badge" id="wlCount">0 檔</span>
-      <span class="sync-badge sync-ing" id="syncBadge">⏳ 初始化</span>
+      <span class="sync-badge sync-ing" id="syncBadge">初始化</span>
     </div>
     <div class="row" style="gap:6px">
       <span class="bar-tick" id="wlTick" style="font-size:10px">30s 後刷新</span>
       <button class="ghost sm" id="btnRefresh">↻</button>
-      <button class="ghost sm" id="btnScan">📡 掃描</button>
+      <button class="ghost sm" id="btnScan">掃描</button>
       <button class="ghost sm" id="btnToggleWl">展開</button>
     </div>
   </div>
   <div class="quick-nav">
-    <button class="quick-nav-btn" id="qnAiScan">🤖 AI 選股</button>
-    <button class="quick-nav-btn" id="qnKline">📊 K 線</button>
-    <button class="quick-nav-btn" id="qnA4d">🔍 四面向</button>
+    <button class="quick-nav-btn" id="qnAiScan">AI 選股</button>
+    <button class="quick-nav-btn" id="qnKline">K 線</button>
+    <button class="quick-nav-btn" id="qnA4d">四面向</button>
   </div>
   <div class="bar"><span id="wlBar" style="width:100%"></span></div>
   <div class="wl-compact-grid" id="wlGridCompact"></div>
@@ -202,9 +202,9 @@
 <!-- Auto LINE -->
 <div class="auto-section">
   <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
-    <span style="font-family:var(--mono);font-size:12px;font-weight:700;color:#93c5fd">🤖 自動 LINE 監控</span>
+    <span style="font-family:var(--mono);font-size:12px;font-weight:700;color:#93c5fd">自動 LINE 監控</span>
     <div class="row" style="gap:6px">
-      <button class="ghost sm" id="btnAiScan">🤖 AI 選股</button>
+      <button class="ghost sm" id="btnAiScan">AI 選股</button>
       <button class="ghost sm" id="btnAuto">已關閉</button>
     </div>
   </div>
@@ -219,7 +219,7 @@
 <!-- AI Scan result (trade page) -->
 <div id="aiScanTradeBox" style="display:none;margin-bottom:14px">
   <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--cyan);margin-bottom:10px;display:flex;align-items:center;gap:8px">
-    🤖 台股 AI 選股結果
+    台股 AI 選股結果
     <span id="aiScanSummary" style="font-size:11px;color:var(--muted);font-weight:400"></span>
     <button class="ghost sm" id="btnAiScanAgain" style="margin-left:auto">重新掃描</button>
   </div>
@@ -273,10 +273,10 @@
 
   <!-- TW AI Signal -->
   <div id="aiBadge" class="ai-block ai-watch">
-    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em">🤖 AI 策略訊號（技術面）</div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em">AI 策略訊號（技術面）</div>
     <div style="display:flex;gap:14px;flex-wrap:wrap">
       <div style="min-width:120px">
-        <div id="aiLabel" class="ai-label">👀 WATCH</div>
+        <div id="aiLabel" class="ai-label">WATCH</div>
         <div id="aiConf" class="ai-conf">技術面評分 — / 100</div>
         <div style="height:5px;background:#172946;border-radius:3px;margin-top:8px;overflow:hidden"><div id="confBar" class="conf-fill" style="width:0%"></div></div>
         <div id="tradeStatusBadge" class="ts-badge ts-WATCH" style="margin-top:8px"></div>
@@ -305,7 +305,7 @@
     </div>
     <div id="tooExtendedReasons" style="display:none;margin-top:6px"></div>
     <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px" id="aiDisc"></div>
-    <div style="margin-top:10px"><button class="ghost sm" id="btnSavePlanTw">📌 加入交易追蹤</button></div>
+    <div style="margin-top:10px"><button class="ghost sm" id="btnSavePlanTw">加入交易追蹤</button></div>
   </div>
 
   <!-- 交易計畫卡 v2 -->
@@ -314,7 +314,7 @@
   <!-- TW K-line -->
   <div class="kline-wrap mobile-defer" id="klineWrap" style="display:none">
     <div class="kline-header">
-      <span>📊 K 線圖 <span class="tw-kline-badge" style="margin-left:8px">漲紅跌綠（台股）</span></span>
+      <span>K 線圖 <span class="tw-kline-badge" style="margin-left:8px">漲紅跌綠（台股）</span></span>
       <span id="klineStatus" style="font-size:11px;color:var(--muted)"></span>
     </div>
     <div class="kline-container" id="klineContainer"><div class="kline-placeholder">K 線資料載入中…</div></div>
@@ -322,7 +322,7 @@
 
   <!-- Indicators -->
   <div class="section">
-    <div class="section-title">📐 技術指標</div>
+    <div class="section-title">技術指標</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-family:var(--mono);font-size:12px">
       <div><div style="color:var(--muted);font-size:10px">MA5</div><div id="dMa5">—</div></div>
       <div><div style="color:var(--muted);font-size:10px">MA20</div><div id="dMa20">—</div></div>
@@ -343,7 +343,7 @@
   </div>
   <!-- Backtest quick -->
   <div class="section">
-    <div class="section-title">📉 回測勝率 <span id="dWrSub" style="font-weight:400;color:var(--muted);font-size:10px"></span></div>
+    <div class="section-title">回測勝率 <span id="dWrSub" style="font-weight:400;color:var(--muted);font-size:10px"></span></div>
     <div style="display:flex;gap:16px;font-family:var(--mono);font-size:12px">
       <div><div style="color:var(--muted);font-size:10px">勝率</div><div id="dWr" style="font-size:18px;font-weight:700">—</div></div>
       <div><div style="color:var(--muted);font-size:10px">試驗次數</div><div id="dTrials">—</div></div>
@@ -368,17 +368,17 @@
 
 <!-- 4D Expand -->
 <div id="d4ExpandSection" style="display:none;margin-bottom:14px">
-  <button class="d4-toggle" id="btnLoad4d">🔍 載入四面向分析（基本面 / 技術 / 籌碼 / 消息）</button>
+  <button class="d4-toggle" id="btnLoad4d">載入四面向分析（基本面 / 技術 / 籌碼 / 消息）</button>
   <div class="d4-expand" id="d4Container"></div>
   <div id="d4NewsSection" style="display:none;margin-top:12px">
-    <div class="section"><div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:8px;text-transform:uppercase">📰 最新相關新聞</div>
+    <div class="section"><div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:8px;text-transform:uppercase">最新相關新聞</div>
     <div id="d4News"></div></div>
   </div>
 </div>
 
 <!-- LINE / Backtest -->
 <div class="section">
-  <div class="section-title">📲 LINE 設定</div>
+  <div class="section-title">LINE 設定</div>
   <div class="row" style="gap:8px;flex-wrap:wrap">
     <span class="live-dot" id="lineDot" style="background:var(--muted);box-shadow:none"></span>
     <span id="lineStatusTxt" style="font-family:var(--mono);font-size:12px;color:var(--muted)">LINE 狀態檢查中…</span>
@@ -392,12 +392,12 @@
 <!-- ═══ TW Market Page ═══ -->
 <div class="page" id="p-market">
   <div class="section">
-    <div class="section-title">🌐 宏觀指標 <button class="ghost sm" id="btnLoadMacro" style="margin-left:auto">載入</button></div>
+    <div class="section-title">宏觀指標 <button class="ghost sm" id="btnLoadMacro" style="margin-left:auto">載入</button></div>
     <div class="macro-grid" id="macroGrid"><div class="macro-item"><div class="macro-label">載入中</div><div class="macro-val">…</div></div></div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px" id="macroNote"></div>
   </div>
   <div class="section">
-    <div class="section-title">📊 市場情緒 <button class="ghost sm" id="btnLoadSentiment" style="margin-left:auto">載入</button></div>
+    <div class="section-title">市場情緒 <button class="ghost sm" id="btnLoadSentiment" style="margin-left:auto">載入</button></div>
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px">
       <span id="sentLabel" style="font-family:var(--mono);font-size:22px;font-weight:700">—</span>
       <div style="flex:1;height:10px;background:#172946;border-radius:5px;overflow:hidden"><div id="sentBar" style="height:100%;background:var(--up);border-radius:5px;transition:width .5s;width:0%"></div></div>
@@ -406,7 +406,7 @@
   </div>
   <!-- AI Scan on market page -->
   <div id="aiScanBox" style="display:none" class="section">
-    <div class="section-title">🤖 AI 選股掃描結果（台股）</div>
+    <div class="section-title">AI 選股掃描結果（台股）</div>
     <div id="aiScanGridMarket"></div>
   </div>
 </div><!-- /p-market -->
@@ -414,12 +414,12 @@
 <!-- ═══ AI Learn Page ═══ -->
 <div class="page" id="p-learn">
   <div class="section">
-    <div class="section-title"><div class="section-title-left">🔬 研究室：每天自動檢驗的策略評分表</div></div>
+    <div class="section-title"><div class="section-title-left">研究室：每天自動檢驗的策略評分表</div></div>
     <div id="labBody"><div class="lb-na">讀取中。</div></div>
   </div>
   <details class="lb-old"><summary>舊版 AI 學習（權重調整沒有經過驗證，之後會移除）</summary>
   <div class="section">
-    <div class="section-title">🧠 AI 真實學習中心 V12.8
+    <div class="section-title">AI 真實學習中心 V12.8
       <button class="ghost sm" id="btnWeights" style="margin-left:auto">載入</button>
     </div>
     <div class="row" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">
@@ -445,18 +445,18 @@
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px" id="learningSourceGrid"></div>
     <div class="section" style="margin:0 0 12px 0;padding:12px;background:#0b1424">
-      <div class="section-title" style="margin-bottom:8px">📊 策略表現排行</div>
+      <div class="section-title" style="margin-bottom:8px">策略表現排行</div>
       <div id="learningStrategyBox" class="learn-log">尚無策略統計</div>
     </div>
     <div class="section" style="margin:0 0 12px 0;padding:12px;background:#0b1424">
-      <div class="section-title" style="margin-bottom:8px">⚖️ 權重建議</div>
+      <div class="section-title" style="margin-bottom:8px">權重建議</div>
       <div id="learningSuggestionBox" class="learn-log">請按「產生建議權重」</div>
     </div>
     <div class="learn-log" id="learnMsg">按「載入」查看 AI 真實學習狀態</div>
   </div>
   <!-- Backtest -->
   <div class="section">
-    <div class="section-title">📉 回測系統</div>
+    <div class="section-title">回測系統</div>
     <div class="row" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <input id="btId" placeholder="股票代號" style="background:#0d1728;border:1px solid var(--line);border-radius:7px;color:var(--text);padding:7px 12px;width:100px;font-family:var(--mono);font-size:13px;outline:none"/>
       <input id="btDays" type="number" value="5" min="1" max="30" style="width:70px;background:#0d1728;border:1px solid var(--line);border-radius:7px;color:var(--text);padding:7px 10px;font-family:var(--mono);font-size:13px;outline:none"/>
@@ -486,13 +486,13 @@
 <div class="page" id="p-plans">
   <div class="section">
     <div class="section-title">
-      <div class="section-title-left">📌 交易追蹤中心 <span class="d-badge" id="planTotalBadge">0 plans</span></div>
+      <div class="section-title-left">交易追蹤中心 <span class="d-badge" id="planTotalBadge">0 plans</span></div>
       <div class="row" style="gap:6px">
         <button class="ghost sm" id="btnRefreshPlans">重新檢查</button>
       </div>
     </div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px">
-      將 AI 策略卡或 AI 掃描候選加入追蹤後，系統會用 stock-lite 快速檢查是否進入入場區、接近目標價或接近止損價。資料儲存在 Firestore：users/{uid}/trade_plans/tw / us。
+      把想買的股票加入追蹤，系統會幫你盯：是否進到入場區、接近目標價或接近停損價。資料跟著你的 Google 帳號同步。
     </div>
     <div class="plan-summary-grid" id="planSummaryGrid"></div>
     <div class="quick-nav" style="margin-bottom:8px">
@@ -513,14 +513,14 @@
 <div class="page" id="p-positions">
   <div class="section">
     <div class="section-title">
-      <div class="section-title-left">💼 持倉管理 <span class="d-badge" id="positionTotalBadge">0 positions</span></div>
+      <div class="section-title-left">持倉管理 <span class="d-badge" id="positionTotalBadge">0 positions</span></div>
       <div class="row" style="gap:6px">
         <button class="ghost sm" id="btnAddPosition">＋新增持倉</button>
         <button class="ghost sm" id="btnRefreshPositions">重新檢查</button>
       </div>
     </div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px">
-      持倉管理用來追蹤已買進的股票，與「交易追蹤」不同。資料儲存在 Firestore：users/{uid}/positions/tw / us。後端只負責用最新價格檢查損益、目標與止損狀態。
+      記下已買進的股票，系統用最新價格算損益，並在接近目標或停損時提醒。資料跟著你的 Google 帳號同步。
     </div>
     <div class="position-summary-grid" id="positionSummaryGrid"></div>
     <div class="quick-nav" style="margin-bottom:8px">
@@ -541,7 +541,7 @@
 <div class="page" id="p-ledger">
   <div class="section">
     <div class="section-title">
-      <div class="section-title-left">📒 帳本：你的真實交易 vs 0050</div>
+      <div class="section-title-left">帳本：你的真實交易 vs 0050</div>
       <button class="ghost sm" id="lgRefresh">重新計算</button>
     </div>
     <div class="lg-status" id="lgStatus"></div>
@@ -551,7 +551,7 @@
     <div id="lgNotes"></div>
   </div>
   <div class="section">
-    <div class="section-title"><div class="section-title-left">➕ 新增成交</div></div>
+    <div class="section-title"><div class="section-title-left">新增成交</div></div>
     <div class="lg-form">
       <label>日期<input type="date" id="lgDate"></label>
       <label>時間（選填）<input type="time" id="lgTime"></label>
@@ -567,7 +567,7 @@
     </div>
     <button id="lgAdd" class="lg-primary">新增這筆成交</button>
     <details class="lg-more" style="margin-top:12px">
-      <summary>📥 匯入元大對帳單（CSV 或貼上表格）</summary>
+      <summary>匯入元大對帳單（CSV 或貼上表格）</summary>
       <div class="lg-sub">選一個 CSV 檔，或在元大網頁、Excel 把成交明細整段複製後貼到下面。需要有成交日期、股票、買賣別、成交價、股數這些欄位，手續費和交易稅有的話會直接採用。重複匯入同一份不會重複計算。</div>
       <input type="file" id="lgFile" accept=".csv,.txt,.tsv,text/csv,text/plain" style="margin-top:8px">
       <textarea id="lgPaste" class="lg-paste" placeholder="或把表格內容貼在這裡"></textarea>
@@ -576,23 +576,23 @@
     </details>
   </div>
   <div class="section">
-    <div class="section-title"><div class="section-title-left">🛡️ 紀律檢查</div></div>
+    <div class="section-title"><div class="section-title-left">紀律檢查</div></div>
     <div id="lgViol"></div>
   </div>
   <div class="section">
-    <div class="section-title"><div class="section-title-left">📅 每週結算（當沖獲利轉 0050）</div></div>
+    <div class="section-title"><div class="section-title-left">每週結算（當沖獲利轉 0050）</div></div>
     <div id="lgWeekly"></div>
   </div>
   <div class="section">
-    <div class="section-title"><div class="section-title-left">📌 未平倉</div></div>
+    <div class="section-title"><div class="section-title-left">未平倉</div></div>
     <div id="lgPos"></div>
   </div>
   <div class="section">
-    <div class="section-title"><div class="section-title-left">📄 已出場交易</div></div>
+    <div class="section-title"><div class="section-title-left">已出場交易</div></div>
     <div id="lgTrades"></div>
   </div>
   <div class="section">
-    <div class="section-title"><div class="section-title-left">🧾 成交紀錄 <span class="d-badge" id="lgFillCount">0 筆</span></div>
+    <div class="section-title"><div class="section-title-left">成交紀錄 <span class="d-badge" id="lgFillCount">0 筆</span></div>
       <button class="ghost sm" data-hq-go="p-journal">舊版交易日誌</button></div>
     <div id="lgFills"></div>
   </div>
@@ -601,7 +601,7 @@
 <div class="page" id="p-journal">
   <div class="section">
     <div class="section-title">
-      <div class="section-title-left">📘 交易日誌與績效回顧 <span class="d-badge" id="journalTotalBadge">0 trades</span></div>
+      <div class="section-title-left">交易日誌與績效回顧 <span class="d-badge" id="journalTotalBadge">0 trades</span></div>
       <div class="row" style="gap:6px">
         <button class="ghost sm" id="btnJournalRefresh">重新整理</button>
         <button class="ghost sm" id="btnJournalRepair">修復日誌</button>
@@ -610,7 +610,7 @@
       </div>
     </div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px">
-      V12.4–V12.9.2 一次整合：結束持倉會移入交易日誌；系統計算勝率、R 倍數、策略型態表現，並可產出文字報告與 CSV。資料儲存在 Firestore：users/{uid}/trade_journal/tw / us。
+      結束持倉會移入交易日誌；系統計算勝率、R 倍數、策略型態表現，並可產出文字報告與 CSV。
     </div>
     <div class="journal-summary-grid" id="journalSummaryGrid"></div>
     <div class="quick-nav" style="margin-bottom:8px">
@@ -624,11 +624,11 @@
     <div class="empty" id="journalEmpty" style="display:none">尚未有已結束交易<br><span class="mini">到「持倉管理」按「結束交易」，即可把持倉移入交易日誌。</span></div>
   </div>
   <div class="section">
-    <div class="section-title"><div class="section-title-left">📊 策略績效表現</div></div>
+    <div class="section-title"><div class="section-title-left">策略績效表現</div></div>
     <div id="strategyStatsBox"></div>
   </div>
   <div class="section">
-    <div class="section-title"><div class="section-title-left">📝 報告中心</div><button class="ghost sm" id="btnReportGenerate">重新產生報告</button></div>
+    <div class="section-title"><div class="section-title-left">報告中心</div><button class="ghost sm" id="btnReportGenerate">重新產生報告</button></div>
     <div class="report-box" id="reportText">尚未產生報告。</div>
   </div>
 </div><!-- /p-journal -->
@@ -638,7 +638,7 @@
 <div class="page" id="p-timemachine">
   <!-- V13.3 小資當沖風控（整張）：下單前檢查 + 今日/累計停損記帳。只在瀏覽器計算，不下單。 -->
   <div class="section" id="dtRiskSection">
-    <div class="section-title"><div class="section-title-left">🛡️ 小資當沖風控（整張） <span class="d-badge">下單前先過這關，不會幫你下單</span></div></div>
+    <div class="section-title"><div class="section-title-left">小資當沖風控（整張） <span class="d-badge">下單前先過這關，不會幫你下單</span></div></div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:8px">
       規則：每筆 ≤ 每筆上限、股價 20～50 元、只做先買後賣、13:00 後不進場、13:20 前全部平倉；今天虧到每日停損就收工，累計虧到總停損就停手回到模擬。
       當天沒賣掉（跌停鎖死、斷線、忘記平倉）T+2 要付整筆買進金額，請確定 2 天內拿得出來。回測：常見當沖規則扣成本後平均每筆虧 0.6%～1.2%。
@@ -665,9 +665,9 @@
     </div>
     <div id="rkLog" style="font-family:var(--mono);font-size:12px;margin-top:6px"></div>
   </div>
-  <script src="js/dt-risk.js?v=14.3.2"></script>
+  <script src="js/dt-risk.js?v=15.0.0"></script>
   <div class="section" id="dtScanSection">
-    <div class="section-title"><div class="section-title-left">🎯 當沖候選（先買後賣） <span class="d-badge">扣成本後的歷史成績，非投資建議</span></div>
+    <div class="section-title"><div class="section-title-left">當沖候選（先買後賣） <span class="d-badge">扣成本後的歷史成績，非投資建議</span></div>
       <div class="row" style="gap:6px"><button class="ghost sm" id="btnDtScan">掃描</button><button class="ghost sm" id="btnDtLevels">更新今日價位</button></div></div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:8px">
       從成交值前 40 名、可現股當沖、非處置股中，挑日內振幅夠大的股票，用「開盤 15 分鐘突破」規則回測近 60 個交易日，
@@ -680,10 +680,10 @@
       <th>今日 進場</th><th>停損</th><th>停利</th><th>狀態</th><th></th></tr></thead><tbody></tbody></table></div>
     <div id="dtFoot" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px"></div>
   </div>
-  <link rel="stylesheet" href="css/daytrade.css?v=14.3.2">
-  <script src="js/dt-screen.js?v=14.3.2"></script>
+  <link rel="stylesheet" href="css/daytrade.css?v=15.0.0">
+  <script src="js/dt-screen.js?v=15.0.0"></script>
   <div class="section" id="tmSection">
-    <div class="section-title"><div class="section-title-left">⏳ 台股時光機 <span class="d-badge">研究／模擬，非投資建議</span></div></div>
+    <div class="section-title"><div class="section-title-left">台股時光機 <span class="d-badge">研究／模擬，非投資建議</span></div></div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px">
       用這檔股票過去 60 個交易日的 5 分 K，把當天剩下的走勢重播 1 萬次，算出先碰停利、先碰停損的機率，並扣掉元大電子下單手續費、0.15% 當沖稅與滑價。
       只做「先買後賣」。不填進場價時，系統用「開盤區間突破」規則自動產生計畫。模擬不是預測，多數散戶當沖長期是虧的。
@@ -708,14 +708,14 @@
     <div id="tmOut" style="display:none"></div>
     <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:10px">方法改寫自 Jake Schincariol 的 trader-timemachine（MIT 授權）。</div>
   </div>
-  <link rel="stylesheet" href="css/timemachine.css?v=14.3.2">
-  <script src="js/timemachine.js?v=14.3.2"></script>
+  <link rel="stylesheet" href="css/timemachine.css?v=15.0.0">
+  <script src="js/timemachine.js?v=15.0.0"></script>
 </div>
 
 <div class="page" id="p-account">
   <div id="accountGuest">
     <div class="account-card">
-      <div style="font-size:40px;margin-bottom:12px">👤</div>
+      
       <div style="font-size:18px;font-weight:700;margin-bottom:8px">尚未登入</div>
       <div style="color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.8">登入 Google 後可跨裝置同步台股自選股</div>
       <button class="google-btn" id="btnGoogleLogin" style="margin:0 auto">
@@ -736,13 +736,27 @@
         <div class="account-meta-item"><div class="account-meta-lbl">最後同步</div><div class="account-meta-val" id="userLastSync">—</div></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
-        <button class="ghost" id="btnManualSync">☁️ 手動同步台股</button>
-        <button class="ghost" id="btnRestoreLegacy">🔄 從舊資料恢復</button>
+        <button class="ghost" id="btnManualSync">手動同步台股</button>
+        <button class="ghost" id="btnRestoreLegacy">從舊資料恢復</button>
         <button class="danger sm" id="btnLogout">登出</button>
       </div>
     </div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;margin-top:10px">
-      投資組合：users/{uid}/portfolios/{portfolio_id} &nbsp;|&nbsp; 舊自選股保留：users/{uid}/watchlists/tw/us
+      自選股、追蹤、持倉與帳本都存在你的 Google 帳號底下，換裝置登入就會同步。
+    </div>
+  </div>
+  <div class="system-health" id="systemHealthPanel">
+    <div class="system-health-head">
+      <div>系統狀態 <span id="sysHealthShort">檢查中…</span></div>
+      <div class="row" style="gap:6px"><button class="ghost sm" id="btnHealthToggle">收合</button><button class="ghost sm" id="btnHealthRefresh">重新檢查</button></div>
+    </div>
+    <div class="health-grid" id="healthGrid">
+      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V15.0.0</b></div>
+      <div class="health-chip"><span>Backend</span><b id="hBackend">—</b></div>
+      <div class="health-chip"><span>Firestore</span><b id="hFirestore">待登入</b></div>
+      <div class="health-chip"><span>Yahoo</span><b id="hYahoo">—</b></div>
+      <div class="health-chip"><span>TWSE</span><b id="hTwse">—</b></div>
+      <div class="health-chip"><span>雲端備份</span><b id="hBackup">—</b></div>
     </div>
   </div>
 </div><!-- /p-account -->
@@ -763,7 +777,7 @@
   </div>
   <div class="portfolio-panel" id="usPortfolioPanel">
   <div class="portfolio-head">
-    <span>📁 US Portfolio</span>
+    <span>US Portfolio</span>
     <div class="portfolio-controls">
       <select class="portfolio-select" id="usPortfolioSelect"></select>
       <button class="ghost sm" id="btnUsPortfolioNew">＋New</button>
@@ -781,10 +795,10 @@
       <input id="usSymbol" placeholder="Symbol or name: AAPL / NVDA / ASTS…" maxlength="12" autocomplete="off"/>
       <div id="usSuggestBox"></div>
     </div>
-    <button class="us-btn" id="btnUsSearch">🔍 Search</button>
+    <button class="us-btn" id="btnUsSearch">Search</button>
     <button class="ghost" id="btnUsAdd">＋ Watchlist</button>
-    <button class="ghost sm" id="btnUsScan">🤖 AI Scan</button>
-    <button class="ghost sm" id="btnUsCtx">🌐 Market</button>
+    <button class="ghost sm" id="btnUsScan">AI Scan</button>
+    <button class="ghost sm" id="btnUsCtx">Market</button>
   </div>
   <div id="usMasterStatus" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:6px"></div>
 </div>
@@ -792,7 +806,7 @@
 <!-- US AI Scan Result -->
 <div id="usAiScanBox" style="display:none;margin-bottom:14px">
   <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:#60a5fa;margin-bottom:10px;display:flex;align-items:center;gap:8px">
-    🤖 US AI Scan
+    US AI Scan
     <span id="usAiScanSummary" style="font-size:11px;color:var(--muted);font-weight:400"></span>
     <button class="ghost sm" id="btnUsScanAgain" style="margin-left:auto">Re-scan</button>
   </div>
@@ -817,7 +831,7 @@
 <!-- US Market Context -->
 <div id="usCtxBox" style="display:none;margin-bottom:14px">
   <div class="section">
-    <div class="section-title" style="color:#60a5fa">🌐 US Market Context</div>
+    <div class="section-title" style="color:#60a5fa">US Market Context</div>
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
       <div id="usCtxScore" style="font-family:var(--mono);font-size:32px;font-weight:800;color:var(--us-up)">—</div>
       <div>
@@ -833,9 +847,9 @@
 <div class="section">
   <div class="section-title">
     <div class="section-title-left">
-      ⭐ US Watchlist
+      US Watchlist
       <span class="d-badge" id="usWlCount">0</span>
-      <span class="sync-badge sync-ing" id="usSyncBadge">⏳</span>
+      <span class="sync-badge sync-ing" id="usSyncBadge"></span>
     </div>
     <div class="row" style="gap:6px">
       <span class="bar-tick" id="usWlTick" style="font-size:10px">30s</span>
@@ -852,10 +866,10 @@
 
   <!-- US AI Signal -->
   <div id="usAiBadge" class="ai-block ai-us-watch">
-    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em">🤖 US AI Strategy Signal</div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em">US AI Strategy Signal</div>
     <div style="display:flex;gap:14px;flex-wrap:wrap">
       <div style="min-width:120px">
-        <div id="usAiLabel" class="ai-label">👀 WATCH</div>
+        <div id="usAiLabel" class="ai-label">WATCH</div>
         <div id="usAiConf" class="ai-conf">Confidence — / 100</div>
         <div style="height:5px;background:#172946;border-radius:3px;margin-top:8px;overflow:hidden"><div id="usConfBar" class="conf-fill" style="width:0%"></div></div>
         <div id="usTradeStatus" style="margin-top:8px"></div>
@@ -875,7 +889,7 @@
     </div>
     <div id="usAiSupRes" style="margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap"></div>
     <div id="usAiRiskReasons" style="margin-top:6px"></div>
-    <div style="margin-top:10px"><button class="ghost sm" id="btnSavePlanUs">📌 Add Trade Plan</button></div>
+    <div style="margin-top:10px"><button class="ghost sm" id="btnSavePlanUs">Add Trade Plan</button></div>
   </div>
 
   <!-- US Price -->
@@ -910,7 +924,7 @@
   <!-- US K-line -->
   <div class="kline-wrap" id="usKlineWrap" style="display:none">
     <div class="kline-header">
-      <span>📊 K-Line <span class="us-kline-badge" style="margin-left:8px">Green=Up / Red=Down</span></span>
+      <span>K-Line <span class="us-kline-badge" style="margin-left:8px">Green=Up / Red=Down</span></span>
       <span id="usKlineStatus" style="font-size:11px;color:var(--muted)"></span>
     </div>
     <div class="kline-container" id="usKlineContainer"><div class="kline-placeholder">Chart loading…</div></div>
@@ -922,16 +936,16 @@
 
 <!-- Footer -->
 <div class="footer">
-  ⚠️ 本工具僅供技術分析學習參考，不構成任何投資建議。台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
+  本工具僅供技術分析學習參考，不構成任何投資建議。台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
   資料來源：TWSE MIS · Yahoo Finance · TWSE Official · FinMind · Google News RSS（均為免費公開）<br>
-  HERO HQ 台股 AI 英雄指揮中心 <span class="app-ver">V14.3.2</span>
+  台股作戰室 <span class="app-ver">V15.0.0</span>
 </div>
 
-<script src="js/app.js?v=14.3.2"></script>
-<script src="js/gooaye.js?v=14.3.2"></script>
-<script src="js/today.js?v=14.3.2"></script>
-<script src="js/ledger.js?v=14.3.2"></script>
-<script src="js/lab.js?v=14.3.2"></script>
+<script src="js/app.js?v=15.0.0"></script>
+<script src="js/gooaye.js?v=15.0.0"></script>
+<script src="js/today.js?v=15.0.0"></script>
+<script src="js/ledger.js?v=15.0.0"></script>
+<script src="js/lab.js?v=15.0.0"></script>
 <div id="toast" class="toast"></div>
 </body>
 </html>
