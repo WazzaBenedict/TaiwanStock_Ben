@@ -7,7 +7,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="15.0.0";
+var FRONTEND_VERSION="15.1.0";
 // 美股功能先收起來（程式碼保留）。要恢復請改成 true。
 var ENABLE_US=false;
 
@@ -24,6 +24,7 @@ function initFeeSetting(){
     if(typeof CURRENT_ID!=="undefined"&&CURRENT_ID&&typeof loadTradePlanV2==="function")loadTradePlanV2(CURRENT_ID);};}
 }
 var RELEASE_NOTES=[
+  "V15.1：每日報告自動匯入。交易日 06:50 的盤前報告與 13:45 的收盤總結會自動存進「報告」頁，保留最近 60 天；同時每天列出當沖 5 檔候選，收盤後自動對答案並累計模擬損益（已扣元大成本，屬模擬追蹤，不是買賣建議）",
   "V15.0：介面全面改版。拿掉英雄主題，換成簡潔的專業風格；手機底部只留總覽、當沖、個股、帳本四個常用分頁，其餘收在「更多」；首頁可以直接輸入代號查個股，常用功能一鍵到；換頁與數字有平順的動態（系統設定減少動態時會自動關閉）",
   "V14.3.2：研究室新增兩條選股規則，每天自動補資料並重新檢驗：「月營收加速前 10 名」與「跟投信買超前 5 名」。股票池是成交值前 150 檔，因為是事後挑的熱門股，這兩條改成要贏過「股票池平均」才算數，而且同一天進場的合併成一期計算。",
   "V14.3.1：研究室新增三條有文獻依據的規則（長期持有正2、正2 搭配 200 日線、高股息 ETF 除息前行情），並加上「外部研究怎麼說」十則證據摘要與「規則變動與複查日期」。持有類規則改用還原股利的價格比較。",
@@ -70,12 +71,12 @@ var PHASE_BRIEF={
   "night":"夜間：適合複盤與準備明天，明早開盤前回來看今日報告。"
 };
 var HOME_ACTIONS=[
+  {page:"p-reports",ic:"doc",t:"每日報告",d:"盤前、收盤與當沖 5 檔"},
   {page:"p-timemachine",ic:"bolt",t:"當沖候選",d:"今日進場、停損、停利價位"},
   {page:"p-ledger",ic:"book",t:"記一筆交易",d:"帳本：實際損益與紀律"},
   {page:"p-positions",ic:"shield",t:"檢查持倉",d:"損益與停損警示"},
   {page:"p-plans",ic:"target",t:"交易追蹤",d:"盯進場與出場價位"},
-  {page:"p-learn",ic:"flask",t:"研究室",d:"哪些規則真的有效"},
-  {page:"p-market",ic:"globe",t:"市場總覽",d:"大盤、總經與情緒"}
+  {page:"p-learn",ic:"flask",t:"研究室",d:"哪些規則真的有效"}
 ];
 function icon(n){return '<svg class="ic" aria-hidden="true"><use href="#i-'+n+'"/></svg>';}
 function goHero(page,scrollId){
@@ -83,7 +84,7 @@ function goHero(page,scrollId){
   if(scrollId){setTimeout(function(){var el=$I(scrollId);if(el)el.scrollIntoView({behavior:"smooth",block:"start"});},60);}
   else{try{window.scrollTo({top:0,behavior:"smooth"});}catch(e){window.scrollTo(0,0);}}
 }
-var NAV_SEC={"p-plans":1,"p-positions":1,"p-market":1,"p-learn":1,"p-account":1,"p-journal":1};
+var NAV_SEC={"p-reports":1,"p-plans":1,"p-positions":1,"p-market":1,"p-learn":1,"p-account":1,"p-journal":1};
 function navMore(open){
   var n=$I("mainNav"),b=$I("navMore"),sc=$I("navScrim");if(!n)return;
   if(open==null)open=!n.classList.contains("more-open");
@@ -582,6 +583,7 @@ function showPage(pageId) {
   if(pageId==="p-account") renderAccountUI(currentUser);
   if(pageId==="p-ledger"&&window.LEDGER) LEDGER.open();
   if(pageId==="p-learn"&&window.LAB) LAB.open();
+  if(pageId==="p-reports"&&window.REPORTS) REPORTS.open();
   try{if(pageId==="p-hq") renderHQ(); navSync(pageId);}catch(e){console.warn("home ui",e);}
   if(pageId==="p-plans") { loadTradePlans().then(function(){renderTradePlans(); refreshTradePlans(false);}); }
 }
