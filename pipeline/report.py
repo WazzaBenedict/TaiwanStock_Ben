@@ -119,6 +119,14 @@ def main(argv: list[str]) -> int:
             snap = None   # 快照不是今天產生的（例如沿用舊檔），不能當今天的報告
     except Exception:
         snap = None
+    # 舊的候選還沒有個股回測就補上（只補最近一天，約 5 次抓取）
+    for d in (arch.get("days") or [])[:1]:
+        items = (d.get("picks") or {}).get("items") or []
+        if items and any("bt" not in x for x in items):
+            try:
+                P.attach_bt(items)
+            except Exception as e:
+                print("bt backfill failed:", type(e).__name__, str(e)[:120])
     if snap:
         day, ph = now.date().isoformat(), phase(now)
         entry = next((d for d in arch.get("days", []) if d["date"] == day), {})

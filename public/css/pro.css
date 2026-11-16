@@ -270,3 +270,5 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulati
 .rp-table th small{font-weight:400;color:var(--muted);font-size:11px}
 .rp-nm{color:var(--muted);font-size:12px}
 @media(max-width:760px){.rp-table th,.rp-table td{padding-left:6px;padding-right:6px}}
+.rp-ok{font-size:11px;color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:0 5px}
+.rp-bt td,.rp-bt th{text-align:right}.rp-bt td:first-child,.rp-bt th:first-child{text-align:left}
