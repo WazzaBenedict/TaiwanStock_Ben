@@ -17,17 +17,30 @@ var REPORTS=(function(){
     return '<td><b>'+e(lim)+'</b></td><td class="down">'+e(stop)+'</td><td>'+(tgt!=null?e(tgt):'—')+'</td>';}
   function planNote(){return '<div class="rp-plan"><b>入場時間</b>：08:30–09:00 用「進場價」掛限價買 1 張，09:00 開盤集合競價成交；開盤價高於進場價就不會成交，那檔今天就不做。'
     +'<br><b>出場</b>：盤中跌破開盤價 × 0.97 停損賣出；沒停損就在 13:25–13:30 收盤集合競價賣出（規則 R1 是收盤賣，沒有固定目標價）。'
-    +'<br><b>參考目標</b>：進場價加一天的平均波動，只是「漲到這裡算很順」的參考，<u>沒有回測過</u>，不要當成保證會到的價位。</div>';}
+    +'<br><b>參考目標</b>：進場價加一天的平均波動。要不要「漲到就賣」，看下方回測表的「到目標賣」是否比「收盤賣」好；兩者差不多時照規則收盤賣。</div>';}
+  // 個股回測（2023-06 起，每天日線；扣元大 6 折手續費與當沖稅；集合競價成交）
+  function pv(v){return v==null?'<span class="rp-na">—</span>':'<span class="'+(v>0?"up":v<0?"down":"")+'">'+(v>0?"+":"")+Number(v).toFixed(2)+'%</span>';}
+  function btTable(items){
+    var rows=items.filter(function(x){return x.bt;});if(!rows.length)return '';
+    var h='<div class="rp-sub">個股回測<span class="rp-hint">'+e(rows[0].bt.from)+' 起，每筆 1 張，已扣元大手續費與當沖稅</span></div><div class="rp-scroll"><table class="rp-table rp-bt"><thead><tr><th>股票<br><small>B 版筆數</small></th><th>收盤賣<br><small>勝率·2025後</small></th><th>到目標賣<br><small>勝率</small></th><th>對照<br><small>天天買</small></th></tr></thead><tbody>';
+    rows.forEach(function(x){var b=x.bt,bc=b.B_close||{},bt=b.B_target||{},ac=b.A_close||{};
+      h+='<tr><td>'+e(x.code)+' <small class="rp-nm">'+e(x.name)+'</small><br><small class="rp-nm">'+e(bc.n)+' 筆</small> '+(b.pass?'<span class="rp-ok">通過</span>':'<span class="rp-warn">只模擬</span>')+'</td><td>'+pv(bc.avg)+'<br><small class="rp-nm">'+(bc.win!=null?bc.win+'%':'—')+' · '+(bc.oos!=null?(bc.oos>0?'+':'')+bc.oos.toFixed(2)+'%':'—')+'</small></td><td>'+pv(bt.avg)+'<br><small class="rp-nm">'+(bt.win!=null?bt.win+'%':'—')+'</small></td><td>'+pv(ac.avg)+'</td></tr>';});
+    var tot=function(k){var n=0,s=0;rows.forEach(function(x){var v=x.bt[k]||{};if(v.n&&v.avg!=null){n+=v.n;s+=v.avg*v.n;}});return n?{n:n,avg:s/n}:null;};
+    var c=tot("B_close"),t=tot("B_target"),c1=tot("B_close_t1");
+    h+='</tbody></table></div><div class="rp-hint">5 檔合計 B 版 '+(c?c.n:0)+' 筆：收盤賣平均 '+pv(c&&c.avg)+'，到目標賣平均 '+pv(t&&t.avg)+'；若買賣各多付 1 檔，收盤賣變成 '+pv(c1&&c1.avg)+'。'
+      +'「通過」＝B 版至少 20 筆、平均賺錢、2025 年後也賺錢；沒通過的只做模擬，不建議真錢。對照組是同一檔每天開盤都買，用來看「挑日子」有沒有用。'
+      +'日線看不出盤中先碰到停損還是目標，同一天兩個都碰到時一律算停損（保守）。每檔筆數只有幾十筆，誤差很大，只能當參考。</div>';
+    return h;}
   function picksTable(day){
     var p=day.picks,res={};(day.results||[]).forEach(function(r){res[r.code]=r;});
     if(!p||!p.items||!p.items.length)return "";
     var has=!!(day.results&&day.results.length);
-    var h='<div class="rp-sub">當沖 5 檔候選<span class="rp-hint">規則 '+e(p.version)+'，母體 '+e(p.universe_n)+' 檔，模擬追蹤</span></div><div class="rp-scroll">'+(has?'':planNote())+'<table class="rp-table"><thead><tr><th>股票</th><th>昨收</th>'+(has?'<th>B 版買進上限</th>':'')+(has?'<th>開盤</th><th>收盤</th><th>A 版損益</th><th>B 版損益</th>':'<th>進場價<br><small>限價</small></th><th>停損<br><small>約</small></th><th>參考目標<br><small>未回測</small></th>')+'</tr></thead><tbody>';
+    var h='<div class="rp-sub">當沖 5 檔候選<span class="rp-hint">規則 '+e(p.version)+'，母體 '+e(p.universe_n)+' 檔，模擬追蹤</span></div><div class="rp-scroll">'+(has?'':planNote())+'<table class="rp-table"><thead><tr><th>股票</th><th>昨收</th>'+(has?'<th>B 版買進上限</th>':'')+(has?'<th>開盤</th><th>收盤</th><th>A 版損益</th><th>B 版損益</th>':'<th>進場價<br><small>限價</small></th><th>停損<br><small>約</small></th><th>參考目標<br><small>見回測</small></th>')+'</tr></thead><tbody>';
     p.items.forEach(function(x){var r=res[x.code];
       h+='<tr><td><button class="td-link" data-rp-stock="'+e(x.code)+'">'+e(x.code)+'</button>'+(has?' ':'<br><small class="rp-nm">')+e(x.name)+(has?'':'</small>')+'</td><td>'+e(x.close)+'</td>'+(has?'<td>'+e(x.buy_b_max)+'</td>':'')
         +(has?(r?'<td>'+e(r.open)+' '+pc(r.gap_pct)+'</td><td>'+e(r.close)+(r.stop_hit?' <span class="rp-warn">停損</span>':'')+'</td><td>'+(r.over_cap?'<span class="rp-na">超過上限沒買</span>':nt(r.a_net))+'</td><td>'+(r.b_taken?nt(r.b_net):'<span class="rp-na">沒買</span>')+'</td>':'<td colspan="4" class="rp-na">沒有成交資料</td>'):planCells(x))+'</tr>';
     });
-    h+='</tbody></table></div><div class="rp-hint">A 版：開盤買、收盤賣。B 版：開盤價不高於「買進上限」（＝進場價）才買。兩版都是每檔 1 張、跌破開盤價 3% 停損，損益已扣元大手續費與當沖稅。</div>';
+    h+='</tbody></table></div>'+(has?'':btTable(p.items))+'<div class="rp-hint">A 版：開盤買、收盤賣。B 版：開盤價不高於「買進上限」（＝進場價）才買。兩版都是每檔 1 張、跌破開盤價 3% 停損，損益已扣元大手續費與當沖稅。</div>';
     return h;
   }
   function dayHtml(d,open){

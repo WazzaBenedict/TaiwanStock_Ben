@@ -118,6 +118,86 @@ def score(pick: dict, bar: dict, fees: BrokerFees | None = None) -> dict:
             "b_net": round(net0) if taken else 0, "b_net_tick1": round(net1) if taken else 0}
 
 
+# ── 個股回測（R1.1：候選先回測再給；定義與研究串 bt5.py 相同，另加「到參考目標就賣」） ──
+BT_START, BT_OOS = "2023-06-01", "2025-01-01"
+
+
+def _net_pct(buy: float, sell: float, fees: BrokerFees) -> float:
+    return fees.round_trip(buy, sell, 1000, daytrade=True)["net_pnl"] / (buy * 1000) * 100
+
+
+def bt_trade(o: float, h: float, low: float, c: float, target: float | None, fees: BrokerFees, slip: int = 0) -> float:
+    """一天的當沖結果（%，扣元大成本）。開盤買；跌破開盤×0.97 停損；有 target 時漲到就賣，
+    同一天停損與目標都碰到時保守算先停損（日線看不出先後）；都沒碰到就收盤賣。"""
+    buy = o + slip * tick(o)
+    stop = o * STOP
+    if low <= stop:
+        ex = floor_tick(stop)
+    elif target is not None and h >= target:
+        ex = target
+    else:
+        ex = c
+    return _net_pct(buy, ex - slip * tick(ex), fees)
+
+
+def backtest(bars: list[dict], start: str = BT_START, fees: BrokerFees | None = None) -> dict:
+    """bars 由舊到新。回傳各版本的筆數、平均淨報酬%、勝率、2025 後平均。
+    A：每天開盤買（同一檔隨便哪天進場，當作對照組）；B：開盤 ≤ 昨收×0.99 才買。
+    close＝收盤賣（R1 原規則）；target＝漲到 開盤×(1+前一日 ATR14%) 就賣。"""
+    fees = fees or BrokerFees()
+    rows = {"A_close": [], "B_close": [], "B_close_t1": [], "A_target": [], "B_target": []}
+    for i in range(15, len(bars)):
+        b, pb = bars[i], bars[i - 1]
+        if b["d"] < start:
+            continue
+        tr = [max(bars[k]["h"] - bars[k]["l"], abs(bars[k]["h"] - bars[k - 1]["c"]), abs(bars[k]["l"] - bars[k - 1]["c"]))
+              for k in range(i - 14, i)]
+        atr = sum(tr) / 14 / pb["c"]
+        o, h, low, c = b["o"], b["h"], b["l"], b["c"]
+        tgt = ceil_tick(o * (1 + atr))
+        a0 = bt_trade(o, h, low, c, None, fees)
+        at = bt_trade(o, h, low, c, tgt, fees)
+        rows["A_close"].append((b["d"], a0))
+        rows["A_target"].append((b["d"], at))
+        if o <= pb["c"] * B_GAP:
+            rows["B_close"].append((b["d"], a0))
+            rows["B_close_t1"].append((b["d"], bt_trade(o, h, low, c, None, fees, slip=1)))
+            rows["B_target"].append((b["d"], at))
+
+    def stat(xs):
+        n = len(xs)
+        if not n:
+            return {"n": 0, "avg": None, "win": None, "oos": None, "oos_n": 0}
+        oo = [v for d, v in xs if d >= BT_OOS]
+        return {"n": n, "avg": round(sum(v for _, v in xs) / n, 2), "win": round(sum(1 for _, v in xs if v > 0) / n * 100),
+                "oos": round(sum(oo) / len(oo), 2) if oo else None, "oos_n": len(oo)}
+    out = {k: stat(v) for k, v in rows.items()}
+    bc, bt_ = out["B_close"], out["B_target"]
+    out["from"] = start
+    out["pass"] = bool(bc["n"] >= 20 and (bc["avg"] or 0) > 0 and (bc["oos"] or 0) > 0)
+    out["target_better"] = bool(bc["n"] and bt_["avg"] is not None and bt_["avg"] > bc["avg"])
+    return out
+
+
+def attach_bt(items: list[dict], cl: httpx.Client | None = None) -> list[dict]:
+    """幫每檔候選加上 bt（抓 5 年日線）。抓不到的那檔 bt=None，不影響其他檔。"""
+    own = cl is None
+    cl = cl or httpx.Client(timeout=30, headers=UA, follow_redirects=True)
+    try:
+        for x in items:
+            if x.get("bt"):
+                continue
+            try:
+                x["bt"] = backtest(daily(cl, x["code"], x.get("mkt", "TW"), "5y"))
+            except Exception as e:
+                print("bt failed", x.get("code"), type(e).__name__, str(e)[:80])
+                x["bt"] = None
+    finally:
+        if own:
+            cl.close()
+    return items
+
+
 def totals(results: list[dict]) -> dict:
     """累計模擬成績。results：所有已結算的單筆。"""
     out = {}
@@ -199,4 +279,5 @@ def build(workers: int = 6) -> dict:
     if len(rows) < len(uni) * 0.5:
         raise RuntimeError(f"only {len(rows)}/{len(uni)} symbols fetched")
     items, n = rank(rows)
+    attach_bt(items)
     return {"signal_date": max(r["date"] for r in rows), "version": VERSION, "universe_n": n, "items": items}

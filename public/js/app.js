@@ -7,7 +7,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="15.3.0";
+var FRONTEND_VERSION="15.4.0";
 // 美股功能先收起來（程式碼保留）。要恢復請改成 true。
 var ENABLE_US=false;
 
@@ -24,6 +24,7 @@ function initFeeSetting(){
     if(typeof CURRENT_ID!=="undefined"&&CURRENT_ID&&typeof loadTradePlanV2==="function")loadTradePlanV2(CURRENT_ID);};}
 }
 var RELEASE_NOTES=[
+  "V15.4：當沖 5 檔每檔附個股回測（2023-06 起，扣元大成本）：B 版筆數、收盤賣與到目標賣的平均報酬與勝率、2025 年後表現、每天都買的對照組，並標示「通過」或「只模擬」",
   "V15.3：每日報告的當沖 5 檔加上操作計畫：進場價（掛限價）、入場時間（08:30–09:00 掛單、09:00 開盤成交）、停損價、參考目標價（未回測，規則仍是收盤賣）",
   "V15.2.1：手機上連點兩下不會再把畫面放大（兩指縮放仍可用），點輸入框也不會自動放大",
   "V15.2：團隊體檢與優化。打開更快（不再下載大型中文字型、腳本延後載入、後端提早喚醒）；回訪直接進總覽，自選股先顯示上次價格；個股 K 線圖修好、手機查詢後自動捲到結果；當沖總停損改成 10,000 元（帳本與風控都同步）；交易計畫建議股數不超過單筆上限 50,000 元；時光機的 ETF 改用 0.1% 證交稅；債券 ETF 免稅到 2026-12-31 後自動恢復課稅；當沖 5 檔在 19:00 用定稿收盤價重算；00631L 這類英文結尾的 ETF 可以查詢與加入自選；個股成交量少算 1000 倍的錯誤修正；持倉沒填目標或停損也能更新價格；帳本紀律檢查改用你在當沖風控存的上限；介面英文與用詞統一成中文（停損、偏多／觀察／避開），按鈕放大好點",

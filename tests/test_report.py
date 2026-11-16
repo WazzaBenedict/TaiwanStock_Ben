@@ -75,3 +75,17 @@ def test_plan_levels_ticks():
     p = plan_levels(35.75, 0.0236)
     assert p["entry_limit"] == 35.35 and p["stop_est"] == 34.25 and p["ref_target"] == 36.2
     assert plan_levels(26.0, 0.0249)["ref_target"] == 26.35
+
+
+def test_backtest_target_and_stop():
+    from pipeline import picks as P
+    def bar(d, o, h, l, c): return {"d": d, "o": o, "h": h, "l": l, "c": c, "v": 1}
+    bars = [bar(f"2023-05-{i:02d}", 30, 30.6, 29.4, 30) for i in range(1, 17)]
+    bars += [bar("2023-06-01", 29.5, 31.0, 29.4, 29.6),   # 開低 → B；碰到目標（約 29.5×1.04）就賣
+             bar("2023-06-02", 29.0, 29.2, 28.0, 28.9),   # 開低，跌破停損
+             bar("2023-06-03", 29.0, 30.6, 28.0, 30.0)]   # 同一天兩邊都碰到 → 算停損
+    r = P.backtest(bars)
+    assert r["A_close"]["n"] == 3 and r["B_close"]["n"] == 2  # 第 3 天開盤沒有比昨收低 1%
+    assert r["B_target"]["avg"] > r["B_close"]["avg"] - 5
+    stop_day = P.bt_trade(29.0, 30.6, 28.0, 30.0, 30.2, P.BrokerFees())
+    assert stop_day < 0
