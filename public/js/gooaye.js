@@ -6,13 +6,19 @@
   function e(s){return String(s==null?"":s).replace(/[&<>'"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c];});}
   var TAG={ok:["有回測支持","gy-ok"],fail:["回測未通過","gy-fail"],note:["紀律提醒","gy-note"]};
   var RULES=[
-    {id:"chase",tag:"ok",title:"昨天漲停的股票，今天開盤不要追",
-     text:"節目多次提到「隔日沖」：前一天鎖漲停，隔天常被倒貨。",
+    {id:"chase",tag:"ok",title:"不要當沖追隔日漲停",
+     text:"昨天漲停的股票，今天開盤追進去、當天就賣，長期是賠的。這條只針對當沖；節目談的波段持有強勢股是另一回事，本站沒有驗證。",
      test:"回測 2015/7–2026/11、成交值前 200 大、5,804 次漲停：隔天開盤買、當天收盤賣，扣成本平均 −0.55%，勝率 42%，12 年裡 11 年是負的。"},
     {id:"slow",tag:"note",title:"盤整或震盪時，先縮小部位、放慢腳步",
      text:"沒買到就放掉，等量縮拉回再看；頻繁追價的磨損會一點一點吃掉本金。"},
     {id:"ytd",tag:"note",title:"今年賺得不多，就守得更嚴",
      text:"防守強度看今年累積損益：獲利墊厚才容許較深的回檔，獲利薄就嚴格停損。帳本頁可以看今年的淨損益。"},
+    {id:"revenge",tag:"note",title:"賠錢之後，不要放大部位想一次扳回",
+     text:"被迫砍倉後改用更大的槓桿拚回來，是最常見的出局方式。本站的每日停損與累計停損就是為了擋這件事。"},
+    {id:"cash",tag:"note",title:"淨值天天往下又看不懂盤，先降部位、拉高現金",
+     text:"寧可少賺一段反彈，也要先守住本金。不要因為今年已經賺過，就放著停損不執行。"},
+    {id:"noadd",tag:"note",title:"正在賠錢的部位不加碼",
+     text:"績效已經告訴你這筆在輸，就不要再攤平擴大。"},
     {id:"own",tag:"note",title:"不跟單，停損自己負責",
      text:"節目自己說不是報牌。聽來的標的也要有自己的進場理由和停損價，套牢時照計畫執行。"},
     {id:"lever",tag:"note",title:"槓桿只用在短期事件，不長抱",
@@ -33,7 +39,7 @@
     var w=(d&&d.watchlist)||[],r=(d&&d.risk)||{};
     var hot=w.filter(function(x){return x.chg_pct!=null&&Number(x.chg_pct)>=9.5;}).map(function(x){return x.code;});
     if(hot.length)return {rule:RULES[0],why:hot.join("、")+" 上一個交易日漲停"};
-    if(r.color==="red")return {rule:RULES[1],why:"大盤風險燈是紅燈"};
+    if(r.color==="red")return {rule:RULES[4],why:"大盤風險燈是紅燈"};
     if(r.color==="yellow")return {rule:RULES[2],why:"大盤風險燈是黃燈"};
     var n=Math.floor((Date.now()+8*36e5)/864e5);
     return {rule:RULES[1+n%(RULES.length-2)],why:""};
