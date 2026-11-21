@@ -29,8 +29,12 @@ def make_router(fetch_history, name_to_code=None) -> APIRouter:
                 try:
                     c = float(r["收盤價"])
                     o = float(r["開盤價"]) if "開盤價" in df.columns and r["開盤價"] == r["開盤價"] else c
-                    if c > 0:
-                        out[str(r["日期"])[:10]] = {"o": o if o > 0 else c, "c": c}
+                    # 有還原收盤價（含股利）就用它，開盤價同比例調整；除息日不會被當成下跌
+                    a = float(r["還原收盤價"]) if "還原收盤價" in df.columns and r["還原收盤價"] == r["還原收盤價"] else c
+                    if c > 0 and a > 0:
+                        f = a / c
+                        o = o if o > 0 else c
+                        out[str(r["日期"])[:10]] = {"o": o * f, "c": a}
                 except (TypeError, ValueError):
                     continue
         except Exception:
