@@ -35,10 +35,11 @@ var REPORTS=(function(){
     var p=day.picks,res={};(day.results||[]).forEach(function(r){res[r.code]=r;});
     if(!p||!p.items||!p.items.length)return "";
     var has=!!(day.results&&day.results.length);
-    var h='<div class="rp-sub">當沖 5 檔候選<span class="rp-hint">規則 '+e(p.version)+'，母體 '+e(p.universe_n)+' 檔，模擬追蹤</span></div><div class="rp-scroll">'+(has?'':planNote())+'<table class="rp-table"><thead><tr><th>股票</th><th>昨收</th>'+(has?'<th>B 版買進上限</th>':'')+(has?'<th>開盤</th><th>收盤</th><th>A 版損益</th><th>B 版損益</th>':'<th>進場價<br><small>限價</small></th><th>停損<br><small>約</small></th><th>參考目標<br><small>見回測</small></th>')+'</tr></thead><tbody>';
+    var noDt=!has&&day.pre&&/不做/.test(day.pre.conclusion||"");
+    var h='<div class="rp-sub">當沖 5 檔候選<span class="rp-hint">規則 '+e(p.version)+'，母體 '+e(p.universe_n)+' 檔，模擬追蹤</span></div>'+(noDt?'<div class="rp-caution"><b>今天盤前結論是「當沖不做」</b>：以下 5 檔只做模擬追蹤，不要真的掛單。</div>':'')+'<div class="rp-scroll">'+(has?'':planNote())+'<table class="rp-table"><thead><tr><th>股票</th><th>昨收</th>'+(has?'<th>開盤</th><th>收盤</th><th>A 版損益</th><th>B 版損益</th>':'<th>進場價<br><small>限價</small></th><th>停損<br><small>約</small></th><th>參考目標<br><small>見回測</small></th>')+'</tr></thead><tbody>';
     p.items.forEach(function(x){var r=res[x.code];
-      h+='<tr><td><button class="td-link" data-rp-stock="'+e(x.code)+'">'+e(x.code)+'</button>'+(has?' ':'<br><small class="rp-nm">')+e(x.name)+(has?'':'</small>')+'</td><td>'+e(x.close)+'</td>'+(has?'<td>'+e(x.buy_b_max)+'</td>':'')
-        +(has?(r?'<td>'+e(r.open)+' '+pc(r.gap_pct)+'</td><td>'+e(r.close)+(r.stop_hit?' <span class="rp-warn">停損</span>':'')+'</td><td>'+(r.over_cap?'<span class="rp-na">超過上限沒買</span>':nt(r.a_net))+'</td><td>'+(r.b_taken?nt(r.b_net):'<span class="rp-na">沒買</span>')+'</td>':'<td colspan="4" class="rp-na">沒有成交資料</td>'):planCells(x))+'</tr>';
+      h+='<tr><td><button class="td-link" data-rp-stock="'+e(x.code)+'">'+e(x.code)+'</button><br><small class="rp-nm">'+e(x.name)+'</small></td><td>'+e(x.close)+'</td>'
+        +(has?(r?'<td>'+e(r.open)+'<br><small>'+pc(r.gap_pct)+'</small></td><td>'+e(r.close)+(r.stop_hit?' <span class="rp-warn">停損</span>':'')+'</td><td>'+(r.over_cap?'<span class="rp-na">超過上限沒買</span>':nt(r.a_net))+'</td><td>'+(r.b_taken?nt(r.b_net):'<span class="rp-na">沒買</span>')+'</td>':'<td colspan="4" class="rp-na">沒有成交資料</td>'):planCells(x))+'</tr>';
     });
     h+='</tbody></table></div>'+(has?'':btTable(p.items))+'<div class="rp-hint">A 版：開盤買、收盤賣。B 版：開盤價不高於「買進上限」（＝進場價）才買。兩版都是每檔 1 張、跌破開盤價 3% 停損，損益已扣元大手續費與當沖稅。</div>';
     return h;
@@ -57,14 +58,14 @@ var REPORTS=(function(){
       h+='<div class="rp-sub">收盤總結<span class="rp-hint">'+e(hm(cl.at))+' 產生</span></div><div class="rp-kpis"><div class="rp-kpi"><span>0050 實際開盤</span><b>'+pc(cl.gap_pct)+'</b></div><div class="rp-kpi"><span>0050 收盤</span><b>'+pc(cl.close_chg_pct)+'</b></div>'
         +(pre&&pre.gap&&pre.gap.ok&&cl.gap_pct!=null?'<div class="rp-kpi"><span>開盤方向</span><b>'+((pre.gap.pct>0)===(cl.gap_pct>0)?"猜對":"猜錯")+'</b></div>':'')+'</div>';
       if(cl.watchlist&&cl.watchlist.length)h+='<div class="td-chips">'+cl.watchlist.map(function(x){return '<span class="td-chip">'+e(x.code)+' '+pc(x.chg_pct)+'</span>';}).join("")+'</div>';
-    }else if(pre){h+='<div class="rp-hint">收盤總結會在 13:45 後自動補上。</div>';}
+    }else if(pre){h+='<div class="rp-hint">收盤總結會在收盤後自動補上（排程可能延後幾小時）。</div>';}
     if(pre&&pre.news&&pre.news.length)h+='<details class="rp-news"><summary>盤前新聞標題（'+pre.news.length+'）</summary><ul>'+pre.news.map(function(t){return '<li>'+e(t)+'</li>';}).join("")+'</ul></details>';
     return h+'</div></details>';
   }
   function totalsHtml(){
     var t=data.picks_totals||{},a=t.a||{},b=t.b||{};
     if(!a.n)return '<div class="rp-hint">當沖 5 檔的模擬成績會從第一個交易日收盤後開始累積。</div>';
-    function box(name,x){return '<div class="rp-kpi"><span>'+name+'（'+x.n+' 筆）</span><b>'+nt(x.net)+' 元</b><small>勝率 '+(x.win_rate_pct==null?"—":x.win_rate_pct+"%")+'，每邊多滑 1 檔是 '+nt(x.net_tick1)+'</small></div>';}
+    function box(name,x){return '<div class="rp-kpi"><span>'+name+'（'+x.n+' 筆）</span><b>'+nt(x.net)+' 元</b><small>勝率 '+(x.win_rate_pct==null?"—":x.win_rate_pct+"%")+'，買賣各差 1 檔：'+nt(x.net_tick1)+' 元</small></div>';}
     return '<div class="rp-kpis">'+box("A 版累計",a)+box("B 版累計",b)+'</div>';
   }
   function render(){
@@ -72,7 +73,7 @@ var REPORTS=(function(){
     if(!data){box.innerHTML='<div class="rp-na">報告還沒產生。</div>';return;}
     var days=data.days||[];
     var h='<div class="rp-sub">當沖 5 檔模擬成績<span class="rp-hint">已對答案 '+(data.picks_days||0)+' 天</span></div>'+totalsHtml()+'<div class="rp-caution">'+e((data.picks_rule||{}).note||"")+'</div>';
-    h+='<div class="rp-sub">每日報告<span class="rp-hint">交易日 06:50 盤前、13:45 收盤自動存檔，保留最近 60 天</span></div>';
+    h+='<div class="rp-sub">每日報告<span class="rp-hint">交易日開盤前與收盤後自動存檔，保留最近 60 天</span></div>';
     h+=days.length?days.map(function(d,i){return dayHtml(d,i===0);}).join(""):'<div class="rp-empty">第一份報告會在下一個交易日 06:50 後自動出現，之後每天累積。</div>';
     box.innerHTML=h;bind(box);
   }
@@ -83,7 +84,8 @@ var REPORTS=(function(){
     if(!d){box.innerHTML='<div class="rp-home-h"><b>每日報告</b><button class="ghost sm" data-hq-go="p-reports">全部報告</button></div><div class="rp-hint">第一份報告會在下一個交易日 06:50 後自動出現。</div>';box.style.display="block";return;}
     var h='<div class="rp-home-h"><b>每日報告</b><span class="rp-hint">'+e(String(d.date||"").slice(5).replace("-","/"))+' '+wk(d.date)+(d.close?"，已收盤":"，盤前")+'</span><button class="ghost sm" data-hq-go="p-reports">全部報告</button></div>';
     if(d.close)h+='<div class="rp-concl">0050 開盤 '+pc(d.close.gap_pct)+'，收盤 '+pc(d.close.close_chg_pct)+'</div>';
-    h+=picksTable(d)||'<div class="rp-hint">今天沒有當沖候選。</div>';
+    var why=d.pre&&d.pre.conclusion?'盤前結論：'+e(d.pre.conclusion):'';
+    h+=picksTable(d)||'<div class="rp-hint">這天沒有當沖 5 檔候選。'+why+'</div>';
     box.innerHTML=h;box.style.display="block";bind(box);
   }
   function load(){

@@ -211,7 +211,7 @@ table{font-variant-numeric:tabular-nums}
 .rp-na{color:var(--muted)}
 .rp-caution{font-size:12.5px;color:var(--yellow);line-height:1.6;margin:8px 0 0}
 .rp-concl{font-size:15px;font-weight:600;line-height:1.5;margin-bottom:10px}
-.rp-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px}
+.rp-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px;margin-bottom:10px}
 .rp-kpi{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .rp-kpi>span{display:block;font-size:12px;color:var(--muted)}
 .rp-kpi b{display:block;font-family:var(--num);font-size:18px;font-weight:700;margin-top:2px}
@@ -248,7 +248,7 @@ table{font-variant-numeric:tabular-nums}
 .section-title-left{flex-wrap:wrap;min-width:0}
 .live-dot.warn{background:#e0a020;animation:none}
 .live-dot.off{background:#6b7280;animation:none}
-details.lb-fold>summary{list-style:none;cursor:pointer}
+details.lb-fold>summary{list-style:none;cursor:pointer;min-height:44px;display:flex;align-items:center}
 details.lb-fold>summary::-webkit-details-marker{display:none}
 details.lb-fold>summary .lb-head::after{content:"展開 ▾";margin-left:auto;font-size:12px;color:var(--muted)}
 details.lb-fold[open]>summary .lb-head::after{content:"收合 ▴"}
@@ -272,3 +272,9 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulati
 @media(max-width:760px){.rp-table th,.rp-table td{padding-left:6px;padding-right:6px}}
 .rp-ok{font-size:11px;color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:0 5px}
 .rp-bt td,.rp-bt th{text-align:right}.rp-bt td:first-child,.rp-bt th:first-child{text-align:left}
+/* v15.5.0 第二輪體檢：手機字級下限與點擊區 */
+@media(max-width:760px){
+  .rp-kpi b{font-size:16px}
+  .k,.sync-badge,#dtFoot,.td-time,.gy-tag,.rp-table th{font-size:12px}
+  .quick-nav-btn{min-height:40px}
+}

@@ -46,7 +46,7 @@ var TODAY=null;
       var id=b.getAttribute("data-td-stock");
       if(typeof loadStock==="function"&&typeof showPage==="function"){showPage("p-trade");loadStock(id);}
     });});
-    var be=$("hqBrief");if(be&&d.conclusion)be.textContent=d.conclusion;
+    if(typeof renderHQ==="function"){try{renderHQ();}catch(x){}}else{var be=$("hqBrief");if(be&&d.conclusion)be.textContent=d.conclusion;}
   }
   function fail(msg){var box=$("todayCard");if(box){box.innerHTML='<div class="td-head"><span class="td-kicker">今日</span></div><div class="td-sub">'+e(msg)+'</div>';box.style.display="block";}}
   window.loadToday=function(){

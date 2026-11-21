@@ -112,7 +112,7 @@ function renderHQ(){
   var pe=$I("hqPhase");if(pe){pe.textContent=ph.label;pe.className="hm-phase"+(ph.key==="live"||ph.key==="open-soon"?" live":"");}
   var ce=$I("hqClock");if(ce)ce.textContent="台北 "+ph.t.label;
   var de=$I("hqDate");if(de){try{de.textContent=new Intl.DateTimeFormat("zh-TW",{timeZone:"Asia/Taipei",month:"long",day:"numeric",weekday:"long"}).format(new Date());}catch(e){}}
-  var be=$I("hqBrief");if(be)be.textContent=(window.TODAY&&TODAY.conclusion)?TODAY.conclusion:(PHASE_BRIEF[ph.key]||"");
+  var be=$I("hqBrief");if(be)be.textContent=(window.TODAY&&TODAY.conclusion)?((ph.key==="closed"?"下個交易日：":"")+TODAY.conclusion):(PHASE_BRIEF[ph.key]||"");
   var qk=$I("hqQuick");
   if(qk&&!qk.firstChild)qk.innerHTML=HOME_ACTIONS.map(function(m){return '<button class="hm-act" data-hq-go="'+m.page+'"><span class="hm-act-ic">'+icon(m.ic)+'</span><span class="hm-act-tx"><b>'+m.t+'</b><small>'+m.d+'</small></span>'+icon("chev")+'</button>';}).join("");
   initFeeSetting();
@@ -1241,7 +1241,7 @@ async function loadMacro() {
   grid.innerHTML='<div class="macro-item"><div class="macro-label">載入中</div><div class="macro-val">…</div></div>';
   try {
     var r=await apiFetch(API+"/api/macro",{},12000);var d=await r.json();
-    var items=[{label:"USD/TWD",key:"usd_twd",dd:3},{label:"DXY 美元",key:"dxy",dd:2},{label:"NASDAQ Fut",key:"nasdaq_futures",dd:0},{label:"SOX",key:"sox",dd:0},{label:"美債10Y%",key:"us10y",dd:2}];
+    var items=[{label:"美元／台幣",key:"usd_twd",dd:3},{label:"DXY 美元",key:"dxy",dd:2},{label:"那斯達克期貨",key:"nasdaq_futures",dd:0},{label:"費城半導體",key:"sox",dd:0},{label:"美債10Y%",key:"us10y",dd:2}];
     grid.innerHTML=items.map(function(it){var v=d[it.key];return'<div class="macro-item"><div class="macro-label">'+it.label+'</div><div class="macro-val">'+(v!=null?Number(v).toFixed(it.dd):"—")+'</div></div>';}).join("");
     var noteEl=$I("macroNote");if(noteEl){var adj=d.macro_adj||0;noteEl.textContent=(d.risk_note||"")+(adj?"  宏觀調整："+(adj>0?"+":"")+adj:"");noteEl.style.color=adj>=0?"var(--down)":"var(--up)";}
   } catch(e) { if(grid)grid.innerHTML='<div class="macro-item"><div class="macro-label" style="color:var(--muted)">宏觀資料暫時無法取得</div></div>'; }
