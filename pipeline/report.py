@@ -69,10 +69,48 @@ def update(arch: dict, snap: dict, now: datetime, picks: dict | None = None, res
             if results:   # 19:00 收盤價定稿時重算，蓋掉 13:45 的初步結果
                 e["results"] = results
     ordered = [days[k] for k in sorted(days, reverse=True)][:MAX_DAYS]
-    done = [r for d in ordered for r in d.get("results") or []]
-    return {"schema": 1, "updated_at": now.isoformat(timespec="seconds"), "days": ordered,
-            "picks_totals": P.totals(done), "picks_days": sum(1 for d in ordered if d.get("results")),
+    keep = all_results({"results_all": arch.get("results_all"), "days": list(days.values())})
+    done = [r for k in sorted(keep) for r in keep[k]]
+    out = {"schema": 1, "updated_at": now.isoformat(timespec="seconds"), "days": ordered, "results_all": keep,
+            "picks_totals": P.totals(done), "picks_days": len(keep),
             "picks_rule": {"version": P.VERSION, "note": "模擬追蹤，不是買賣建議。A 版回測扣成本後為負；B 版（開盤跌 1% 以上才買）要累積 100 筆以上才下結論。每檔 1 張，成本用元大費率。"}}
+    if arch.get("next_picks"):
+        out["next_picks"] = arch["next_picks"]
+    return out
+
+
+def target_day(now: datetime) -> str:
+    """下一份當沖候選是給哪一天用的：交易日 09:00 前是今天，否則是下一個平日（國定假日不另外判斷）。"""
+    d = now.date()
+    if now.weekday() < 5 and (now.hour, now.minute) < (9, 0):
+        return d.isoformat()
+    d += timedelta(days=1)
+    while d.weekday() >= 5:
+        d += timedelta(days=1)
+    return d.isoformat()
+
+
+def place_next_picks(arch: dict, today: str) -> dict:
+    """純函式：next_picks 的日期到了（或已過），就放進那一天的報告；尚未到的留著給畫面顯示「下個交易日」。"""
+    np = arch.get("next_picks")
+    if not np or np.get("for_date", "9999") > today:
+        return arch
+    days = {d["date"]: dict(d) for d in arch.get("days", [])}
+    e = days.setdefault(np["for_date"], {"date": np["for_date"]})
+    if not e.get("picks"):
+        e["picks"] = {k: v for k, v in np.items() if k != "for_date"}
+    out = dict(arch, days=[days[k] for k in sorted(days, reverse=True)][:MAX_DAYS])
+    out.pop("next_picks", None)
+    return out
+
+
+def all_results(arch: dict) -> dict:
+    """累計成績不受 60 天保存上限影響：每天的對答案另外留一份（date -> results）。"""
+    keep = dict(arch.get("results_all") or {})
+    for d in arch.get("days", []):
+        if d.get("results"):
+            keep[d["date"]] = d["results"]
+    return keep
 
 
 def score_day(entry: dict, day: str) -> list[dict]:
@@ -127,15 +165,27 @@ def main(argv: list[str]) -> int:
                 P.attach_bt(items)
             except Exception as e:
                 print("bt backfill failed:", type(e).__name__, str(e)[:120])
+    # 當沖 5 檔：收盤後（或隔天清晨）就先算好「下個交易日」的候選。
+    # GitHub 的定時工作常延後好幾個小時，不能只靠 06:50 那一次。
+    tday = target_day(now)
+    have = any(d.get("date") == tday and d.get("picks") for d in arch.get("days", [])) \
+        or (arch.get("next_picks") or {}).get("for_date") == tday
+    after_close = now.weekday() < 5 and (now.hour, now.minute) >= (13, 35)
+    if not have and (after_close or tday == now.date().isoformat() or now.weekday() >= 5):
+        try:
+            picks = P.build()
+            if picks.get("items"):
+                arch["next_picks"] = dict(picks, for_date=tday)
+                print("picks built for", tday, "from", picks.get("signal_date"), [x["code"] for x in picks["items"]])
+            else:
+                print("picks empty: universe", picks.get("universe_n"))
+        except Exception as e:
+            print("picks failed:", type(e).__name__, str(e)[:160])
+    arch = place_next_picks(arch, now.date().isoformat())
     if snap:
         day, ph = now.date().isoformat(), phase(now)
         entry = next((d for d in arch.get("days", []) if d["date"] == day), {})
         picks = results = None
-        if ph == "pre" and not entry.get("picks"):
-            try:
-                picks = P.build()
-            except Exception as e:
-                print("picks failed:", type(e).__name__, str(e)[:160])
         if ph == "close" and entry.get("picks"):
             results = score_day(entry, day) or None
         arch = update(arch, snap, now, picks, results)
