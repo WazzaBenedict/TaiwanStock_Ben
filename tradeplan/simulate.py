@@ -26,14 +26,11 @@ def _locked(o, h, l, c, prev_c, up: bool) -> bool:
     return c >= prev_c * 1.095 if up else c <= prev_c * 0.905
 
 
-def simulate(df: pd.DataFrame, setup: pd.Series, rules: PlanRules = PlanRules(),
-             costs: Costs = Costs(), etf: bool = False) -> list[dict]:
-    if df is None or len(df) < 30:
-        return []
+def _prep(df: pd.DataFrame) -> tuple:
+    """跟 setup 無關的欄位只算一次（隨機對照組會用同一份 df 跑 200 次）。"""
     df = df.reset_index(drop=True).copy()
     for col in ("開盤價", "最高價", "最低價"):          # 缺值以收盤價補，避免 NaN 比較靜默失效
         df[col] = df[col].fillna(df["收盤價"])
-    setup = pd.Series(setup).reset_index(drop=True).fillna(False).astype(bool)
     o = df["開盤價"].astype(float).values
     h = df["最高價"].astype(float).values
     l = df["最低價"].astype(float).values
@@ -41,6 +38,15 @@ def simulate(df: pd.DataFrame, setup: pd.Series, rules: PlanRules = PlanRules(),
     dates = pd.to_datetime(df["日期"]).dt.strftime("%Y-%m-%d").values
     atr = atr14(df).values
     ma5 = df["收盤價"].rolling(5).mean().values
+    return o, h, l, c, dates, atr, ma5
+
+
+def simulate(df: pd.DataFrame, setup: pd.Series, rules: PlanRules = PlanRules(),
+             costs: Costs = Costs(), etf: bool = False, _arrays: tuple | None = None) -> list[dict]:
+    if df is None or len(df) < 30:
+        return []
+    o, h, l, c, dates, atr, ma5 = _arrays if _arrays is not None else _prep(df)
+    setup = pd.Series(setup).reset_index(drop=True).fillna(False).astype(bool).to_numpy()
     n = len(df)
     ck = (costs, etf)   # 成本依每筆成交價算（1 張，含最低手續費）
 
@@ -95,7 +101,7 @@ def simulate(df: pd.DataFrame, setup: pd.Series, rules: PlanRules = PlanRules(),
             if order is not None and d >= order["expire"]:
                 order = None
         # ── 沒單：第 d 天收盤是否出現條件（明天起掛單）──
-        if order is None and pos is None and setup.iloc[d]:
+        if order is None and pos is None and setup[d]:
             lv = levels_at(c[d], _nz(ma5[d]), _nz(atr[d]), rules, etf)
             if lv:
                 order = {"lv": lv, "expire": d + rules.entry_valid_days, "date": dates[d]}
@@ -177,10 +183,11 @@ def random_entry_control(df: pd.DataFrame, n_trades: int, rules: PlanRules = Pla
     eligible = np.arange(start, len(df) - 1)
     k = min(n_trades, len(eligible))
     means, counts = [], []
+    arrays = _prep(df)
     for _ in range(runs):
         mask = np.zeros(len(df), dtype=bool)
         mask[rng.choice(eligible, size=k, replace=False)] = True
-        tr = simulate(df, pd.Series(mask), rules, costs, etf)
+        tr = simulate(df, mask, rules, costs, etf, _arrays=arrays)
         if tr:
             means.append(float(np.mean([t["ret"] for t in tr])))
             counts.append(len(tr))
