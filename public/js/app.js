@@ -7,7 +7,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="15.5.0";
+var FRONTEND_VERSION="15.5.1";
 // 美股功能先收起來（程式碼保留）。要恢復請改成 true。
 var ENABLE_US=false;
 
@@ -24,6 +24,7 @@ function initFeeSetting(){
     if(typeof CURRENT_ID!=="undefined"&&CURRENT_ID&&typeof loadTradePlanV2==="function")loadTradePlanV2(CURRENT_ID);};}
 }
 var RELEASE_NOTES=[
+  "V15.5.1：效能小修。總覽的今日卡與每日報告不再等登入與圖表元件，第一次打開約快 1.5 秒；交易計畫卡（進場價、目標價）後端計算快約 10 倍；自選股先顯示上次價格；系統健康檢查改成打開「帳號」頁才跑。",
   "V15.5：每週體檢第 2 輪。研究室與帳本的 0050 影子改用含股利的還原價（除息日不再出現假的下跌）；當沖 5 檔改成收盤後就先算好「下個交易日」的候選，首頁與報告頁直接顯示，不再因排程延後而整天沒有候選；已對答案的日子也保留個股回測表與進場價；開盤方向 ±0.05% 內算持平；帳本同一天買賣優先配成當沖；排程改到冷門時段並多排幾次；手機報告表更好讀、當沖不做的日子加警示。",
   "V15.4.1：「股癌紀律提醒」新增 3 條（賠錢後不放大部位扳回、淨值一直掉先降部位拉高現金、賠錢的部位不加碼），共 13 條；第 1 條改寫成「不要當沖追隔日漲停」，說明它只針對當沖。大盤風險燈紅燈時改顯示「先降部位、拉高現金」。",
   "V15.4：當沖 5 檔每檔附個股回測（2023-06 起，扣元大成本）：B 版筆數、收盤賣與到目標賣的平均報酬與勝率、2025 年後表現、每天都買的對照組，並標示「通過」或「只模擬」",
@@ -223,7 +224,6 @@ function refreshAuthHealthStatus(){
   try{
     setHealth("hFrontend","V"+FRONTEND_VERSION,"health-ok");
     setHealth("hFirestore",currentUser?"Connected":"待登入",currentUser?"health-ok":"health-warn");
-    loadSystemHealth();
   }catch(e){console.warn("refresh auth health", e&&e.message?e.message:e);}
 }
 
@@ -231,6 +231,7 @@ async function onUserLogin(user) {
   renderAccountUI(user);
   saveUserProfile(user).catch(function(){});
   await loadWatchlist();
+  restoreWLCache(); renderWL();   // 先顯示上次的自選股價格，不等後面的資料
   await loadPortfolios("tw");
   await loadTradePlans(); renderTradePlans();
   await loadPositions(); renderPositions();
@@ -585,7 +586,7 @@ function showPage(pageId) {
   var p=$I(pageId); if(p) p.classList.add("active");
   document.querySelectorAll(".nav-tab").forEach(function(b){if(b.dataset.page===pageId)b.classList.add("active");});
   if(pageId==="p-market"&&currentUser){loadMacro();loadSentiment();}
-  if(pageId==="p-account") renderAccountUI(currentUser);
+  if(pageId==="p-account"){renderAccountUI(currentUser);try{loadSystemHealth();}catch(e){}}
   try{
     if(pageId==="p-ledger"&&window.LEDGER) LEDGER.open();
     if(pageId==="p-learn"&&window.LAB) LAB.open();
