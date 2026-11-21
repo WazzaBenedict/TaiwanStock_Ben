@@ -1,6 +1,6 @@
 name: Deploy frontend
 # 發布 public/ 到 Firebase Hosting，並在發布前產生「今日」快照 public/data/today.json 與每日報告存檔 public/data/reports.json。
-# 觸發：合併到 main、手動、以及交易日 06:50／13:45／19:00（台北時間）定時更新快照。
+# 觸發：合併到 main、手動、以及交易日盤前／收盤／晚上（台北時間）多個時段定時更新快照。
 # 需要 repo secret FIREBASE_SERVICE_ACCOUNT；選用 FINMIND_TOKEN（提高夜盤資料額度）。
 # 注意：GitHub 的定時工作可能延遲數分鐘；repo 60 天沒有任何活動時，定時工作會被自動停用。
 on:
@@ -8,9 +8,12 @@ on:
     branches: [main]
     paths: ["public/**", "pipeline/**", "cloudstore.py", "firebase.json", ".firebaserc", ".github/workflows/deploy-hosting.yml"]
   schedule:
-    - cron: "50 22 * * 0-4"   # 06:50 台北，週一至週五（盤前）
-    - cron: "45 5 * * 1-5"    # 13:45 台北（收盤）
-    - cron: "0 11 * * 1-5"    # 19:00 台北（收盤價定稿）
+    # GitHub 定時工作整點常延後好幾小時，改用冷門分鐘並多排幾個時段；每次都會自動補算缺的報告與候選
+    - cron: "17 21 * * 0-4"   # 05:17 台北（盤前，美股已收）
+    - cron: "41 22 * * 0-4"   # 06:41 台北（盤前）
+    - cron: "37 5 * * 1-5"    # 13:37 台北（收盤）
+    - cron: "37 6 * * 1-5"    # 14:37 台北（收盤，補跑）
+    - cron: "13 11 * * 1-5"   # 19:13 台北（收盤價定稿）
   workflow_dispatch:
 concurrency:
   group: deploy-hosting

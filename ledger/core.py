@@ -10,7 +10,7 @@
 - 當沖：這筆買進金額若當天放在 0050，開盤到收盤的損益。
 - 隔日以上：這筆買進金額若在進場日收盤買 0050，抱到出場日收盤的損益。
 - 未平倉：抱到最新收盤。
-影子帳不扣 0050 的買賣成本，所以對 0050 略為有利，方向上偏保守。
+影子帳不扣 0050 的買賣成本；價格用含股利的還原價（抓得到時），除息不會讓 0050 看起來比較差。
 """
 from __future__ import annotations
 
@@ -118,6 +118,7 @@ def compute(fills: list[dict], bars0050: dict | None = None, last_prices: dict |
 
         # 賣出：先進先出配對
         queue = lots.get(f["code"], [])
+        queue.sort(key=lambda l: l["date"] != f["date"])   # 同一天買的先配（才是當沖），其餘照先進先出
         remain = f["shares"]
         matched = []
         while remain > 0 and queue:
@@ -188,7 +189,7 @@ def compute(fills: list[dict], bars0050: dict | None = None, last_prices: dict |
             "rules": rules, "fees": {"name": fees.name, "fee_discount": fees.fee_discount,
                                      "fills_with_actual_costs": used_actual_costs, "fills": len(rows)},
             "notes": ["損益已扣手續費與交易稅；成交紀錄有實際費用時用實際值，否則用元大電子下單費率估算。",
-                      "影子 0050：當沖比當天 0050 開盤到收盤；隔日以上比進場日收盤到出場日收盤；未扣 0050 買賣成本。",
+                      "影子 0050：當沖比當天 0050 開盤到收盤；隔日以上比進場日收盤到出場日收盤；未扣 0050 買賣成本；價格含股利（還原價）。",
                       "先進先出配對；同一天買進並賣出視為當沖（交易稅 0.15%）。成交紀錄沒有時間時，同一天視為先買後賣，無法檢查先賣後買與 13:00 後進場。"]}
 
 

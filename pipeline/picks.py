@@ -81,7 +81,9 @@ def rank(rows: list[dict], top: int = TOP) -> tuple[list[dict], int]:
     """過濾母體、算分數，回傳（前 top 名, 母體檔數）。只用最新一個交易日的資料。"""
     if not rows:
         return [], 0
-    last = max(r["date"] for r in rows)
+    # 用多數股票的最新日期；少數股票多一根（或少一根）不能把整個母體刷掉
+    from collections import Counter
+    last = Counter(r["date"] for r in rows).most_common(1)[0][0]
     pool = [dict(r) for r in rows if r["date"] == last and r["val20"] >= MIN_VALUE
             and MIN_PRICE <= r["close"] <= MAX_PRICE and r["atr"] >= MIN_ATR]
     for r in pool:
@@ -109,7 +111,7 @@ def score(pick: dict, bar: dict, fees: BrokerFees | None = None) -> dict:
     net1 = fees.round_trip(o + tick(o), exit_p - tick(exit_p), 1000, daytrade=True)["net_pnl"]
     # 開盤跳空讓 1 張超過單筆上限 NT$50,000 時，照規則不買
     over_cap = o * 1000 > MAX_NOTIONAL
-    taken = o <= pick["buy_b_max"] and not over_cap
+    taken = round(o, 2) <= round(pick["buy_b_max"], 2) and not over_cap
     if over_cap:
         net0 = net1 = 0
     return {"code": pick["code"], "name": pick["name"], "open": round(o, 2), "close": round(c, 2),
@@ -133,7 +135,7 @@ def bt_trade(o: float, h: float, low: float, c: float, target: float | None, fee
     stop = o * STOP
     if low <= stop:
         ex = floor_tick(stop)
-    elif target is not None and h >= target:
+    elif target is not None and h > target:     # 剛好碰到不算成交（保守）
         ex = target
     else:
         ex = c
@@ -143,7 +145,8 @@ def bt_trade(o: float, h: float, low: float, c: float, target: float | None, fee
 def backtest(bars: list[dict], start: str = BT_START, fees: BrokerFees | None = None) -> dict:
     """bars 由舊到新。回傳各版本的筆數、平均淨報酬%、勝率、2025 後平均。
     A：每天開盤買（同一檔隨便哪天進場，當作對照組）；B：開盤 ≤ 昨收×0.99 才買。
-    close＝收盤賣（R1 原規則）；target＝漲到 開盤×(1+前一日 ATR14%) 就賣。"""
+    close＝收盤賣（R1 原規則）；target＝漲到 進場價（昨收×0.99）×(1+前一日 ATR14%) 就賣，和報告顯示的參考目標相同。
+    2025 後仍在 R1 的研究期間內，不是真正的樣本外。"""
     fees = fees or BrokerFees()
     rows = {"A_close": [], "B_close": [], "B_close_t1": [], "A_target": [], "B_target": []}
     for i in range(15, len(bars)):
@@ -154,12 +157,13 @@ def backtest(bars: list[dict], start: str = BT_START, fees: BrokerFees | None = 
               for k in range(i - 14, i)]
         atr = sum(tr) / 14 / pb["c"]
         o, h, low, c = b["o"], b["h"], b["l"], b["c"]
-        tgt = ceil_tick(o * (1 + atr))
+        lim = floor_tick(pb["c"] * B_GAP)          # 和報告上顯示的進場價、參考目標同一個算法
+        tgt = ceil_tick(lim * (1 + atr))
         a0 = bt_trade(o, h, low, c, None, fees)
         at = bt_trade(o, h, low, c, tgt, fees)
         rows["A_close"].append((b["d"], a0))
         rows["A_target"].append((b["d"], at))
-        if o <= pb["c"] * B_GAP:
+        if o <= lim:
             rows["B_close"].append((b["d"], a0))
             rows["B_close_t1"].append((b["d"], bt_trade(o, h, low, c, None, fees, slip=1)))
             rows["B_target"].append((b["d"], at))
@@ -174,7 +178,7 @@ def backtest(bars: list[dict], start: str = BT_START, fees: BrokerFees | None = 
     out = {k: stat(v) for k, v in rows.items()}
     bc, bt_ = out["B_close"], out["B_target"]
     out["from"] = start
-    out["pass"] = bool(bc["n"] >= 20 and (bc["avg"] or 0) > 0 and (bc["oos"] or 0) > 0)
+    out["pass"] = bool(bc["n"] >= 20 and (bc["avg"] or 0) > 0 and (bc["oos"] or 0) > 0 and bc["oos_n"] >= 10)
     out["target_better"] = bool(bc["n"] and bt_["avg"] is not None and bt_["avg"] > bc["avg"])
     return out
 
@@ -253,7 +257,8 @@ def daily(cl: httpx.Client, code: str, mkt: str, rng: str = "2y") -> list[dict]:
         d = time.strftime("%Y-%m-%d", time.gmtime(ts + off))
         if out and out[-1]["d"] == d:
             continue
-        out.append({"d": d, "o": o, "h": h, "l": low, "c": c, "v": v})
+        # Yahoo 給的是 float32，28.85 會變 28.850000381；四捨五入到分，避免「等於限價」被判成高於
+        out.append({"d": d, "o": round(o, 2), "h": round(h, 2), "l": round(low, 2), "c": round(c, 2), "v": v})
     return out
 
 

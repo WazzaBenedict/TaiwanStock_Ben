@@ -46,7 +46,7 @@ var TODAY=null;
       var id=b.getAttribute("data-td-stock");
       if(typeof loadStock==="function"&&typeof showPage==="function"){showPage("p-trade");loadStock(id);}
     });});
-    var be=$("hqBrief");if(be&&d.conclusion)be.textContent=d.conclusion;
+    if(typeof renderHQ==="function"){try{renderHQ();}catch(x){}}else{var be=$("hqBrief");if(be&&d.conclusion)be.textContent=d.conclusion;}
   }
   function fail(msg){var box=$("todayCard");if(box){box.innerHTML='<div class="td-head"><span class="td-kicker">今日</span></div><div class="td-sub">'+e(msg)+'</div>';box.style.display="block";}}
   window.loadToday=function(){
@@ -55,7 +55,7 @@ var TODAY=null;
     }).then(function(d){
       if(!d||!d.generated_at)throw new Error("格式錯誤");
       TODAY=d;window.TODAY=d;render(d);if(typeof window.renderGooaye==="function")window.renderGooaye(d);
-    }).catch(function(err){fail("今日快照還沒準備好（"+(err.message||err)+"）。排程會在交易日 06:50、13:45、19:00 更新。");});
+    }).catch(function(err){fail("今日快照還沒準備好（"+(err.message||err)+"）。排程會在交易日盤前、收盤後與晚上 更新。");});
   };
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",window.loadToday);else window.loadToday();
   setInterval(function(){if(!document.hidden)window.loadToday();},10*60*1000);

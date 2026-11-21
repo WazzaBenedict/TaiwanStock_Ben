@@ -89,3 +89,29 @@ def test_backtest_target_and_stop():
     assert r["B_target"]["avg"] > r["B_close"]["avg"] - 5
     stop_day = P.bt_trade(29.0, 30.6, 28.0, 30.0, 30.2, P.BrokerFees())
     assert stop_day < 0
+
+
+def test_next_picks_flow():
+    from datetime import datetime
+    from pipeline import report as R
+    tpe = R.TPE
+    assert R.target_day(datetime(2026, 11, 20, 22, 0, tzinfo=tpe)) == "2026-11-23"   # 週五晚上 → 下週一
+    assert R.target_day(datetime(2026, 11, 23, 3, 0, tzinfo=tpe)) == "2026-11-23"    # 週一清晨 → 當天
+    assert R.target_day(datetime(2026, 11, 23, 11, 0, tzinfo=tpe)) == "2026-11-24"   # 盤中 → 明天
+    arch = {"days": [{"date": "2026-11-20", "results": [{"code": "1"}]}],
+            "next_picks": {"for_date": "2026-11-23", "version": "R1", "items": [{"code": "1102"}]}}
+    assert R.place_next_picks(arch, "2026-11-21") is arch                              # 還沒到，不動
+    out = R.place_next_picks(arch, "2026-11-23")
+    assert "next_picks" not in out and out["days"][0]["date"] == "2026-11-23"
+    assert out["days"][0]["picks"]["items"][0]["code"] == "1102" and "for_date" not in out["days"][0]["picks"]
+    keep = R.all_results({"results_all": {"2026-01-01": [{"code": "x"}]}, "days": arch["days"]})
+    assert set(keep) == {"2026-01-01", "2026-11-20"}
+
+
+def test_rank_uses_common_date():
+    from pipeline import picks as P
+    base = {"val20": 3e8, "close": 30.0, "atr": 0.02, "on20": 0, "max20": 0.01, "h52": 0.9, "r5": 0}
+    rows = [dict(base, code=str(1000 + i), name="x", mkt="TW", date="2026-11-20", on20=i / 100) for i in range(20)]
+    rows += [dict(base, code=str(2000 + i), name="y", mkt="TW", date="2026-11-21") for i in range(3)]
+    items, n = P.rank(rows)
+    assert n == 20 and len(items) == 5

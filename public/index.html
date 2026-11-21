@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>台股作戰室 V15.4.1</title>
+<title>台股作戰室 V15.5.0</title>
 <meta name="theme-color" content="#0b0f17"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -19,12 +19,12 @@
 <script defer src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <!-- Chart.js -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/app.css?v=15.4.1">
-<link rel="stylesheet" href="css/today.css?v=15.4.1">
-<link rel="stylesheet" href="css/ledger.css?v=15.4.1">
-<link rel="stylesheet" href="css/lab.css?v=15.4.1">
-<link rel="stylesheet" href="css/gooaye.css?v=15.4.1">
-<link rel="stylesheet" href="css/pro.css?v=15.4.1">
+<link rel="stylesheet" href="css/app.css?v=15.5.0">
+<link rel="stylesheet" href="css/today.css?v=15.5.0">
+<link rel="stylesheet" href="css/ledger.css?v=15.5.0">
+<link rel="stylesheet" href="css/lab.css?v=15.5.0">
+<link rel="stylesheet" href="css/gooaye.css?v=15.5.0">
+<link rel="stylesheet" href="css/pro.css?v=15.5.0">
 </head>
 <body>
 
@@ -45,7 +45,7 @@
       使用 Google 帳號登入
     </button>
     <div id="loginError"></div>
-    <div class="login-ver">版本 <b class="app-ver">V15.4.1</b></div>
+    <div class="login-ver">版本 <b class="app-ver">V15.5.0</b></div>
   </div>
 </div>
 
@@ -71,7 +71,7 @@
   <div class="logo">
     <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="8" fill="url(#bm2)"/><defs><linearGradient id="bm2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5b9dff"/><stop offset="1" stop-color="#3a5bd9"/></linearGradient></defs><path d="M6.5 18.5l4.5-5 3.5 3 6.5-8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="21" cy="8.5" r="1.8" fill="#fff"/></svg>
     <span class="brand-name">台股作戰室</span>
-    <span class="ver app-ver" title="目前版本">V15.4.1</span>
+    <span class="ver app-ver" title="目前版本">V15.5.0</span>
   </div>
   <div class="hdr-r">
     <div class="mkt-switcher us-only">
@@ -124,7 +124,7 @@
   <div class="hm-acts" id="hqQuick"></div>
   <div class="gy" id="gyCard"></div>
   <details class="hm-fold" id="hqNotes">
-    <summary><b class="app-ver">V15.4.1</b> 更新內容</summary>
+    <summary><b class="app-ver">V15.5.0</b> 更新內容</summary>
     <ul id="hqNotesList"></ul>
   </details>
   <details class="hm-fold">
@@ -405,7 +405,7 @@
 <div class="page" id="p-market">
   <div class="section">
     <div class="section-title">宏觀指標 <button class="ghost sm" id="btnLoadMacro" style="margin-left:auto">載入</button></div>
-    <div class="macro-grid" id="macroGrid"><div class="macro-item"><div class="macro-label">載入中</div><div class="macro-val">…</div></div></div>
+    <div class="macro-grid" id="macroGrid"><div class="macro-item"><div class="macro-label">按右上「載入」</div><div class="macro-val" style="font-size:13px">看匯率、美元、美債</div></div></div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px" id="macroNote"></div>
   </div>
   <div class="section">
@@ -661,7 +661,7 @@
       <label>停損 % <input id="rkStop" type="number" step="0.1" min="0.1" value="1.5" style="width:64px"></label>
       <button class="ghost sm" id="rkCheck">檢查</button>
     </div>
-    <details style="font-size:12px;margin-bottom:8px"><summary>我的上限設定</summary>
+    <details style="font-size:12px;margin-bottom:8px"><summary style="min-height:40px;display:flex;align-items:center;cursor:pointer">我的上限設定</summary>
       <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:6px">
         <label>交割金 <input id="rkCash" type="number" step="100" style="width:80px"></label>
         <label>當沖額度 <input id="rkCredit" type="number" step="1000" style="width:96px"></label>
@@ -685,13 +685,13 @@
       扣掉元大電子下單手續費（依你的折扣、低消 20 元）、0.15% 當沖稅與 1 檔滑價，並和同一檔股票「隨機進場」比較。打不贏隨機進場就代表這個規則在這檔沒有優勢。
     </div>
     <div id="dtRule" style="font-size:12px;line-height:1.7;margin-bottom:8px"></div>
-    <div id="dtMsg" style="font-family:var(--mono);font-size:12px;color:var(--muted)"></div>
+    <div id="dtMsg" style="font-family:var(--mono);font-size:12px;color:var(--muted)">按「掃描」產生今天的候選（約 1 分鐘）。每天固定的 5 檔與進場價在「更多 → 報告」。</div>
     <div style="overflow-x:auto"><table class="dt-table" id="dtTable" style="display:none"><thead><tr>
       <th>股票</th><th>收盤</th><th>日內振幅</th><th>來回成本</th><th>規則筆數</th><th>規則 平均R</th><th>隨機 平均R</th><th>結論</th>
       <th>今日 進場</th><th>停損</th><th>停利</th><th>狀態</th><th></th></tr></thead><tbody></tbody></table></div>
     <div id="dtFoot" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px"></div>
   </div>
-  <link rel="stylesheet" href="css/daytrade.css?v=15.4.1">
+  <link rel="stylesheet" href="css/daytrade.css?v=15.5.0">
   <div class="section" id="tmSection">
     <div class="section-title"><div class="section-title-left">台股時光機 <span class="d-badge">研究／模擬，非投資建議</span></div></div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px">
@@ -718,7 +718,7 @@
     <div id="tmOut" style="display:none"></div>
     <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:10px">方法改寫自 Jake Schincariol 的 trader-timemachine（MIT 授權）。</div>
   </div>
-  <link rel="stylesheet" href="css/timemachine.css?v=15.4.1">
+  <link rel="stylesheet" href="css/timemachine.css?v=15.5.0">
 </div>
 
 <div class="page" id="p-account">
@@ -760,7 +760,7 @@
       <div class="row" style="gap:6px"><button class="ghost sm" id="btnHealthToggle">收合</button><button class="ghost sm" id="btnHealthRefresh">重新檢查</button></div>
     </div>
     <div class="health-grid" id="healthGrid">
-      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V15.4.1</b></div>
+      <div class="health-chip"><span>Frontend</span><b id="hFrontend">V15.5.0</b></div>
       <div class="health-chip"><span>Backend</span><b id="hBackend">—</b></div>
       <div class="health-chip"><span>Firestore</span><b id="hFirestore">待登入</b></div>
       <div class="health-chip"><span>Yahoo</span><b id="hYahoo">—</b></div>
@@ -947,19 +947,19 @@
 <div class="footer">
   本工具僅供技術分析學習參考，不構成任何投資建議。台股慣例：上漲紅色，下跌綠色。股市有風險，投資人應自行判斷，盈虧自負。<br>
   資料來源：TWSE MIS · Yahoo Finance · TWSE Official · FinMind · Google News RSS（均為免費公開）<br>
-  台股作戰室 <span class="app-ver">V15.4.1</span>
+  台股作戰室 <span class="app-ver">V15.5.0</span>
 </div>
 
-<script defer src="js/app.js?v=15.4.1"></script>
-<script defer src="js/gooaye.js?v=15.4.1"></script>
-<script defer src="js/today.js?v=15.4.1"></script>
-<script defer src="js/ledger.js?v=15.4.1"></script>
-<script defer src="js/lab.js?v=15.4.1"></script>
-<script defer src="js/reports.js?v=15.4.1"></script>
+<script defer src="js/app.js?v=15.5.0"></script>
+<script defer src="js/gooaye.js?v=15.5.0"></script>
+<script defer src="js/today.js?v=15.5.0"></script>
+<script defer src="js/ledger.js?v=15.5.0"></script>
+<script defer src="js/lab.js?v=15.5.0"></script>
+<script defer src="js/reports.js?v=15.5.0"></script>
 <!-- 這幾個模組用到 app.js 的共用函式（$I、API…），defer 時必須排在 app.js 之後 -->
-<script defer src="js/dt-risk.js?v=15.4.1"></script>
-<script defer src="js/dt-screen.js?v=15.4.1"></script>
-<script defer src="js/timemachine.js?v=15.4.1"></script>
+<script defer src="js/dt-risk.js?v=15.5.0"></script>
+<script defer src="js/dt-screen.js?v=15.5.0"></script>
+<script defer src="js/timemachine.js?v=15.5.0"></script>
 <div id="toast" class="toast"></div>
 </body>
 </html>

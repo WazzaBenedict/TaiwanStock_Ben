@@ -7,7 +7,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="15.4.1";
+var FRONTEND_VERSION="15.5.0";
 // 美股功能先收起來（程式碼保留）。要恢復請改成 true。
 var ENABLE_US=false;
 
@@ -24,6 +24,7 @@ function initFeeSetting(){
     if(typeof CURRENT_ID!=="undefined"&&CURRENT_ID&&typeof loadTradePlanV2==="function")loadTradePlanV2(CURRENT_ID);};}
 }
 var RELEASE_NOTES=[
+  "V15.5：每週體檢第 2 輪。研究室與帳本的 0050 影子改用含股利的還原價（除息日不再出現假的下跌）；當沖 5 檔改成收盤後就先算好「下個交易日」的候選，首頁與報告頁直接顯示，不再因排程延後而整天沒有候選；已對答案的日子也保留個股回測表與進場價；開盤方向 ±0.05% 內算持平；帳本同一天買賣優先配成當沖；排程改到冷門時段並多排幾次；手機報告表更好讀、當沖不做的日子加警示。",
   "V15.4.1：「股癌紀律提醒」新增 3 條（賠錢後不放大部位扳回、淨值一直掉先降部位拉高現金、賠錢的部位不加碼），共 13 條；第 1 條改寫成「不要當沖追隔日漲停」，說明它只針對當沖。大盤風險燈紅燈時改顯示「先降部位、拉高現金」。",
   "V15.4：當沖 5 檔每檔附個股回測（2023-06 起，扣元大成本）：B 版筆數、收盤賣與到目標賣的平均報酬與勝率、2025 年後表現、每天都買的對照組，並標示「通過」或「只模擬」",
   "V15.3：每日報告的當沖 5 檔加上操作計畫：進場價（掛限價）、入場時間（08:30–09:00 掛單、09:00 開盤成交）、停損價、參考目標價（未回測，規則仍是收盤賣）",
@@ -112,7 +113,7 @@ function renderHQ(){
   var pe=$I("hqPhase");if(pe){pe.textContent=ph.label;pe.className="hm-phase"+(ph.key==="live"||ph.key==="open-soon"?" live":"");}
   var ce=$I("hqClock");if(ce)ce.textContent="台北 "+ph.t.label;
   var de=$I("hqDate");if(de){try{de.textContent=new Intl.DateTimeFormat("zh-TW",{timeZone:"Asia/Taipei",month:"long",day:"numeric",weekday:"long"}).format(new Date());}catch(e){}}
-  var be=$I("hqBrief");if(be)be.textContent=(window.TODAY&&TODAY.conclusion)?TODAY.conclusion:(PHASE_BRIEF[ph.key]||"");
+  var be=$I("hqBrief");if(be)be.textContent=(window.TODAY&&TODAY.conclusion)?((ph.key==="closed"?"下個交易日：":"")+TODAY.conclusion):(PHASE_BRIEF[ph.key]||"");
   var qk=$I("hqQuick");
   if(qk&&!qk.firstChild)qk.innerHTML=HOME_ACTIONS.map(function(m){return '<button class="hm-act" data-hq-go="'+m.page+'"><span class="hm-act-ic">'+icon(m.ic)+'</span><span class="hm-act-tx"><b>'+m.t+'</b><small>'+m.d+'</small></span>'+icon("chev")+'</button>';}).join("");
   initFeeSetting();
@@ -1241,7 +1242,7 @@ async function loadMacro() {
   grid.innerHTML='<div class="macro-item"><div class="macro-label">載入中</div><div class="macro-val">…</div></div>';
   try {
     var r=await apiFetch(API+"/api/macro",{},12000);var d=await r.json();
-    var items=[{label:"USD/TWD",key:"usd_twd",dd:3},{label:"DXY 美元",key:"dxy",dd:2},{label:"NASDAQ Fut",key:"nasdaq_futures",dd:0},{label:"SOX",key:"sox",dd:0},{label:"美債10Y%",key:"us10y",dd:2}];
+    var items=[{label:"美元／台幣",key:"usd_twd",dd:3},{label:"DXY 美元",key:"dxy",dd:2},{label:"那斯達克期貨",key:"nasdaq_futures",dd:0},{label:"費城半導體",key:"sox",dd:0},{label:"美債10Y%",key:"us10y",dd:2}];
     grid.innerHTML=items.map(function(it){var v=d[it.key];return'<div class="macro-item"><div class="macro-label">'+it.label+'</div><div class="macro-val">'+(v!=null?Number(v).toFixed(it.dd):"—")+'</div></div>';}).join("");
     var noteEl=$I("macroNote");if(noteEl){var adj=d.macro_adj||0;noteEl.textContent=(d.risk_note||"")+(adj?"  宏觀調整："+(adj>0?"+":"")+adj:"");noteEl.style.color=adj>=0?"var(--down)":"var(--up)";}
   } catch(e) { if(grid)grid.innerHTML='<div class="macro-item"><div class="macro-label" style="color:var(--muted)">宏觀資料暫時無法取得</div></div>'; }

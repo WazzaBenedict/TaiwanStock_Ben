@@ -14,7 +14,7 @@ import cloudstore
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-APP_VERSION = "15.4.1"  # 每次發版只改這一行；前端在 public/js/app.js 的 FRONTEND_VERSION
+APP_VERSION = "15.5.0"  # 每次發版只改這一行；前端在 public/js/app.js 的 FRONTEND_VERSION
 
 app = FastAPI(title="台股作戰室 API", version=APP_VERSION)
 _raw = os.getenv("ALLOWED_ORIGINS",
@@ -448,11 +448,14 @@ async def _ffy(sid, days, cl):
             res=res[0]; ts_a=res.get("timestamp",[])
             q=res.get("indicators",{}).get("quote",[{}])[0]
             o,h,l,c,v=q.get("open",[]),q.get("high",[]),q.get("low",[]),q.get("close",[]),q.get("volume",[])
+            # 還原收盤價（含股利）：比較報酬（例如帳本的影子 0050）要用這個，技術指標仍用原始價
+            adj=((res.get("indicators",{}).get("adjclose") or [{}])[0] or {}).get("adjclose") or []
             if not ts_a or not c: continue
             recs=[{"日期":pd.to_datetime(ts,unit="s",utc=True).tz_convert("Asia/Taipei").date(),
                    "成交股數":(v[i] if i<len(v) else 0) or 0,
                    "開盤價":o[i] if i<len(o) else c[i],"最高價":h[i] if i<len(h) else c[i],
-                   "最低價":l[i] if i<len(l) else c[i],"收盤價":c[i]}
+                   "最低價":l[i] if i<len(l) else c[i],"收盤價":c[i],
+                   "還原收盤價":(adj[i] if i<len(adj) and adj[i] is not None else c[i])}
                   for i,ts in enumerate(ts_a) if i<len(c) and c[i] is not None]
             if not recs: continue
             df=pd.DataFrame(recs); df["日期"]=pd.to_datetime(df["日期"]); return df.sort_values("日期").reset_index(drop=True)

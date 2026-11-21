@@ -6,7 +6,8 @@
 - 上線後：從 LIVE_START 起，規則寫死之後才發生的日子，每天自動累積，最可信
 
 每筆交易都扣元大成本（twcosts），並和「同一筆錢同期放 0050」比較。
-標籤由程式依固定門檻判定，不靠人工挑選。價格未含股利，對買進持有略為不利。
+標籤由程式依固定門檻判定，不靠人工挑選。
+價格用含股利的還原價（v15.5 起）：除息日不會被當成大跌，持有期間的股利也算進報酬；0050 對照組同樣用還原價。
 """
 from __future__ import annotations
 
@@ -53,7 +54,7 @@ def rule_gap_up_daytrade(bars, gap=1.0, **_):
 
 
 def rule_overnight(bars, **_):
-    return [{"d_in": p["d"], "d_out": b["d"], "buy": p["c"], "sell": b["o"], "daytrade": False}
+    return [{"d_in": p["d"], "d_out": b["d"], "buy": p["c"], "sell": b["o"], "daytrade": False, "sell_at_open": True}
             for p, b in zip(bars, bars[1:]) if b["o"]]
 
 
@@ -390,7 +391,8 @@ def evaluate(rule: dict, bars, bench: list[dict], today: str, fees=None, trades=
             base = bi["o"] if t["daytrade"] or t.get("at_open") else bi["c"]
             if not base:
                 continue
-            row = {"net": trade_net(t["buy"], t["sell"], code, t["daytrade"], fees), "bench": uncond if uncond is not None else bo["c"] / base - 1}
+            end = bo["o"] if t.get("sell_at_open") and bo.get("o") else bo["c"]   # 對照組和交易用同一段時間
+            row = {"net": trade_net(t["buy"], t["sell"], code, t["daytrade"], fees), "bench": uncond if uncond is not None else end / base - 1}
             if pool_bench is not None:
                 pb = pool_bench.get((t["d_in"], t["d_out"], bool(t.get("at_open"))))
                 if pb is None:
@@ -433,8 +435,11 @@ def yahoo(cl: httpx.Client, code: str, rng: str = "10y") -> list[dict]:
                 if not c or c <= 0:
                     continue
                 d = day(ts)
-                rows.append({"d": d, "o": q["open"][k], "h": q["high"][k], "l": q["low"][k], "c": c,
-                             "a": adj[k] if k < len(adj) and adj[k] else c, "div": d in divs})
+                a = adj[k] if k < len(adj) and adj[k] else c
+                f = a / c   # 還原比例：開高低收同比例調整，報酬與訊號都含股利
+                sc = lambda x: x * f if x else x
+                rows.append({"d": d, "o": sc(q["open"][k]), "h": sc(q["high"][k]), "l": sc(q["low"][k]), "c": a,
+                             "rc": c, "a": a, "div": d in divs})
             if len(rows) > 250:
                 return rows
         except Exception:
