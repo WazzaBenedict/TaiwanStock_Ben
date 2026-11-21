@@ -7,7 +7,7 @@ function safeBind(id, evt, fn) {
   try { var el=document.getElementById(id); if(el) el.addEventListener(evt,fn); } catch(e){}
 }
 
-var FRONTEND_VERSION="15.4.1";
+var FRONTEND_VERSION="15.5.0";
 // 美股功能先收起來（程式碼保留）。要恢復請改成 true。
 var ENABLE_US=false;
 
@@ -24,6 +24,7 @@ function initFeeSetting(){
     if(typeof CURRENT_ID!=="undefined"&&CURRENT_ID&&typeof loadTradePlanV2==="function")loadTradePlanV2(CURRENT_ID);};}
 }
 var RELEASE_NOTES=[
+  "V15.5：每週體檢第 2 輪。研究室與帳本的 0050 影子改用含股利的還原價（除息日不再出現假的下跌）；當沖 5 檔改成收盤後就先算好「下個交易日」的候選，首頁與報告頁直接顯示，不再因排程延後而整天沒有候選；已對答案的日子也保留個股回測表與進場價；開盤方向 ±0.05% 內算持平；帳本同一天買賣優先配成當沖；排程改到冷門時段並多排幾次；手機報告表更好讀、當沖不做的日子加警示。",
   "V15.4.1：「股癌紀律提醒」新增 3 條（賠錢後不放大部位扳回、淨值一直掉先降部位拉高現金、賠錢的部位不加碼），共 13 條；第 1 條改寫成「不要當沖追隔日漲停」，說明它只針對當沖。大盤風險燈紅燈時改顯示「先降部位、拉高現金」。",
   "V15.4：當沖 5 檔每檔附個股回測（2023-06 起，扣元大成本）：B 版筆數、收盤賣與到目標賣的平均報酬與勝率、2025 年後表現、每天都買的對照組，並標示「通過」或「只模擬」",
   "V15.3：每日報告的當沖 5 檔加上操作計畫：進場價（掛限價）、入場時間（08:30–09:00 掛單、09:00 開盤成交）、停損價、參考目標價（未回測，規則仍是收盤賣）",

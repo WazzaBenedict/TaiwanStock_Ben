@@ -174,7 +174,10 @@ def main(argv: list[str]) -> int:
     if not have and (after_close or tday == now.date().isoformat() or now.weekday() >= 5):
         try:
             picks = P.build()
-            if picks.get("items"):
+            if picks.get("items") and after_close and picks.get("signal_date") != now.date().isoformat():
+                # 收盤後跑，但 Yahoo 還沒有今天的日線：先不存，等下一次排程再算
+                print("picks skipped: signal_date", picks.get("signal_date"), "not today")
+            elif picks.get("items"):
                 arch["next_picks"] = dict(picks, for_date=tday)
                 print("picks built for", tday, "from", picks.get("signal_date"), [x["code"] for x in picks["items"]])
             else:

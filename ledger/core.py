@@ -118,6 +118,7 @@ def compute(fills: list[dict], bars0050: dict | None = None, last_prices: dict |
 
         # 賣出：先進先出配對
         queue = lots.get(f["code"], [])
+        queue.sort(key=lambda l: l["date"] != f["date"])   # 同一天買的先配（才是當沖），其餘照先進先出
         remain = f["shares"]
         matched = []
         while remain > 0 and queue:

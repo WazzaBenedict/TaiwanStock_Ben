@@ -10,7 +10,7 @@ var LAB=(function(){
   }
   function render(){
     var box=$("labBody");if(!box)return;
-    if(!data){box.innerHTML='<div class="lb-na">評分表還沒產生，下一次排程（交易日 06:50、13:45、19:00）後會出現。</div>';return;}
+    if(!data){box.innerHTML='<div class="lb-na">評分表還沒產生，下一次排程（交易日盤前、收盤後與晚上）後會出現。</div>';return;}
     var c=data.counts||{},cls={"可用":"ok","研究中":"mid","未通過":"bad"};
     var h='<div class="lb-verdict">'+(c["可用"]?'目前有 '+c["可用"]+' 條規則通過檢驗。':'目前沒有任何一條規則通過檢驗。能做的最好選擇仍是持有 0050。')+'</div>';
     h+='<div class="lb-counts"><span class="lb-tag ok">可用 '+(c["可用"]||0)+'</span><span class="lb-tag mid">研究中 '+(c["研究中"]||0)+'</span><span class="lb-tag bad">未通過 '+(c["未通過"]||0)+'</span><span class="lb-age">'+e(data.today)+' 更新，已自動重算 '+(data.runs||1)+' 次</span></div>';

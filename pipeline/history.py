@@ -23,7 +23,9 @@ def update(log: list[dict], snap: dict) -> list[dict]:
     rows = {r["date"]: dict(r) for r in log}
     day = snap["generated_at"][:10]
     gap = snap.get("gap_estimate") or {}
-    if snap.get("phase") == "premarket" and gap.get("ok"):
+    from datetime import date
+    weekend = date.fromisoformat(day).weekday() >= 5   # 週末不是交易日，不記預估
+    if snap.get("phase") == "premarket" and gap.get("ok") and not weekend:
         sox = next((o["chg_pct"] for o in (snap.get("overnight") or {}).get("us", []) if o["symbol"] == "^SOX"), None)
         rows[day] = {"date": day, "pred_pct": gap["pct"], "basis": gap.get("basis"), "sox_pct": sox,
                      "actual_pct": rows.get(day, {}).get("actual_pct")}
